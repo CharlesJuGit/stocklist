@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多空標的</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-6">
+
+  <!-- 廣告區（可移除：刪掉此 section 即可） -->
+  <section id="ad-banner" class="mb-4 text-center text-xs text-gray-500">
+    <!-- 替換成你的 AdSense 代碼 -->
+    <div class="bg-gray-800 rounded p-2">廣告位置</div>
+  </section>
+
+  <h1 class="text-2xl font-bold text-center mb-6">多空標的</h1>
+
+  <!-- 免責聲明 -->
+  <p class="text-center text-xs text-gray-500 mb-6">本網站內容僅供參考，不構成任何投資建議，投資人應自行判斷並負擔風險。</p>
+
+  <!-- 多空兩欄 -->
+  <div class="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+    <!-- 多頭 -->
+    <div>
+      <h2 class="text-green-400 font-bold text-lg mb-3">▲ 多頭推薦</h2>
+      <div id="long-list" class="space-y-2"></div>
+    </div>
+    <!-- 空頭 -->
+    <div>
+      <h2 class="text-red-400 font-bold text-lg mb-3">▼ 空頭推薦</h2>
+      <div id="short-list" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- 詳細面板（彈出） -->
+  <div id="modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="modal-title" class="text-xl font-bold"></h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+
+      <!-- 三大法人 tab -->
+      <div class="flex gap-2 mb-3">
+        <button onclick="switchTab('1d')" id="tab-1d"
+          class="px-3 py-1 rounded text-sm bg-blue-600 text-white">當日</button>
+        <button onclick="switchTab('5d')" id="tab-5d"
+          class="px-3 py-1 rounded text-sm bg-gray-700 text-white">近5日</button>
+      </div>
+
+      <div id="chip-loading" class="text-gray-400 text-sm">載入中...</div>
+      <div id="chip-1d" class="hidden"></div>
+      <div id="chip-5d" class="hidden"></div>
+    </div>
+  </div>
+
+  <!-- 流量統計（Google Analytics，可移除：刪掉此 script） -->
+  <!-- 替換 G-XXXXXXXXXX 為你的 GA4 ID -->
+  <!--
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
+  -->
+
+  <!-- Buy Me a Coffee（替換 YOUR_USERNAME 為你的帳號） -->
+  <div class="text-center mt-10">
+    <a href="https://buymeacoffee.com/YOUR_USERNAME" target="_blank"
+      class="inline-block bg-yellow-400 hover:bg-yellow-300 text-black font-bold px-5 py-2 rounded-full text-sm transition">
+      ☕ Buy me a coffee
+    </a>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
