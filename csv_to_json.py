@@ -13,20 +13,30 @@ import ssl
 import urllib.request
 
 def fetch_stock_names():
-    """從證交所抓所有股票代號對應名稱"""
-    url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
-    try:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10, context=ctx) as res:
-            raw = res.read()
-            data = json.loads(raw.decode("utf-8"))
-            return {item["Code"]: item["Name"] for item in data}
-    except Exception as e:
-        print(f"[警告] 無法抓取股票名稱：{e}，名稱欄位將留空")
-        return {}
+    """從證交所＋櫃買中心抓所有股票代號對應名稱"""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    name_map = {}
+
+    sources = [
+        ("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", "Code", "Name"),
+        ("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes", "SecuritiesCompanyCode", "CompanyName"),
+    ]
+    for url, code_key, name_key in sources:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as res:
+                data = json.loads(res.read().decode("utf-8"))
+                for item in data:
+                    code = item.get(code_key, "").strip()
+                    name = item.get(name_key, "").strip()
+                    if code and name:
+                        name_map[code] = name
+        except Exception as e:
+            print(f"[警告] 無法抓取 {url}：{e}")
+
+    return name_map
 
 def read_csv(path):
     """讀取 CSV，取第一欄股號，去掉 .TW 後綴"""

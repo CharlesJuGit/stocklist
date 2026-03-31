@@ -6,8 +6,8 @@ async function loadStocks() {
   const res = await fetch('stocks.json');
   const data = await res.json();
 
-  renderList('long-list', data.long, 'green');
-  renderList('short-list', data.short, 'red');
+  renderList('long-list', data.long, 'red');
+  renderList('short-list', data.short, 'green');
 }
 
 function renderList(containerId, stocks, color) {
