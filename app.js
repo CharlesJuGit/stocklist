@@ -16,7 +16,7 @@ function renderList(containerId, stocks, color) {
     <button onclick="openModal('${s.id}', '${s.name}')"
       class="w-full text-left bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition">
       <span class="font-bold text-${color}-400">${s.id}</span>
-      <span class="ml-2">${s.name}</span>
+      <span class="ml-2 text-${color}-400">${s.name}</span>
     </button>
   `).join('');
 }
