@@ -52,6 +52,27 @@ async function switchTab(tab) {
   document.getElementById(`chip-${tab}`).classList.remove('hidden');
 }
 
+// 從 TWSE T86 抓單日個股三大法人，回傳 {date, foreign, trust, dealer} 或 null
+const t86Cache = {};
+async function fetchT86(date) {
+  if (t86Cache[date]) return t86Cache[date];
+  const url = `https://www.twse.com.tw/rwd/zh/fund/T86?date=${date}&selectType=ALLBUT0999&response=json`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.data || json.data.length === 0) return null;
+  t86Cache[date] = json.data;
+  return json.data;
+}
+
+// 從 T86 資料列取得個股數值
+function parseStockRow(row) {
+  return {
+    foreign: parseInt(row[4].replace(/,/g, '')) || 0,
+    trust:   parseInt(row[7].replace(/,/g, '')) || 0,
+    dealer:  parseInt(row[8].replace(/,/g, '')) || 0,
+  };
+}
+
 // 抓三大法人資料
 async function loadChipData(stockId, tab) {
   const cacheKey = `${stockId}-${tab}`;
@@ -61,10 +82,10 @@ async function loadChipData(stockId, tab) {
   }
 
   try {
-    // 使用 TWSE 公開 API
-    const today = getTwseDate();
-    const days = tab === '1d' ? 1 : 5;
-    const html = await fetchTwseChip(stockId, today, days);
+    const dates = getRecentTradingDates(7); // 多抓幾天以防假日
+    const html = tab === '1d'
+      ? await buildChip1d(stockId, dates)
+      : await buildChip5d(stockId, dates);
     chipCache[cacheKey] = html;
     document.getElementById(`chip-${tab}`).innerHTML = html;
   } catch (e) {
@@ -72,42 +93,88 @@ async function loadChipData(stockId, tab) {
   }
 }
 
-async function fetchTwseChip(stockId, date, days) {
-  // 證交所三大法人 API
-  const url = `https://www.twse.com.tw/rwd/zh/fund/T86?date=${date}&selectType=ALLBUT0999&response=json`;
-  const res = await fetch(url);
-  const json = await res.json();
+// 當日
+async function buildChip1d(stockId, dates) {
+  for (const date of dates) {
+    const data = await fetchT86(date);
+    if (!data) continue;
+    const row = data.find(r => r[0] === stockId);
+    if (!row) continue;
+    const { foreign, trust, dealer } = parseStockRow(row);
+    const total = foreign + trust + dealer;
+    const fmt_date = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+    return `
+      <table class="w-full text-sm">
+        <thead><tr class="text-gray-400 border-b border-gray-700">
+          <th class="text-left py-1">法人</th>
+          <th class="text-right py-1">買賣超（張）</th>
+        </tr></thead>
+        <tbody>
+          ${chipRow('外資', foreign)}
+          ${chipRow('投信', trust)}
+          ${chipRow('自營商', dealer)}
+          <tr class="border-t border-gray-700 font-bold">
+            <td class="py-1">主力合計</td>
+            <td class="text-right py-1 ${total >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="text-xs text-gray-500 mt-2">資料日期：${fmt_date}</p>`;
+  }
+  return '<p class="text-gray-400 text-sm">查無資料</p>';
+}
 
-  if (!json.data) return '<p class="text-gray-400 text-sm">無資料</p>';
+// 近5日
+async function buildChip5d(stockId, dates) {
+  const rows = [];
+  for (const date of dates) {
+    if (rows.length >= 5) break;
+    const data = await fetchT86(date);
+    if (!data) continue;
+    const row = data.find(r => r[0] === stockId);
+    if (!row) continue;
+    const { foreign, trust, dealer } = parseStockRow(row);
+    rows.push({ date, foreign, trust, dealer });
+  }
+  if (rows.length === 0) return '<p class="text-gray-400 text-sm">查無資料</p>';
 
-  // 找對應股票
-  const row = json.data.find(r => r[0] === stockId);
-  if (!row) return '<p class="text-gray-400 text-sm">查無此股票當日資料</p>';
+  const totForeign = rows.reduce((s, r) => s + r.foreign, 0);
+  const totTrust   = rows.reduce((s, r) => s + r.trust,   0);
+  const totDealer  = rows.reduce((s, r) => s + r.dealer,  0);
+  const totTotal   = totForeign + totTrust + totDealer;
 
-  // row 欄位：證券代號、證券名稱、外資買、外資賣、外資買賣超、投信買、投信賣、投信買賣超、自營商買賣超
-  const foreign = parseInt(row[4].replace(/,/g, ''));
-  const trust   = parseInt(row[7].replace(/,/g, ''));
-  const dealer  = parseInt(row[8].replace(/,/g, ''));
-  const total   = foreign + trust + dealer;
+  const dataRows = rows.map(r => {
+    const total = r.foreign + r.trust + r.dealer;
+    const fmt_date = r.date.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3');
+    const c = total >= 0 ? 'text-red-400' : 'text-green-400';
+    return `<tr class="border-b border-gray-800 text-xs">
+      <td class="py-1 text-gray-400">${fmt_date}</td>
+      <td class="text-right py-1 ${r.foreign >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(r.foreign)}</td>
+      <td class="text-right py-1 ${r.trust   >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(r.trust)}</td>
+      <td class="text-right py-1 ${r.dealer  >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(r.dealer)}</td>
+      <td class="text-right py-1 font-bold ${c}">${fmt(total)}</td>
+    </tr>`;
+  }).join('');
 
   return `
-    <table class="w-full text-sm">
+    <table class="w-full text-xs">
       <thead><tr class="text-gray-400 border-b border-gray-700">
-        <th class="text-left py-1">法人</th>
-        <th class="text-right py-1">買賣超（張）</th>
+        <th class="text-left py-1">日期</th>
+        <th class="text-right py-1">外資</th>
+        <th class="text-right py-1">投信</th>
+        <th class="text-right py-1">自營</th>
+        <th class="text-right py-1">合計</th>
       </tr></thead>
-      <tbody>
-        ${chipRow('外資', foreign)}
-        ${chipRow('投信', trust)}
-        ${chipRow('自營商', dealer)}
-        <tr class="border-t border-gray-700 font-bold">
-          <td class="py-1">合計</td>
-          <td class="text-right py-1 ${total >= 0 ? 'text-green-400' : 'text-red-400'}">${fmt(total)}</td>
-        </tr>
-      </tbody>
+      <tbody>${dataRows}</tbody>
+      <tfoot><tr class="border-t border-gray-600 font-bold text-xs">
+        <td class="py-1 text-gray-300">5日合計</td>
+        <td class="text-right py-1 ${totForeign >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(totForeign)}</td>
+        <td class="text-right py-1 ${totTrust   >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(totTrust)}</td>
+        <td class="text-right py-1 ${totDealer  >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(totDealer)}</td>
+        <td class="text-right py-1 ${totTotal   >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(totTotal)}</td>
+      </tr></tfoot>
     </table>
-    <p class="text-xs text-gray-500 mt-2">資料來源：台灣證交所　${days === 1 ? '當日' : '近5日'}</p>
-  `;
+    <p class="text-xs text-gray-500 mt-2">近 ${rows.length} 個交易日</p>`;
 }
 
 function chipRow(label, val) {
