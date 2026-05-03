@@ -221,8 +221,8 @@ async function loadOptions(dates) {
         const type = row[2];
         const buyOI  = parseInt(row[5]?.replace(/,/g, '') || '0') || 0;
         const sellOI = parseInt(row[7]?.replace(/,/g, '') || '0') || 0;
-        if (type === 'Call') { bc += buyOI; sc += sellOI; }
-        if (type === 'Put')  { bp += buyOI; sp += sellOI; }
+        if (type === '買權') { bc += buyOI; sc += sellOI; }
+        if (type === '賣權') { bp += buyOI; sp += sellOI; }
       }
 
       if (bc + sc + bp + sp === 0) continue; // 無資料，試前一日
