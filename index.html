@@ -14,7 +14,41 @@
     <div class="bg-gray-800 rounded p-2">廣告位置</div>
   </section>
 
-  <h1 class="text-2xl font-bold text-center mb-6">多空標的</h1>
+  <h1 class="text-2xl font-bold text-center mb-4">多空標的</h1>
+
+  <!-- 市場資訊面板 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4 space-y-3">
+
+    <!-- 資料日期 -->
+    <div class="text-center text-xs text-gray-400" id="market-date">載入中...</div>
+
+    <!-- 三大法人 -->
+    <div>
+      <div class="text-xs text-gray-500 mb-1">三大法人買賣超（億元）</div>
+      <div class="grid grid-cols-4 gap-2 text-center text-sm" id="institute-row">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">外資</div><div id="inst-foreign">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">投信</div><div id="inst-trust">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">自營商</div><div id="inst-dealer">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計</div><div id="inst-total">--</div></div>
+      </div>
+    </div>
+
+    <!-- 選擇權 -->
+    <div>
+      <div class="text-xs text-gray-500 mb-1">台指選擇權未平倉（口）</div>
+      <div class="grid grid-cols-4 gap-2 text-center text-sm" id="options-row">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">BC（買Call）</div><div id="opt-bc">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">SC（賣Call）</div><div id="opt-sc">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">BP（買Put）</div><div id="opt-bp">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">SP（賣Put）</div><div id="opt-sp">--</div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-center text-sm mt-2">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Call 淨部位（BC－SC）</div><div id="opt-call-net">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Put 淨部位（BP－SP）</div><div id="opt-put-net">--</div></div>
+      </div>
+    </div>
+
+  </div>
 
   <!-- 免責聲明 -->
   <p class="text-center text-xs text-gray-500 mb-6">本網站內容僅供參考，不構成任何投資建議，投資人應自行判斷並負擔風險。</p>
