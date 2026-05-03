@@ -134,105 +134,120 @@ document.getElementById('modal').addEventListener('click', function(e) {
 
 // ── 市場資訊面板 ──────────────────────────────────────
 
+// 取得最近 N 個交易日的日期字串（YYYYMMDD），跳過週末
+function getRecentTradingDates(n = 5) {
+  const dates = [];
+  const d = new Date();
+  while (dates.length < n) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dates.push(`${y}${m}${day}`);
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  return dates;
+}
+
 async function loadMarketInfo() {
-  const date = getTwseDate();
+  const dates = getRecentTradingDates(5);
   await Promise.all([
-    loadInstitutes(date),
-    loadOptions(date),
+    loadInstitutes(dates),
+    loadOptions(dates),
   ]);
 }
 
-// 三大法人總買賣超
-async function loadInstitutes(date) {
-  try {
-    const url = `https://www.twse.com.tw/rwd/zh/fund/BFI82U?dayDate=${date}&weekDate=&monthDate=&type=day&response=json`;
-    const res = await fetch(url);
-    const json = await res.json();
+// 三大法人總買賣超（自動找最近有資料的交易日）
+async function loadInstitutes(dates) {
+  for (const date of dates) {
+    try {
+      const url = `https://www.twse.com.tw/rwd/zh/fund/BFI82U?dayDate=${date}&weekDate=&monthDate=&type=day&response=json`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.data || json.data.length === 0) continue;
 
-    // data 每列：單位名稱、買進金額、賣出金額、買賣差額
-    if (!json.data) throw new Error('no data');
+      const find = (keyword) => {
+        const row = json.data.find(r => r[0].includes(keyword));
+        return row ? parseFloat(row[3].replace(/,/g, '')) / 100000000 : null;
+      };
 
-    const find = (keyword) => {
-      const row = json.data.find(r => r[0].includes(keyword));
-      return row ? parseFloat(row[3].replace(/,/g, '')) / 100000000 : null; // 元 → 億
-    };
+      const foreign = find('外資及陸資(不含外資自營商)') ?? find('外資');
+      const trust   = find('投信');
+      const dealer  = find('自營商(自行買賣)') ?? find('自營商');
+      const total   = (foreign ?? 0) + (trust ?? 0) + (dealer ?? 0);
 
-    const foreign = find('外資及陸資(不含外資自營商)') ?? find('外資');
-    const trust   = find('投信');
-    const dealer  = find('自營商(自行買賣)') ?? find('自營商');
-    const total   = (foreign ?? 0) + (trust ?? 0) + (dealer ?? 0);
+      const setEl = (id, val) => {
+        const el = document.getElementById(id);
+        if (val === null) { el.textContent = '--'; return; }
+        el.textContent = (val >= 0 ? '+' : '') + val.toFixed(1) + '億';
+        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+      };
 
-    const setEl = (id, val) => {
-      const el = document.getElementById(id);
-      if (val === null) { el.textContent = '--'; return; }
-      el.textContent = (val >= 0 ? '+' : '') + val.toFixed(1) + '億';
-      el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
-    };
+      setEl('inst-foreign', foreign);
+      setEl('inst-trust',   trust);
+      setEl('inst-dealer',  dealer);
+      setEl('inst-total',   total);
 
-    setEl('inst-foreign', foreign);
-    setEl('inst-trust',   trust);
-    setEl('inst-dealer',  dealer);
-    setEl('inst-total',   total);
-
-    // 更新資料日期
-    const dateStr = json.date || date;
-    const fmt = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-    document.getElementById('market-date').textContent =
-      `資料日期：${fmt}（收盤後更新，若顯示 -- 表示今日尚未更新）`;
-
-  } catch (e) {
-    ['inst-foreign','inst-trust','inst-dealer','inst-total'].forEach(id => {
-      document.getElementById(id).textContent = '--';
-    });
+      const fmt = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+      document.getElementById('market-date').textContent =
+        `資料日期：${fmt}（收盤後更新）`;
+      return;
+    } catch (e) { continue; }
   }
+  ['inst-foreign','inst-trust','inst-dealer','inst-total'].forEach(id => {
+    document.getElementById(id).textContent = '--';
+  });
 }
 
-// 台指選擇權 BC/SC/BP/SP 未平倉
-async function loadOptions(date) {
-  try {
-    const url = `https://www.taifex.com.tw/cht/3/callsAndPutsDown?queryType=1&marketCode=0&dateaddcnt=&queryDate=${date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3')}&commodity_id=TXO`;
-    const res = await fetch(url);
-    const text = await res.text();
+// 台指選擇權（透過 CORS proxy 繞過 TAIFEX 限制）
+async function loadOptions(dates) {
+  for (const date of dates) {
+    try {
+      const taifexDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3');
+      const target = `https://www.taifex.com.tw/cht/3/callsAndPutsDown?queryType=1&marketCode=0&dateaddcnt=&queryDate=${taifexDate}&commodity_id=TXO`;
+      const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+      const res = await fetch(url);
+      const text = await res.text();
 
-    // 解析 CSV
-    const lines = text.trim().split('\n').map(l => l.split(',').map(s => s.replace(/"/g, '').trim()));
+      const lines = text.trim().split('\n').map(l =>
+        l.split(',').map(s => s.replace(/"/g, '').trim())
+      );
 
-    // 找 Call / Put 的買方/賣方未平倉
-    // 欄位順序：日期, 契約, 買賣權, 到期月份, 履約價, 買方口數, 買方金額, 賣方口數, 賣方金額, ...
-    let bc = 0, sc = 0, bp = 0, sp = 0;
-    for (const row of lines) {
-      if (row.length < 8) continue;
-      const type = row[2]; // Call / Put
-      const buyOI  = parseInt(row[5]?.replace(/,/g, '') || '0') || 0;
-      const sellOI = parseInt(row[7]?.replace(/,/g, '') || '0') || 0;
-      if (type === 'Call') { bc += buyOI; sc += sellOI; }
-      if (type === 'Put')  { bp += buyOI; sp += sellOI; }
-    }
-
-    const callNet = bc - sc;
-    const putNet  = bp - sp;
-
-    const setOpt = (id, val, positiveIsRed = true) => {
-      const el = document.getElementById(id);
-      el.textContent = val.toLocaleString();
-      if (id.endsWith('net')) {
-        el.className = (positiveIsRed ? val >= 0 : val < 0)
-          ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+      let bc = 0, sc = 0, bp = 0, sp = 0;
+      for (const row of lines) {
+        if (row.length < 8) continue;
+        const type = row[2];
+        const buyOI  = parseInt(row[5]?.replace(/,/g, '') || '0') || 0;
+        const sellOI = parseInt(row[7]?.replace(/,/g, '') || '0') || 0;
+        if (type === 'Call') { bc += buyOI; sc += sellOI; }
+        if (type === 'Put')  { bp += buyOI; sp += sellOI; }
       }
-    };
 
-    setOpt('opt-bc', bc);
-    setOpt('opt-sc', sc);
-    setOpt('opt-bp', bp);
-    setOpt('opt-sp', sp);
-    setOpt('opt-call-net', callNet);
-    setOpt('opt-put-net',  putNet);
+      if (bc + sc + bp + sp === 0) continue; // 無資料，試前一日
 
-  } catch (e) {
-    ['opt-bc','opt-sc','opt-bp','opt-sp','opt-call-net','opt-put-net'].forEach(id => {
-      document.getElementById(id).textContent = '--';
-    });
+      const callNet = bc - sc;
+      const putNet  = bp - sp;
+
+      document.getElementById('opt-bc').textContent = bc.toLocaleString();
+      document.getElementById('opt-sc').textContent = sc.toLocaleString();
+      document.getElementById('opt-bp').textContent = bp.toLocaleString();
+      document.getElementById('opt-sp').textContent = sp.toLocaleString();
+
+      const setNet = (id, val) => {
+        const el = document.getElementById(id);
+        el.textContent = (val >= 0 ? '+' : '') + val.toLocaleString();
+        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+      };
+      setNet('opt-call-net', callNet);
+      setNet('opt-put-net',  putNet);
+      return;
+    } catch (e) { continue; }
   }
+  ['opt-bc','opt-sc','opt-bp','opt-sp','opt-call-net','opt-put-net'].forEach(id => {
+    document.getElementById(id).textContent = '--';
+  });
 }
 
 loadStocks();
