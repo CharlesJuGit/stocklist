@@ -8,6 +8,10 @@ async function loadStocks() {
 
   renderList('long-list', data.long, 'red');
   renderList('short-list', data.short, 'green');
+  if (data.updated) {
+    document.getElementById('stocks-updated').textContent =
+      `推薦清單更新：${data.updated}`;
+  }
 }
 
 function renderList(containerId, stocks, color) {
@@ -262,7 +266,30 @@ async function loadTaifexJson() {
   if (_taifexCache) return _taifexCache;
   const res = await fetch('taifex_data.json');
   _taifexCache = await res.json();
+
+  // 顯示 TAIFEX 資料更新時間（台灣時間）
+  if (_taifexCache.updated_at) {
+    const tw = new Date(new Date(_taifexCache.updated_at).getTime() + 8 * 3600 * 1000);
+    const fmt = tw.toISOString().slice(0, 16).replace('T', ' ');
+    document.getElementById('taifex-updated').textContent = `期貨/選擇權資料更新：${fmt}（台灣時間）`;
+  }
+
   return _taifexCache;
+}
+
+// 每天 18:30 台灣時間自動更新市場資訊
+function scheduleAutoRefresh() {
+  let lastRefreshDay = null;
+  setInterval(() => {
+    const twNow = new Date(Date.now() + 8 * 3600 * 1000);
+    const h = twNow.getUTCHours();
+    const m = twNow.getUTCMinutes();
+    const day = twNow.toISOString().slice(0, 10);
+    if (h === 18 && m === 30 && day !== lastRefreshDay) {
+      lastRefreshDay = day;
+      refreshAll();
+    }
+  }, 60000); // 每分鐘檢查一次
 }
 
 // 外資期貨未平倉（大台+小台/4）與結算比
@@ -403,3 +430,4 @@ async function refreshAll() {
 
 loadStocks();
 loadMarketInfo();
+scheduleAutoRefresh();
