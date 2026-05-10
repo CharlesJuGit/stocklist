@@ -223,7 +223,101 @@ async function loadMarketInfo() {
   await Promise.all([
     loadInstitutes(dates),
     loadOptions(dates),
+    loadFutures(dates),
   ]);
+}
+
+// 計算下一個結算日（每月第三個星期三）
+function getNextSettlementDate() {
+  const today = new Date();
+  let d = new Date(today.getFullYear(), today.getMonth(), 1);
+  let wedCount = 0;
+  while (wedCount < 3) {
+    if (d.getDay() === 3) wedCount++;
+    if (wedCount < 3) d.setDate(d.getDate() + 1);
+  }
+  // 若今天已過本月結算日，找下個月的
+  if (today > d) {
+    d = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    wedCount = 0;
+    while (wedCount < 3) {
+      if (d.getDay() === 3) wedCount++;
+      if (wedCount < 3) d.setDate(d.getDate() + 1);
+    }
+  }
+  return d;
+}
+
+function daysUntilSettlement() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const settlement = getNextSettlementDate();
+  settlement.setHours(0, 0, 0, 0);
+  return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
+}
+
+// 外資期貨未平倉（大台+小台/4）與結算比
+async function loadFutures(dates) {
+  for (const date of dates) {
+    try {
+      const taifexDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3');
+      const target = `https://www.taifex.com.tw/cht/3/futContractsDate?queryType=1&marketCode=0&contractId=TXF&dateaddcnt=0&queryDate=${taifexDate}`;
+      const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+      const res = await fetch(url);
+      const text = await res.text();
+
+      // 解析 CSV：找外資（Dealer/IT/Fini）的淨部位
+      const lines = text.trim().split('\n').map(l =>
+        l.split(',').map(s => s.replace(/"/g, '').trim())
+      );
+
+      // 找外資列（自營商=Dealer, 投信=IT, 外資=Fini）
+      let txNet = null, mtxNet = null;
+      for (const row of lines) {
+        if (row.length < 10) continue;
+        const name = row[1] || '';
+        // 大台 TXF 外資淨部位
+        if (row[0] === 'TXF' && name.includes('外資')) {
+          txNet = parseInt(row[9]?.replace(/,/g, '') || '0') || 0;
+        }
+        // 小台 MXF 外資淨部位
+        if (row[0] === 'MXF' && name.includes('外資')) {
+          mtxNet = parseInt(row[9]?.replace(/,/g, '') || '0') || 0;
+        }
+      }
+
+      if (txNet === null && mtxNet === null) continue;
+
+      txNet  = txNet  ?? 0;
+      mtxNet = mtxNet ?? 0;
+
+      // 小台換算大台當量（÷4）
+      const mtxEq = mtxNet / 4;
+      const total = txNet + mtxEq;
+      const days  = daysUntilSettlement();
+      const ratio = days > 0 ? (total / days).toFixed(1) : '--';
+
+      const setFut = (id, val) => {
+        const el = document.getElementById(id);
+        el.textContent = (val >= 0 ? '+' : '') + Math.round(val).toLocaleString();
+        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+      };
+
+      setFut('fut-tx',    txNet);
+      setFut('fut-mtx',   mtxEq);
+      setFut('fut-total', total);
+      document.getElementById('fut-days').textContent = `${days} 天`;
+
+      const ratioEl = document.getElementById('fut-ratio');
+      const ratioNum = parseFloat(ratio);
+      ratioEl.textContent = (ratioNum >= 0 ? '+' : '') + ratio;
+      ratioEl.className = ratioNum >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+      return;
+    } catch (e) { continue; }
+  }
+  ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio'].forEach(id => {
+    document.getElementById(id).textContent = '--';
+  });
 }
 
 // 三大法人總買賣超（自動找最近有資料的交易日）

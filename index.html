@@ -48,6 +48,20 @@
       </div>
     </div>
 
+    <!-- 外資期貨未平倉與結算比 -->
+    <div>
+      <div class="text-xs text-gray-500 mb-1">外資期貨未平倉（口）</div>
+      <div class="grid grid-cols-3 gap-2 text-center text-sm">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">大台淨部位</div><div id="fut-tx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">小台淨部位</div><div id="fut-mtx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計（大台當量）</div><div id="fut-total">--</div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-center text-sm mt-2">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">距結算剩餘天數</div><div id="fut-days">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">結算比（絕對值÷天數）</div><div id="fut-ratio">--</div></div>
+      </div>
+    </div>
+
     <!-- 參考連結 -->
     <div>
       <div class="text-xs text-gray-500 mb-2">參考連結</div>
