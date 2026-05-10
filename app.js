@@ -222,8 +222,8 @@ async function loadMarketInfo() {
   const dates = getRecentTradingDates(10); // 多抓幾天確保能找到最近交易日
   await Promise.all([
     loadInstitutes(dates),
-    loadOptions(dates),
-    loadFutures(dates),
+    loadOptions(),
+    loadFutures(),
   ]);
 }
 
@@ -256,78 +256,81 @@ function daysUntilSettlement() {
   return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
 }
 
+// Fetch TAIFEX openapi with Big5 encoding fix (server sends Big5 but claims UTF-8)
+async function fetchTaifexJson(url) {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  const text = new TextDecoder('big5').decode(buf);
+  return JSON.parse(text);
+}
+
+// Get field from row: supports array-of-arrays (by index) or array-of-objects (by key)
+function taifexGet(row, idx, key) {
+  return Array.isArray(row) ? row[idx] : (row[key] ?? '');
+}
+
 // 外資期貨未平倉（大台+小台/4）與結算比
 async function loadFutures(dates) {
-  for (const date of dates) {
-    try {
-      // 用 TAIFEX openapi（不需要 CORS proxy）
-      const url = `https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate?queryDate=${date}`;
-      const res = await fetch(url);
-      const text = await res.text();
-      const lines = text.trim().split('\n').map(l =>
-        l.split(',').map(s => s.replace(/"/g, '').trim())
+  try {
+    const data = await fetchTaifexJson(
+      'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate'
+    );
+    if (!Array.isArray(data) || data.length === 0) throw new Error('empty');
+
+    const findNet = (contractName, identity) => {
+      const row = data.find(r =>
+        taifexGet(r, 1, 'ContractCode') === contractName &&
+        String(taifexGet(r, 2, 'Item')).includes(identity)
       );
+      if (!row) return 0;
+      const val = taifexGet(row, 13, 'OpenInterest(Net)');
+      return parseInt(String(val).replace(/,/g, '')) || 0;
+    };
 
-      // 欄位：Date, ContractCode, Item, ..., OI(Long)[9], OI(Short)[11], OI(Net)[13]
-      const parseNet = (contract, identity) => {
-        const row = lines.find(r => r[1] === contract && (r[2] || '').includes(identity));
-        return row ? (parseInt(row[13]?.replace(/,/g, '') || '0') || 0) : null;
-      };
+    const txF  = findNet('臺股期貨', '外資');
+    const txT  = findNet('臺股期貨', '投信');
+    const txD  = findNet('臺股期貨', '自營');
+    const mtxF = findNet('小型臺指期貨', '外資');
+    const mtxT = findNet('小型臺指期貨', '投信');
+    const mtxD = findNet('小型臺指期貨', '自營');
 
-      const txForeign  = parseNet('臺股期貨', '外資');
-      const txDealer   = parseNet('臺股期貨', '自營');
-      const txTrust    = parseNet('臺股期貨', '投信');
-      const mtxForeign = parseNet('小型臺指期貨', '外資');
-      const mtxDealer  = parseNet('小型臺指期貨', '自營');
-      const mtxTrust   = parseNet('小型臺指期貨', '投信');
+    // 散戶 = -(外資+投信+自營)，因為市場總淨部位=0
+    const txRetail  = -(txF + txT + txD);
+    const mtxRetail = -(mtxF + mtxT + mtxD);
 
-      if (txForeign === null && mtxForeign === null) continue;
+    // 小台換算大台當量（÷4）
+    const mtxFEq   = mtxF / 4;
+    const futTotal = txF + mtxFEq;
+    const retMtxEq = mtxRetail / 4;
+    const retTotal = txRetail + retMtxEq;
 
-      const txF  = txForeign  ?? 0;
-      const txD  = txDealer   ?? 0;
-      const txT  = txTrust    ?? 0;
-      const mtxF = mtxForeign ?? 0;
-      const mtxD = mtxDealer  ?? 0;
-      const mtxT = mtxTrust   ?? 0;
+    const days  = daysUntilSettlement();
+    const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
 
-      // 散戶 = 市場合計 - 三大法人，但 openapi 沒有合計列
-      // 改用：散戶大台 = -(外資+自營+投信)，因為市場總淨部位=0
-      const txRetail  = -(txF + txD + txT);
-      const mtxRetail = -(mtxF + mtxD + mtxT);
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      el.textContent = (val >= 0 ? '+' : '') + Math.round(val).toLocaleString();
+      el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+    };
 
-      // 小台換算大台當量（÷4）
-      const mtxEq    = mtxF / 4;
-      const futTotal = txF + mtxEq;
-      const retMtxEq = mtxRetail / 4;
-      const retTotal = txRetail + retMtxEq;
+    setVal('fut-tx',    txF);
+    setVal('fut-mtx',   mtxFEq);
+    setVal('fut-total', futTotal);
+    setVal('ret-tx',    txRetail);
+    setVal('ret-mtx',   retMtxEq);
+    setVal('ret-total', retTotal);
 
-      const days  = daysUntilSettlement();
-      const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
-
-      const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        el.textContent = (val >= 0 ? '+' : '') + Math.round(val).toLocaleString();
-        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
-      };
-
-      setVal('fut-tx',    txF);
-      setVal('fut-mtx',   mtxEq);
-      setVal('fut-total', futTotal);
-      setVal('ret-tx',    txRetail);
-      setVal('ret-mtx',   retMtxEq);
-      setVal('ret-total', retTotal);
-
-      document.getElementById('fut-days').textContent = `${days} 天`;
-      const ratioEl = document.getElementById('fut-ratio');
-      const ratioNum = parseFloat(ratio);
-      ratioEl.textContent = (ratioNum >= 0 ? '+' : '') + ratio;
-      ratioEl.className = ratioNum >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
-      return;
-    } catch (e) { continue; }
+    document.getElementById('fut-days').textContent = `${days} 天`;
+    const ratioEl = document.getElementById('fut-ratio');
+    const ratioNum = parseFloat(ratio);
+    ratioEl.textContent = isNaN(ratioNum) ? '--' : (ratioNum >= 0 ? '+' : '') + ratio;
+    ratioEl.className = ratioNum >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+  } catch (e) {
+    console.error('loadFutures:', e);
+    ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio','ret-tx','ret-mtx','ret-total'].forEach(id => {
+      document.getElementById(id).textContent = '--';
+    });
   }
-  ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio','ret-tx','ret-mtx','ret-total'].forEach(id => {
-    document.getElementById(id).textContent = '--';
-  });
 }
 
 // 三大法人總買賣超（自動找最近有資料的交易日）
@@ -372,53 +375,51 @@ async function loadInstitutes(dates) {
   });
 }
 
-// 台指選擇權（透過 CORS proxy 繞過 TAIFEX 限制）
+// 台指選擇權（openapi.taifex.com.tw，無需 CORS proxy）
 async function loadOptions(dates) {
-  for (const date of dates) {
-    try {
-      const taifexDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3');
-      const target = `https://www.taifex.com.tw/cht/3/callsAndPutsDown?queryType=1&marketCode=0&dateaddcnt=&queryDate=${taifexDate}&commodity_id=TXO`;
-      const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
-      const res = await fetch(url);
-      const text = await res.text();
+  try {
+    const data = await fetchTaifexJson(
+      'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate'
+    );
+    if (!Array.isArray(data) || data.length === 0) throw new Error('empty');
 
-      const lines = text.trim().split('\n').map(l =>
-        l.split(',').map(s => s.replace(/"/g, '').trim())
-      );
+    // 第一個 ContractCode = 臺指選擇權 (TXO)
+    const firstCode = taifexGet(data[0], 1, 'ContractCode');
 
-      let bc = 0, sc = 0, bp = 0, sp = 0;
-      for (const row of lines) {
-        if (row.length < 8) continue;
-        const type = row[2];
-        const buyOI  = parseInt(row[5]?.replace(/,/g, '') || '0') || 0;
-        const sellOI = parseInt(row[7]?.replace(/,/g, '') || '0') || 0;
-        if (type === '買權') { bc += buyOI; sc += sellOI; }
-        if (type === '賣權') { bp += buyOI; sp += sellOI; }
-      }
+    let bc = 0, sc = 0, bp = 0, sp = 0;
+    for (const row of data) {
+      if (taifexGet(row, 1, 'ContractCode') !== firstCode) break;
+      // col[2] = "CALL" or "PUT" (English, no encoding issue)
+      const type   = taifexGet(row, 2, 'CallPut');
+      const buyOI  = parseInt(String(taifexGet(row, 10, 'BuyOpenInterest')  || '0').replace(/,/g, '')) || 0;
+      const sellOI = parseInt(String(taifexGet(row, 12, 'SellOpenInterest') || '0').replace(/,/g, '')) || 0;
+      if (type === 'CALL') { bc += buyOI; sc += sellOI; }
+      if (type === 'PUT')  { bp += buyOI; sp += sellOI; }
+    }
 
-      if (bc + sc + bp + sp === 0) continue; // 無資料，試前一日
+    if (bc + sc + bp + sp === 0) throw new Error('all zero');
 
-      const callNet = bc - sc;
-      const putNet  = bp - sp;
+    const callNet = bc - sc;
+    const putNet  = bp - sp;
 
-      document.getElementById('opt-bc').textContent = bc.toLocaleString();
-      document.getElementById('opt-sc').textContent = sc.toLocaleString();
-      document.getElementById('opt-bp').textContent = bp.toLocaleString();
-      document.getElementById('opt-sp').textContent = sp.toLocaleString();
+    document.getElementById('opt-bc').textContent = bc.toLocaleString();
+    document.getElementById('opt-sc').textContent = sc.toLocaleString();
+    document.getElementById('opt-bp').textContent = bp.toLocaleString();
+    document.getElementById('opt-sp').textContent = sp.toLocaleString();
 
-      const setNet = (id, val) => {
-        const el = document.getElementById(id);
-        el.textContent = (val >= 0 ? '+' : '') + val.toLocaleString();
-        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
-      };
-      setNet('opt-call-net', callNet);
-      setNet('opt-put-net',  putNet);
-      return;
-    } catch (e) { continue; }
+    const setNet = (id, val) => {
+      const el = document.getElementById(id);
+      el.textContent = (val >= 0 ? '+' : '') + val.toLocaleString();
+      el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+    };
+    setNet('opt-call-net', callNet);
+    setNet('opt-put-net',  putNet);
+  } catch (e) {
+    console.error('loadOptions:', e);
+    ['opt-bc','opt-sc','opt-bp','opt-sp','opt-call-net','opt-put-net'].forEach(id => {
+      document.getElementById(id).textContent = '--';
+    });
   }
-  ['opt-bc','opt-sc','opt-bp','opt-sp','opt-call-net','opt-put-net'].forEach(id => {
-    document.getElementById(id).textContent = '--';
-  });
 }
 
 async function refreshAll() {
