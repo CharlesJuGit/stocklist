@@ -256,16 +256,26 @@ function daysUntilSettlement() {
   return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
 }
 
-// 解析 TAIFEX openapi CSV 回應，只回傳有日期的資料列（跳過標頭）
+// 解析 TAIFEX openapi CSV（openapi.taifex.com.tw 無 CORS header，需透過 proxy）
 async function fetchTaifexCsv(url) {
-  const res = await fetch(url);
-  const buf = await res.arrayBuffer();
-  // 先試 UTF-8；若有亂碼（含替換字元）再改 Big5
-  let text = new TextDecoder('utf-8').decode(buf);
-  if (text.includes('\uFFFD')) text = new TextDecoder('big5').decode(buf);
-  return text.trim().split('\n')
-    .map(l => l.split(',').map(s => s.replace(/"/g, '').trim()))
-    .filter(r => r.length > 3 && /^\d{8}/.test(r[0])); // 只留日期開頭的資料列
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  ];
+  for (const makeProxy of proxies) {
+    try {
+      const res = await fetch(makeProxy(url));
+      if (!res.ok) continue;
+      const buf = await res.arrayBuffer();
+      let text = new TextDecoder('utf-8').decode(buf);
+      if (text.includes('\uFFFD')) text = new TextDecoder('big5').decode(buf);
+      const rows = text.trim().split('\n')
+        .map(l => l.split(',').map(s => s.replace(/"/g, '').trim()))
+        .filter(r => r.length > 3 && /^\d{8}/.test(r[0]));
+      if (rows.length > 0) return rows;
+    } catch { continue; }
+  }
+  return [];
 }
 
 // 外資期貨未平倉（大台+小台/4）與結算比
