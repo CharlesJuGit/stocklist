@@ -256,81 +256,35 @@ function daysUntilSettlement() {
   return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
 }
 
-// 解析 TAIFEX openapi CSV（openapi.taifex.com.tw 無 CORS header，需透過 proxy）
-async function fetchTaifexCsv(url) {
-  const proxies = [
-    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  ];
-  for (const makeProxy of proxies) {
-    try {
-      const res = await fetch(makeProxy(url));
-      if (!res.ok) continue;
-      const buf = await res.arrayBuffer();
-      let text = new TextDecoder('utf-8').decode(buf);
-      if (text.includes('\uFFFD')) text = new TextDecoder('big5').decode(buf);
-      const rows = text.trim().split('\n')
-        .map(l => l.split(',').map(s => s.replace(/"/g, '').trim()))
-        .filter(r => r.length > 3 && /^\d{8}/.test(r[0]));
-      if (rows.length > 0) return rows;
-    } catch { continue; }
-  }
-  return [];
+// 讀取由 GitHub Actions 每日更新的 taifex_data.json（同源，無 CORS 問題）
+let _taifexCache = null;
+async function loadTaifexJson() {
+  if (_taifexCache) return _taifexCache;
+  const res = await fetch('taifex_data.json');
+  _taifexCache = await res.json();
+  return _taifexCache;
 }
 
 // 外資期貨未平倉（大台+小台/4）與結算比
-// CSV 欄位：[0]日期 [1]商品 [2]身份 [3]多方交易 [4]多方金額 [5]空方交易 [6]空方金額
-//           [7]淨交易 [8]淨金額 [9]多方未平倉口數 [10]多方金額 [11]空方未平倉口數 [12]空方金額
-// 淨部位 = row[9] - row[11]
 async function loadFutures() {
   try {
-    const rows = await fetchTaifexCsv(
-      'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate'
-    );
-    if (rows.length === 0) throw new Error('empty');
+    const data = await loadTaifexJson();
+    const f = data.futures;
+    if (!f) throw new Error('no futures');
 
-    // 依商品名稱（col[1]）分組，中文即使亂碼也同一商品字串相同
-    const groups = [];
-    let curProd = null, curGroup = [];
-    for (const row of rows) {
-      if (row[1] !== curProd) {
-        if (curGroup.length) groups.push(curGroup);
-        curProd = row[1];
-        curGroup = [row];
-      } else {
-        curGroup.push(row);
-      }
-    }
-    if (curGroup.length) groups.push(curGroup);
+    const txF  = f.txF  ?? 0;
+    const txT  = f.txT  ?? 0;
+    const txD  = f.txD  ?? 0;
+    const mtxF = f.mtxF ?? 0;
+    const mtxT = f.mtxT ?? 0;
+    const mtxD = f.mtxD ?? 0;
 
-    // groups[0] = 臺股期貨(大台)，groups[last] = 小型臺指期貨(小台)
-    // 每組內順序固定：[0]自營商 [1]投信 [2]外資及陸資
-    const txGroup  = groups[0];
-    const mtxGroup = groups[groups.length - 1];
-
-    const getNet = (group, idx) => {
-      const row = group?.[idx];
-      if (!row) return 0;
-      return (parseInt(row[9]?.replace(/,/g, '') || '0') || 0)
-           - (parseInt(row[11]?.replace(/,/g, '') || '0') || 0);
-    };
-
-    const txF  = getNet(txGroup, 2);   // 外資
-    const txT  = getNet(txGroup, 1);   // 投信
-    const txD  = getNet(txGroup, 0);   // 自營
-    const mtxF = getNet(mtxGroup, 2);
-    const mtxT = getNet(mtxGroup, 1);
-    const mtxD = getNet(mtxGroup, 0);
-
-    // 散戶 = -(外資+投信+自營)，因為市場總淨部位=0
     const txRetail  = -(txF + txT + txD);
     const mtxRetail = -(mtxF + mtxT + mtxD);
-
-    // 小台換算大台當量（÷4）
-    const mtxFEq   = mtxF / 4;
-    const futTotal = txF + mtxFEq;
-    const retMtxEq = mtxRetail / 4;
-    const retTotal = txRetail + retMtxEq;
+    const mtxFEq    = mtxF / 4;
+    const futTotal  = txF + mtxFEq;
+    const retMtxEq  = mtxRetail / 4;
+    const retTotal  = txRetail + retMtxEq;
 
     const days  = daysUntilSettlement();
     const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
@@ -403,28 +357,14 @@ async function loadInstitutes(dates) {
   });
 }
 
-// 台指選擇權（openapi.taifex.com.tw，無需 CORS proxy）
-// CSV 欄位：[0]日期 [1]商品 [2]CALL/PUT [3]身份 [4]買方交易 [5]金額 [6]賣方交易 [7]金額
-//           [8]差額 [9]差額金額 [10]買方未平倉口數 [11]金額 [12]賣方未平倉口數 [13]金額...
+// 台指選擇權（讀 taifex_data.json）
 async function loadOptions() {
   try {
-    const rows = await fetchTaifexCsv(
-      'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate'
-    );
-    if (rows.length === 0) throw new Error('empty');
+    const data = await loadTaifexJson();
+    const o = data.options;
+    if (!o) throw new Error('no options');
 
-    // 第一個商品 = 臺指選擇權 (TXO)；col[2] = "CALL"/"PUT"（英文，無編碼問題）
-    const firstProd = rows[0][1];
-    let bc = 0, sc = 0, bp = 0, sp = 0;
-    for (const row of rows) {
-      if (row[1] !== firstProd) break;
-      const type   = row[2]; // "CALL" or "PUT"
-      const buyOI  = parseInt(row[10]?.replace(/,/g, '') || '0') || 0;
-      const sellOI = parseInt(row[12]?.replace(/,/g, '') || '0') || 0;
-      if (type === 'CALL') { bc += buyOI; sc += sellOI; }
-      if (type === 'PUT')  { bp += buyOI; sp += sellOI; }
-    }
-
+    const { bc, sc, bp, sp } = o;
     if (bc + sc + bp + sp === 0) throw new Error('all zero');
 
     const callNet = bc - sc;
@@ -455,6 +395,7 @@ async function refreshAll() {
   btn.textContent = '載入中...';
   btn.disabled = true;
   chipCache = {};
+  _taifexCache = null;
   await Promise.all([loadStocks(), loadMarketInfo()]);
   btn.textContent = '↻ 重新整理';
   btn.disabled = false;
