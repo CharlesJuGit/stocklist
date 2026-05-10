@@ -14,7 +14,13 @@
     <div class="bg-gray-800 rounded p-2">廣告位置</div>
   </section>
 
-  <h1 class="text-2xl font-bold text-center mb-4">多空標的</h1>
+  <div class="flex items-center justify-center gap-3 mb-4">
+    <h1 class="text-2xl font-bold">多空標的</h1>
+    <button onclick="refreshAll()" id="refresh-btn"
+      class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-full transition">
+      ↻ 重新整理
+    </button>
+  </div>
 
   <!-- 市場資訊面板 -->
   <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4 space-y-3">

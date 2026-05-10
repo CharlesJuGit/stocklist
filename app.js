@@ -219,7 +219,7 @@ function getRecentTradingDates(n = 5) {
 }
 
 async function loadMarketInfo() {
-  const dates = getRecentTradingDates(5);
+  const dates = getRecentTradingDates(10); // 多抓幾天確保能找到最近交易日
   await Promise.all([
     loadInstitutes(dates),
     loadOptions(dates),
@@ -261,32 +261,39 @@ async function loadFutures(dates) {
   for (const date of dates) {
     try {
       const taifexDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3');
-      const target = `https://www.taifex.com.tw/cht/3/futContractsDate?queryType=1&marketCode=0&contractId=TXF&dateaddcnt=0&queryDate=${taifexDate}`;
-      const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
-      const res = await fetch(url);
-      const text = await res.text();
 
-      // 解析 CSV：找外資（Dealer/IT/Fini）的淨部位
-      const lines = text.trim().split('\n').map(l =>
-        l.split(',').map(s => s.replace(/"/g, '').trim())
-      );
+      // 大台和小台分開抓（同一個 API 換 contractId）
+      const fetchContract = async (contractId) => {
+        const target = `https://www.taifex.com.tw/cht/3/futContractsDate?queryType=1&marketCode=0&contractId=${contractId}&dateaddcnt=0&queryDate=${taifexDate}`;
+        const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        return text.trim().split('\n').map(l =>
+          l.split(',').map(s => s.replace(/"/g, '').trim())
+        );
+      };
 
-      // 解析各身份別淨部位（大台TXF、小台MXF）
-      const parseNet = (contract, identity) => {
-        const row = lines.find(r => r[0] === contract && (r[1] || '').includes(identity));
+      const [txLines, mtxLines] = await Promise.all([
+        fetchContract('TXF'),
+        fetchContract('MXF'),
+      ]);
+
+      // 解析各身份別淨部位
+      const parseNet = (lines, identity) => {
+        const row = lines.find(r => (r[1] || '').includes(identity));
         return row ? (parseInt(row[9]?.replace(/,/g, '') || '0') || 0) : 0;
       };
 
-      const txForeign  = parseNet('TXF', '外資');
-      const txDealer   = parseNet('TXF', '自營');
-      const txTrust    = parseNet('TXF', '投信');
-      const txTotal    = parseNet('TXF', '合計');
+      const txForeign  = parseNet(txLines,  '外資');
+      const txDealer   = parseNet(txLines,  '自營');
+      const txTrust    = parseNet(txLines,  '投信');
+      const txTotal    = parseNet(txLines,  '合計');
       const txRetail   = txTotal - txForeign - txDealer - txTrust;
 
-      const mtxForeign = parseNet('MXF', '外資');
-      const mtxDealer  = parseNet('MXF', '自營');
-      const mtxTrust   = parseNet('MXF', '投信');
-      const mtxTotal   = parseNet('MXF', '合計');
+      const mtxForeign = parseNet(mtxLines, '外資');
+      const mtxDealer  = parseNet(mtxLines, '自營');
+      const mtxTrust   = parseNet(mtxLines, '投信');
+      const mtxTotal   = parseNet(mtxLines, '合計');
       const mtxRetail  = mtxTotal - mtxForeign - mtxDealer - mtxTrust;
 
       if (txTotal === 0 && mtxTotal === 0) continue;
@@ -415,6 +422,16 @@ async function loadOptions(dates) {
   ['opt-bc','opt-sc','opt-bp','opt-sp','opt-call-net','opt-put-net'].forEach(id => {
     document.getElementById(id).textContent = '--';
   });
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = '載入中...';
+  btn.disabled = true;
+  chipCache = {};
+  await Promise.all([loadStocks(), loadMarketInfo()]);
+  btn.textContent = '↻ 重新整理';
+  btn.disabled = false;
 }
 
 loadStocks();
