@@ -260,49 +260,46 @@ function daysUntilSettlement() {
 async function loadFutures(dates) {
   for (const date of dates) {
     try {
-      const taifexDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1/$2/$3');
+      // 用 TAIFEX openapi（不需要 CORS proxy）
+      const url = `https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate?queryDate=${date}`;
+      const res = await fetch(url);
+      const text = await res.text();
+      const lines = text.trim().split('\n').map(l =>
+        l.split(',').map(s => s.replace(/"/g, '').trim())
+      );
 
-      // 大台和小台分開抓（同一個 API 換 contractId）
-      const fetchContract = async (contractId) => {
-        const target = `https://www.taifex.com.tw/cht/3/futContractsDate?queryType=1&marketCode=0&contractId=${contractId}&dateaddcnt=0&queryDate=${taifexDate}`;
-        const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
-        const res = await fetch(url);
-        const text = await res.text();
-        return text.trim().split('\n').map(l =>
-          l.split(',').map(s => s.replace(/"/g, '').trim())
-        );
+      // 欄位：Date, ContractCode, Item, ..., OI(Long)[9], OI(Short)[11], OI(Net)[13]
+      const parseNet = (contract, identity) => {
+        const row = lines.find(r => r[1] === contract && (r[2] || '').includes(identity));
+        return row ? (parseInt(row[13]?.replace(/,/g, '') || '0') || 0) : null;
       };
 
-      const [txLines, mtxLines] = await Promise.all([
-        fetchContract('TXF'),
-        fetchContract('MXF'),
-      ]);
+      const txForeign  = parseNet('臺股期貨', '外資');
+      const txDealer   = parseNet('臺股期貨', '自營');
+      const txTrust    = parseNet('臺股期貨', '投信');
+      const mtxForeign = parseNet('小型臺指期貨', '外資');
+      const mtxDealer  = parseNet('小型臺指期貨', '自營');
+      const mtxTrust   = parseNet('小型臺指期貨', '投信');
 
-      // 解析各身份別淨部位
-      const parseNet = (lines, identity) => {
-        const row = lines.find(r => (r[1] || '').includes(identity));
-        return row ? (parseInt(row[9]?.replace(/,/g, '') || '0') || 0) : 0;
-      };
+      if (txForeign === null && mtxForeign === null) continue;
 
-      const txForeign  = parseNet(txLines,  '外資');
-      const txDealer   = parseNet(txLines,  '自營');
-      const txTrust    = parseNet(txLines,  '投信');
-      const txTotal    = parseNet(txLines,  '合計');
-      const txRetail   = txTotal - txForeign - txDealer - txTrust;
+      const txF  = txForeign  ?? 0;
+      const txD  = txDealer   ?? 0;
+      const txT  = txTrust    ?? 0;
+      const mtxF = mtxForeign ?? 0;
+      const mtxD = mtxDealer  ?? 0;
+      const mtxT = mtxTrust   ?? 0;
 
-      const mtxForeign = parseNet(mtxLines, '外資');
-      const mtxDealer  = parseNet(mtxLines, '自營');
-      const mtxTrust   = parseNet(mtxLines, '投信');
-      const mtxTotal   = parseNet(mtxLines, '合計');
-      const mtxRetail  = mtxTotal - mtxForeign - mtxDealer - mtxTrust;
-
-      if (txTotal === 0 && mtxTotal === 0) continue;
+      // 散戶 = 市場合計 - 三大法人，但 openapi 沒有合計列
+      // 改用：散戶大台 = -(外資+自營+投信)，因為市場總淨部位=0
+      const txRetail  = -(txF + txD + txT);
+      const mtxRetail = -(mtxF + mtxD + mtxT);
 
       // 小台換算大台當量（÷4）
-      const mtxEq        = mtxForeign / 4;
-      const futTotal     = txForeign + mtxEq;
-      const retMtxEq     = mtxRetail / 4;
-      const retTotal     = txRetail + retMtxEq;
+      const mtxEq    = mtxF / 4;
+      const futTotal = txF + mtxEq;
+      const retMtxEq = mtxRetail / 4;
+      const retTotal = txRetail + retMtxEq;
 
       const days  = daysUntilSettlement();
       const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
@@ -313,7 +310,7 @@ async function loadFutures(dates) {
         el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
       };
 
-      setVal('fut-tx',    txForeign);
+      setVal('fut-tx',    txF);
       setVal('fut-mtx',   mtxEq);
       setVal('fut-total', futTotal);
       setVal('ret-tx',    txRetail);
