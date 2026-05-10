@@ -256,43 +256,61 @@ function daysUntilSettlement() {
   return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
 }
 
-// Fetch TAIFEX openapi with Big5 encoding fix (server sends Big5 but claims UTF-8)
-async function fetchTaifexJson(url) {
+// 解析 TAIFEX openapi CSV 回應，只回傳有日期的資料列（跳過標頭）
+async function fetchTaifexCsv(url) {
   const res = await fetch(url);
   const buf = await res.arrayBuffer();
-  const text = new TextDecoder('big5').decode(buf);
-  return JSON.parse(text);
-}
-
-// Get field from row: supports array-of-arrays (by index) or array-of-objects (by key)
-function taifexGet(row, idx, key) {
-  return Array.isArray(row) ? row[idx] : (row[key] ?? '');
+  // 先試 UTF-8；若有亂碼（含替換字元）再改 Big5
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) text = new TextDecoder('big5').decode(buf);
+  return text.trim().split('\n')
+    .map(l => l.split(',').map(s => s.replace(/"/g, '').trim()))
+    .filter(r => r.length > 3 && /^\d{8}/.test(r[0])); // 只留日期開頭的資料列
 }
 
 // 外資期貨未平倉（大台+小台/4）與結算比
-async function loadFutures(dates) {
+// CSV 欄位：[0]日期 [1]商品 [2]身份 [3]多方交易 [4]多方金額 [5]空方交易 [6]空方金額
+//           [7]淨交易 [8]淨金額 [9]多方未平倉口數 [10]多方金額 [11]空方未平倉口數 [12]空方金額
+// 淨部位 = row[9] - row[11]
+async function loadFutures() {
   try {
-    const data = await fetchTaifexJson(
+    const rows = await fetchTaifexCsv(
       'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate'
     );
-    if (!Array.isArray(data) || data.length === 0) throw new Error('empty');
+    if (rows.length === 0) throw new Error('empty');
 
-    const findNet = (contractName, identity) => {
-      const row = data.find(r =>
-        taifexGet(r, 1, 'ContractCode') === contractName &&
-        String(taifexGet(r, 2, 'Item')).includes(identity)
-      );
+    // 依商品名稱（col[1]）分組，中文即使亂碼也同一商品字串相同
+    const groups = [];
+    let curProd = null, curGroup = [];
+    for (const row of rows) {
+      if (row[1] !== curProd) {
+        if (curGroup.length) groups.push(curGroup);
+        curProd = row[1];
+        curGroup = [row];
+      } else {
+        curGroup.push(row);
+      }
+    }
+    if (curGroup.length) groups.push(curGroup);
+
+    // groups[0] = 臺股期貨(大台)，groups[last] = 小型臺指期貨(小台)
+    // 每組內順序固定：[0]自營商 [1]投信 [2]外資及陸資
+    const txGroup  = groups[0];
+    const mtxGroup = groups[groups.length - 1];
+
+    const getNet = (group, idx) => {
+      const row = group?.[idx];
       if (!row) return 0;
-      const val = taifexGet(row, 13, 'OpenInterest(Net)');
-      return parseInt(String(val).replace(/,/g, '')) || 0;
+      return (parseInt(row[9]?.replace(/,/g, '') || '0') || 0)
+           - (parseInt(row[11]?.replace(/,/g, '') || '0') || 0);
     };
 
-    const txF  = findNet('臺股期貨', '外資');
-    const txT  = findNet('臺股期貨', '投信');
-    const txD  = findNet('臺股期貨', '自營');
-    const mtxF = findNet('小型臺指期貨', '外資');
-    const mtxT = findNet('小型臺指期貨', '投信');
-    const mtxD = findNet('小型臺指期貨', '自營');
+    const txF  = getNet(txGroup, 2);   // 外資
+    const txT  = getNet(txGroup, 1);   // 投信
+    const txD  = getNet(txGroup, 0);   // 自營
+    const mtxF = getNet(mtxGroup, 2);
+    const mtxT = getNet(mtxGroup, 1);
+    const mtxD = getNet(mtxGroup, 0);
 
     // 散戶 = -(外資+投信+自營)，因為市場總淨部位=0
     const txRetail  = -(txF + txT + txD);
@@ -376,23 +394,23 @@ async function loadInstitutes(dates) {
 }
 
 // 台指選擇權（openapi.taifex.com.tw，無需 CORS proxy）
-async function loadOptions(dates) {
+// CSV 欄位：[0]日期 [1]商品 [2]CALL/PUT [3]身份 [4]買方交易 [5]金額 [6]賣方交易 [7]金額
+//           [8]差額 [9]差額金額 [10]買方未平倉口數 [11]金額 [12]賣方未平倉口數 [13]金額...
+async function loadOptions() {
   try {
-    const data = await fetchTaifexJson(
+    const rows = await fetchTaifexCsv(
       'https://openapi.taifex.com.tw/v1/MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate'
     );
-    if (!Array.isArray(data) || data.length === 0) throw new Error('empty');
+    if (rows.length === 0) throw new Error('empty');
 
-    // 第一個 ContractCode = 臺指選擇權 (TXO)
-    const firstCode = taifexGet(data[0], 1, 'ContractCode');
-
+    // 第一個商品 = 臺指選擇權 (TXO)；col[2] = "CALL"/"PUT"（英文，無編碼問題）
+    const firstProd = rows[0][1];
     let bc = 0, sc = 0, bp = 0, sp = 0;
-    for (const row of data) {
-      if (taifexGet(row, 1, 'ContractCode') !== firstCode) break;
-      // col[2] = "CALL" or "PUT" (English, no encoding issue)
-      const type   = taifexGet(row, 2, 'CallPut');
-      const buyOI  = parseInt(String(taifexGet(row, 10, 'BuyOpenInterest')  || '0').replace(/,/g, '')) || 0;
-      const sellOI = parseInt(String(taifexGet(row, 12, 'SellOpenInterest') || '0').replace(/,/g, '')) || 0;
+    for (const row of rows) {
+      if (row[1] !== firstProd) break;
+      const type   = row[2]; // "CALL" or "PUT"
+      const buyOI  = parseInt(row[10]?.replace(/,/g, '') || '0') || 0;
+      const sellOI = parseInt(row[12]?.replace(/,/g, '') || '0') || 0;
       if (type === 'CALL') { bc += buyOI; sc += sellOI; }
       if (type === 'PUT')  { bp += buyOI; sp += sellOI; }
     }
