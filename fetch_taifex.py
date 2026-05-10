@@ -35,32 +35,24 @@ def parse_futures(text):
     if not rows:
         return None, {}
 
-    # 依商品（col[1]）分組；順序固定：自營[0] 投信[1] 外資[2]
-    groups, cur_prod, cur_group = [], None, []
-    for row in rows:
-        if row[1] != cur_prod:
-            if cur_group:
-                groups.append(cur_group)
-            cur_prod, cur_group = row[1], [row]
-        else:
-            cur_group.append(row)
-    if cur_group:
-        groups.append(cur_group)
+    # 用中文名稱比對（Python 伺服器端執行，無編碼問題）
+    # col[1]=商品名稱, col[2]=身份別
+    def find_net(prod_kw, ident_kw):
+        for row in rows:
+            if prod_kw in row[1] and ident_kw in row[2]:
+                lo = int(row[9].replace(",", "") or "0") if len(row) > 9 and row[9] else 0
+                so = int(row[11].replace(",", "") or "0") if len(row) > 11 and row[11] else 0
+                return lo - so
+        return 0
 
-    def net(group, idx):
-        row = group[idx] if idx < len(group) else None
-        if not row:
-            return 0
-        lo = int(row[9].replace(",", "") or "0") if len(row) > 9 else 0
-        so = int(row[11].replace(",", "") or "0") if len(row) > 11 else 0
-        return lo - so
-
-    tx  = groups[0]             # 臺股期貨（大台）
-    mtx = groups[-1]            # 小型臺指期貨（小台）
     date = rows[0][0]
     return date, {
-        "txF":  net(tx, 2),  "txT":  net(tx, 1),  "txD":  net(tx, 0),
-        "mtxF": net(mtx, 2), "mtxT": net(mtx, 1), "mtxD": net(mtx, 0),
+        "txF":  find_net("臺股期貨",   "外資"),
+        "txT":  find_net("臺股期貨",   "投信"),
+        "txD":  find_net("臺股期貨",   "自營"),
+        "mtxF": find_net("小型臺指期貨", "外資"),
+        "mtxT": find_net("小型臺指期貨", "投信"),
+        "mtxD": find_net("小型臺指期貨", "自營"),
     }
 
 
