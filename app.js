@@ -271,43 +271,49 @@ async function loadFutures(dates) {
         l.split(',').map(s => s.replace(/"/g, '').trim())
       );
 
-      // 找外資列（自營商=Dealer, 投信=IT, 外資=Fini）
-      let txNet = null, mtxNet = null;
-      for (const row of lines) {
-        if (row.length < 10) continue;
-        const name = row[1] || '';
-        // 大台 TXF 外資淨部位
-        if (row[0] === 'TXF' && name.includes('外資')) {
-          txNet = parseInt(row[9]?.replace(/,/g, '') || '0') || 0;
-        }
-        // 小台 MXF 外資淨部位
-        if (row[0] === 'MXF' && name.includes('外資')) {
-          mtxNet = parseInt(row[9]?.replace(/,/g, '') || '0') || 0;
-        }
-      }
+      // 解析各身份別淨部位（大台TXF、小台MXF）
+      const parseNet = (contract, identity) => {
+        const row = lines.find(r => r[0] === contract && (r[1] || '').includes(identity));
+        return row ? (parseInt(row[9]?.replace(/,/g, '') || '0') || 0) : 0;
+      };
 
-      if (txNet === null && mtxNet === null) continue;
+      const txForeign  = parseNet('TXF', '外資');
+      const txDealer   = parseNet('TXF', '自營');
+      const txTrust    = parseNet('TXF', '投信');
+      const txTotal    = parseNet('TXF', '合計');
+      const txRetail   = txTotal - txForeign - txDealer - txTrust;
 
-      txNet  = txNet  ?? 0;
-      mtxNet = mtxNet ?? 0;
+      const mtxForeign = parseNet('MXF', '外資');
+      const mtxDealer  = parseNet('MXF', '自營');
+      const mtxTrust   = parseNet('MXF', '投信');
+      const mtxTotal   = parseNet('MXF', '合計');
+      const mtxRetail  = mtxTotal - mtxForeign - mtxDealer - mtxTrust;
+
+      if (txTotal === 0 && mtxTotal === 0) continue;
 
       // 小台換算大台當量（÷4）
-      const mtxEq = mtxNet / 4;
-      const total = txNet + mtxEq;
-      const days  = daysUntilSettlement();
-      const ratio = days > 0 ? (total / days).toFixed(1) : '--';
+      const mtxEq        = mtxForeign / 4;
+      const futTotal     = txForeign + mtxEq;
+      const retMtxEq     = mtxRetail / 4;
+      const retTotal     = txRetail + retMtxEq;
 
-      const setFut = (id, val) => {
+      const days  = daysUntilSettlement();
+      const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
+
+      const setVal = (id, val) => {
         const el = document.getElementById(id);
         el.textContent = (val >= 0 ? '+' : '') + Math.round(val).toLocaleString();
         el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
       };
 
-      setFut('fut-tx',    txNet);
-      setFut('fut-mtx',   mtxEq);
-      setFut('fut-total', total);
-      document.getElementById('fut-days').textContent = `${days} 天`;
+      setVal('fut-tx',    txForeign);
+      setVal('fut-mtx',   mtxEq);
+      setVal('fut-total', futTotal);
+      setVal('ret-tx',    txRetail);
+      setVal('ret-mtx',   retMtxEq);
+      setVal('ret-total', retTotal);
 
+      document.getElementById('fut-days').textContent = `${days} 天`;
       const ratioEl = document.getElementById('fut-ratio');
       const ratioNum = parseFloat(ratio);
       ratioEl.textContent = (ratioNum >= 0 ? '+' : '') + ratio;
@@ -315,7 +321,7 @@ async function loadFutures(dates) {
       return;
     } catch (e) { continue; }
   }
-  ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio'].forEach(id => {
+  ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio','ret-tx','ret-mtx','ret-total'].forEach(id => {
     document.getElementById(id).textContent = '--';
   });
 }
