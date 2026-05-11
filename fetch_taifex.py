@@ -220,10 +220,22 @@ if not _TOKEN:
         _TOKEN = ""
 
 print("抓取台指期 TX OHLC (FinMind)...")
-twii_records = fetch_tx_ohlc(_TOKEN, 25)
-print(f"  取得 {len(twii_records)} 天")
+twii_records = []
+if _TOKEN:
+    try:
+        twii_records = fetch_tx_ohlc(_TOKEN, 25)
+        print(f"  取得 {len(twii_records)} 天")
+    except Exception as e:
+        print(f"  FinMind 失敗：{e}，跳過 TX 波動")
+else:
+    print("  未設定 FINMIND_TOKEN，跳過 TX 波動")
+
 print("抓取 NQ=F OHLC (Yahoo Finance)...")
-nq_records   = fetch_yahoo_ohlc("NQ=F",  25)
+nq_records = []
+try:
+    nq_records = fetch_yahoo_ohlc("NQ=F", 25)
+except Exception as e:
+    print(f"  Yahoo Finance 失敗：{e}")
 
 tx_vol = build_vol_data(twii_records, "TX")
 nq_vol = build_vol_data(nq_records,   "NQ")
