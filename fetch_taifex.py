@@ -195,47 +195,55 @@ def build_vol_data(records, label):
 
 
 # ── 主程式 ────────────────────────────────────────────────────
+import os as _os, sys as _sys
 
 FUT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
 OPT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate")
 
-fut_text = fetch_csv(FUT_URL)
-opt_text = fetch_csv(OPT_URL)
+# TAIFEX 未平倉
+date, futures, options = None, {}, {}
+try:
+    fut_text = fetch_csv(FUT_URL)
+    date, futures = parse_futures(fut_text)
+    print(f"futures OK  date={date}  txF={futures.get('txF')}")
+except Exception as e:
+    print(f"futures FAIL: {e}")
 
-date, futures = parse_futures(fut_text)
-options       = parse_options(opt_text)
+try:
+    opt_text = fetch_csv(OPT_URL)
+    options = parse_options(opt_text)
+    print(f"options OK  bc={options.get('bc')}")
+except Exception as e:
+    print(f"options FAIL: {e}")
 
-# 波動資料（台指期 TX + NQ 期貨）
-import os as _os
+# FinMind token
 _TOKEN = _os.environ.get("FINMIND_TOKEN", "")
 if not _TOKEN:
-    # 本地開發：從 stockematool/config.py 讀取
-    import sys as _sys
     _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../stockematool'))
     try:
         from config import FINMIND_TOKEN as _TOKEN
     except Exception:
         _TOKEN = ""
 
-print("抓取台指期 TX OHLC (FinMind)...")
+# 波動資料
 twii_records = []
 if _TOKEN:
     try:
         twii_records = fetch_tx_ohlc(_TOKEN, 25)
-        print(f"  取得 {len(twii_records)} 天")
+        print(f"TX OHLC OK  {len(twii_records)} days")
     except Exception as e:
-        print(f"  FinMind 失敗：{e}，跳過 TX 波動")
+        print(f"TX OHLC FAIL: {e}")
 else:
-    print("  未設定 FINMIND_TOKEN，跳過 TX 波動")
+    print("FINMIND_TOKEN not set, skipping TX volatility")
 
-print("抓取 NQ=F OHLC (Yahoo Finance)...")
 nq_records = []
 try:
     nq_records = fetch_yahoo_ohlc("NQ=F", 25)
+    print(f"NQ OHLC OK  {len(nq_records)} days")
 except Exception as e:
-    print(f"  Yahoo Finance 失敗：{e}")
+    print(f"NQ OHLC FAIL: {e}")
 
 tx_vol = build_vol_data(twii_records, "TX")
 nq_vol = build_vol_data(nq_records,   "NQ")
@@ -244,16 +252,11 @@ result = {
     "date":       date,
     "futures":    futures,
     "options":    options,
-    "volatility": {
-        "tx": tx_vol,
-        "nq": nq_vol,
-    },
+    "volatility": {"tx": tx_vol, "nq": nq_vol},
     "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
 }
 
 with open("taifex_data.json", "w", encoding="utf-8") as f:
     json.dump(result, f, ensure_ascii=False, indent=2)
 
-print(f"OK  date={date}  txF={futures.get('txF')}  bc={options.get('bc')}")
-print(f"    TX yd={tx_vol.get('yesterday',{}).get('range')} avg20={tx_vol.get('avg20')} cat={tx_vol.get('category')}")
-print(f"    NQ yd={nq_vol.get('yesterday',{}).get('range')} avg20={nq_vol.get('avg20')} cat={nq_vol.get('category')}")
+print("taifex_data.json written OK")
