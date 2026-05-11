@@ -158,7 +158,7 @@ def fetch_yahoo_ohlc(symbol, n_days=25):
 
 
 def classify(rng, avg):
-    """依據與均值的比例分類：低/小/大/高"""
+    """依據與均值的比例分類：低/小/中/大/高"""
     if avg <= 0:
         return "—"
     ratio = rng / avg
@@ -166,7 +166,9 @@ def classify(rng, avg):
         return "低"
     elif ratio < 0.7:
         return "小"
-    elif ratio <= 1.3:
+    elif ratio < 1.0:
+        return "中"
+    elif ratio <= 1.4:
         return "大"
     else:
         return "高"

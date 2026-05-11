@@ -234,8 +234,8 @@ async function loadMarketInfo() {
 
 // ── 波動區塊 ──────────────────────────────────────────────────
 
-const CAT_COLOR = { '低': 'text-blue-400', '小': 'text-yellow-400', '大': 'text-orange-400', '高': 'text-red-400' };
-const CAT_BG    = { '低': 'bg-blue-900',   '小': 'bg-yellow-900',   '大': 'bg-orange-900',   '高': 'bg-red-900' };
+const CAT_COLOR = { '低': 'text-blue-400', '小': 'text-cyan-400', '中': 'text-yellow-400', '大': 'text-orange-400', '高': 'text-red-400' };
+const CAT_BG    = { '低': 'bg-blue-900',   '小': 'bg-cyan-900',   '中': 'bg-yellow-900',   '大': 'bg-orange-900',   '高': 'bg-red-900' };
 
 async function loadVolatility() {
   try {
@@ -269,7 +269,7 @@ function openVolModal(key) {
     document.getElementById('vol-modal-title').textContent = titles[key] || '';
     const rows = [...vol.history].reverse().map(r => {
       const cat = r.range && vol.avg20
-        ? (r.range < vol.avg20 * 0.4 ? '低' : r.range < vol.avg20 * 0.7 ? '小' : r.range <= vol.avg20 * 1.3 ? '大' : '高')
+        ? (r.range < vol.avg20 * 0.4 ? '低' : r.range < vol.avg20 * 0.7 ? '小' : r.range < vol.avg20 * 1.0 ? '中' : r.range <= vol.avg20 * 1.4 ? '大' : '高')
         : '--';
       const c = CAT_COLOR[cat] || 'text-gray-300';
       return `<div class="flex justify-between items-center py-1 border-b border-gray-800">
