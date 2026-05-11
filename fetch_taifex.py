@@ -96,14 +96,45 @@ def parse_options(text):
     return {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
 
 
-# ── Yahoo Finance OHLC（台加權 + NQ 期貨）────────────────────
+# ── FinMind 台指期 OHLC ──────────────────────────────────────
+
+def fetch_tx_ohlc(token, n_days=25):
+    """
+    從 FinMind 抓台指期（TX）近月合約每日高低點。
+    用 after_market session 的 max/min（含日盤+夜盤完整波動）。
+    """
+    from datetime import date as _date
+    start = (_date.today() - timedelta(days=60)).strftime("%Y-%m-%d")
+    url = (f"https://api.finmindtrade.com/api/v4/data"
+           f"?dataset=TaiwanFuturesDaily&data_id=TX&start_date={start}&token={token}")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read())
+
+    rows = data.get("data", [])
+    # 只取近月合約（contract_date 為純 6 位數字，如 202605）的 after_market
+    by_date = {}
+    for row in rows:
+        if (row["trading_session"] == "after_market"
+                and len(row["contract_date"]) == 6
+                and row["volume"] > 0):
+            dt = row["date"]
+            # 近月優先：取成交量最大的
+            if dt not in by_date or row["volume"] > by_date[dt]["volume"]:
+                by_date[dt] = row
+
+    records = []
+    for dt in sorted(by_date.keys()):
+        r = by_date[dt]
+        h, l = round(r["max"]), round(r["min"])
+        records.append({"date": dt, "high": h, "low": l, "range": h - l})
+
+    return records[-n_days:] if len(records) >= n_days else records
+
+
+# ── Yahoo Finance OHLC（NQ 期貨）────────────────────────────
 
 def fetch_yahoo_ohlc(symbol, n_days=25):
-    """
-    取得最近 n_days 個交易日的 OHLC，回傳 list of dict:
-      [{"date": "2026-05-08", "high": ..., "low": ..., "range": ...}, ...]
-    最新的在最後（index -1 = 最近一天）
-    """
     url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
            f"?interval=1d&range=60d")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -121,14 +152,8 @@ def fetch_yahoo_ohlc(symbol, n_days=25):
         if h is None or l is None:
             continue
         dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
-        records.append({
-            "date":  dt,
-            "high":  round(h),
-            "low":   round(l),
-            "range": round(h - l),
-        })
+        records.append({"date": dt, "high": round(h), "low": round(l), "range": round(h - l)})
 
-    # 只取最近 n_days 筆（已排除 None）
     return records[-n_days:] if len(records) >= n_days else records
 
 
@@ -180,10 +205,22 @@ opt_text = fetch_csv(OPT_URL)
 date, futures = parse_futures(fut_text)
 options       = parse_options(opt_text)
 
-# 波動資料（台加權指數代替台指期；NQ 期貨）
-print("抓取 ^TWII OHLC...")
-twii_records = fetch_yahoo_ohlc("^TWII", 25)
-print("抓取 NQ=F OHLC...")
+# 波動資料（台指期 TX + NQ 期貨）
+import os as _os
+_TOKEN = _os.environ.get("FINMIND_TOKEN", "")
+if not _TOKEN:
+    # 本地開發：從 stockematool/config.py 讀取
+    import sys as _sys
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../stockematool'))
+    try:
+        from config import FINMIND_TOKEN as _TOKEN
+    except Exception:
+        _TOKEN = ""
+
+print("抓取台指期 TX OHLC (FinMind)...")
+twii_records = fetch_tx_ohlc(_TOKEN, 25)
+print(f"  取得 {len(twii_records)} 天")
+print("抓取 NQ=F OHLC (Yahoo Finance)...")
 nq_records   = fetch_yahoo_ohlc("NQ=F",  25)
 
 tx_vol = build_vol_data(twii_records, "TX")

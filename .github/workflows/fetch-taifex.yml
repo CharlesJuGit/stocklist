@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch TAIFEX data
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: python3 fetch_taifex.py
 
       - name: Commit and push
