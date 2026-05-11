@@ -219,7 +219,7 @@ except Exception as e:
     print(f"options FAIL: {e}")
 
 # FinMind token
-_TOKEN = _os.environ.get("FINMIND_TOKEN", "")
+_TOKEN = _os.environ.get("FINMIND_TOKEN", "").strip()
 if not _TOKEN:
     _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../stockematool'))
     try:
