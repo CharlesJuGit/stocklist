@@ -223,13 +223,77 @@ function getRecentTradingDates(n = 5) {
 }
 
 async function loadMarketInfo() {
-  const dates = getRecentTradingDates(10); // 多抓幾天確保能找到最近交易日
+  const dates = getRecentTradingDates(10);
   await Promise.all([
     loadInstitutes(dates),
     loadOptions(),
     loadFutures(),
+    loadVolatility(),
   ]);
 }
+
+// ── 波動區塊 ──────────────────────────────────────────────────
+
+const CAT_COLOR = { '低': 'text-blue-400', '小': 'text-yellow-400', '大': 'text-orange-400', '高': 'text-red-400' };
+const CAT_BG    = { '低': 'bg-blue-900',   '小': 'bg-yellow-900',   '大': 'bg-orange-900',   '高': 'bg-red-900' };
+
+async function loadVolatility() {
+  try {
+    const data = await loadTaifexJson();
+    const vol = data.volatility;
+    if (!vol) return;
+    renderVol('tx', vol.tx, '台指期');
+    renderVol('nq', vol.nq, 'Nasdaq 期貨');
+  } catch (e) { console.error('loadVolatility:', e); }
+}
+
+function renderVol(key, vol, label) {
+  if (!vol || !vol.yesterday) return;
+  const yd = vol.yesterday;
+  document.getElementById(`${key}-high`).textContent  = yd.high.toLocaleString();
+  document.getElementById(`${key}-low`).textContent   = yd.low.toLocaleString();
+  document.getElementById(`${key}-range`).textContent = yd.range.toLocaleString();
+  document.getElementById(`${key}-avg`).textContent   = vol.avg20.toLocaleString();
+  const cat = vol.category || '--';
+  const el = document.getElementById(`${key}-cat`);
+  el.textContent = cat;
+  el.className = `text-sm font-bold px-3 py-1 rounded-full ${CAT_BG[cat] || 'bg-gray-700'} ${CAT_COLOR[cat] || 'text-white'}`;
+}
+
+let _volData = null;
+function openVolModal(key) {
+  loadTaifexJson().then(data => {
+    const vol = data?.volatility?.[key];
+    if (!vol?.history) return;
+    const titles = { tx: '台指期 前20天波動', nq: 'Nasdaq 期貨 前20天波動' };
+    document.getElementById('vol-modal-title').textContent = titles[key] || '';
+    const rows = [...vol.history].reverse().map(r => {
+      const cat = r.range && vol.avg20
+        ? (r.range < vol.avg20 * 0.4 ? '低' : r.range < vol.avg20 * 0.7 ? '小' : r.range <= vol.avg20 * 1.3 ? '大' : '高')
+        : '--';
+      const c = CAT_COLOR[cat] || 'text-gray-300';
+      return `<div class="flex justify-between items-center py-1 border-b border-gray-800">
+        <span class="text-gray-400">${r.date}</span>
+        <span class="text-gray-300">${r.high.toLocaleString()} / ${r.low.toLocaleString()}</span>
+        <span class="w-14 text-right font-bold ${c}">${r.range.toLocaleString()}</span>
+        <span class="w-6 text-right text-xs ${c}">${cat}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('vol-modal-body').innerHTML =
+      `<div class="flex justify-between text-xs text-gray-500 mb-1 px-0">
+         <span>日期</span><span>高/低</span><span class="w-14 text-right">波動</span><span class="w-6"></span>
+       </div>` + rows;
+    document.getElementById('vol-modal').classList.remove('hidden');
+  });
+}
+
+function closeVolModal() {
+  document.getElementById('vol-modal').classList.add('hidden');
+}
+
+document.getElementById('vol-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeVolModal();
+});
 
 // 計算下一個結算日（每月第三個星期三）
 function getNextSettlementDate() {

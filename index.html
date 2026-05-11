@@ -101,6 +101,72 @@
   <!-- 免責聲明 -->
   <p class="text-center text-xs text-gray-500 mb-6">本網站內容僅供參考，不構成任何投資建議，投資人應自行判斷並負擔風險。</p>
 
+  <!-- 波動區塊 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4">
+    <div class="text-xs text-gray-500 mb-3">每日波動比較（前一日 vs 20日均值）</div>
+    <div class="grid grid-cols-2 gap-4">
+
+      <!-- 台指期（^TWII 代理） -->
+      <div class="bg-gray-800 rounded-lg p-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-bold text-gray-200">台指期</span>
+          <button onclick="openVolModal('tx')"
+            class="text-xs text-blue-400 hover:text-blue-300 underline">前20天 ▸</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-1">
+          前日高：<span id="tx-high" class="text-white">--</span>
+          低：<span id="tx-low" class="text-white">--</span>
+        </div>
+        <div class="flex justify-between items-center mt-2">
+          <div class="text-xs text-gray-400">前日波動</div>
+          <div id="tx-range" class="text-lg font-bold text-white">--</div>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+          <div class="text-xs text-gray-400">20日均值</div>
+          <div id="tx-avg" class="text-sm text-gray-300">--</div>
+        </div>
+        <div class="mt-2 text-center">
+          <span id="tx-cat" class="text-sm font-bold px-3 py-1 rounded-full bg-gray-700">--</span>
+        </div>
+      </div>
+
+      <!-- Nasdaq 期貨 -->
+      <div class="bg-gray-800 rounded-lg p-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-bold text-gray-200">Nasdaq 期貨</span>
+          <button onclick="openVolModal('nq')"
+            class="text-xs text-blue-400 hover:text-blue-300 underline">前20天 ▸</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-1">
+          前日高：<span id="nq-high" class="text-white">--</span>
+          低：<span id="nq-low" class="text-white">--</span>
+        </div>
+        <div class="flex justify-between items-center mt-2">
+          <div class="text-xs text-gray-400">前日波動</div>
+          <div id="nq-range" class="text-lg font-bold text-white">--</div>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+          <div class="text-xs text-gray-400">20日均值</div>
+          <div id="nq-avg" class="text-sm text-gray-300">--</div>
+        </div>
+        <div class="mt-2 text-center">
+          <span id="nq-cat" class="text-sm font-bold px-3 py-1 rounded-full bg-gray-700">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 波動歷史彈出視窗 -->
+  <div id="vol-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="vol-modal-title" class="text-lg font-bold"></h2>
+        <button onclick="closeVolModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="vol-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- 股票更新時間 -->
   <div class="text-center text-xs text-gray-500 mb-2" id="stocks-updated"></div>
 
