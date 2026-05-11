@@ -218,34 +218,13 @@ try:
 except Exception as e:
     print(f"options FAIL: {e}")
 
-# FinMind token
-_TOKEN = _os.environ.get("FINMIND_TOKEN", "").strip()
-if not _TOKEN:
-    _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../stockematool'))
-    try:
-        from config import FINMIND_TOKEN as _TOKEN
-    except Exception:
-        _TOKEN = ""
-
-# 波動資料：優先用 FinMind TX 期貨，失敗則 fallback 到 Yahoo ^TWII
+# 波動資料：TX 用 Yahoo Finance ^TWII（無需額外 token，CI 友好）
 twii_records = []
-if _TOKEN:
-    try:
-        twii_records = fetch_tx_ohlc(_TOKEN, 25)
-        print(f"TX OHLC OK (FinMind)  {len(twii_records)} days")
-    except Exception as e:
-        print(f"TX FinMind FAIL ({e}), trying Yahoo ^TWII fallback...")
-        try:
-            twii_records = fetch_yahoo_ohlc("^TWII", 25)
-            print(f"TX OHLC OK (^TWII fallback)  {len(twii_records)} days")
-        except Exception as e2:
-            print(f"TX OHLC FAIL: {e2}")
-else:
-    try:
-        twii_records = fetch_yahoo_ohlc("^TWII", 25)
-        print(f"TX OHLC OK (^TWII, no token)  {len(twii_records)} days")
-    except Exception as e:
-        print(f"TX OHLC FAIL: {e}")
+try:
+    twii_records = fetch_yahoo_ohlc("^TWII", 25)
+    print(f"TX OHLC OK  {len(twii_records)} days")
+except Exception as e:
+    print(f"TX OHLC FAIL: {e}")
 
 nq_records = []
 try:
