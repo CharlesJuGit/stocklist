@@ -38,3 +38,4 @@ jobs:
             git pull --rebase origin main
             git push origin main
           fi
+        continue-on-error: true
