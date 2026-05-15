@@ -228,6 +228,176 @@ def build_vol_data(records, label):
     }
 
 
+# ── 結算日與交易日計算 ─────────────────────────────────────────
+
+def get_settlement_date(ref_date=None):
+    """取得台指期當月結算日（第三個週三）。若已過結算日則取下月。"""
+    from datetime import date as _date
+    d = ref_date or _date.today()
+    # 找當月第三個週三
+    first = d.replace(day=1)
+    wednesdays = []
+    for i in range(31):
+        candidate = first.replace(day=1)
+        try:
+            candidate = _date(first.year, first.month, 1 + i)
+        except ValueError:
+            break
+        if candidate.month != first.month:
+            break
+        if candidate.weekday() == 2:  # 週三
+            wednesdays.append(candidate)
+    settlement = wednesdays[2] if len(wednesdays) >= 3 else wednesdays[-1]
+    # 若今天已過結算日，取下月
+    if d > settlement:
+        if first.month == 12:
+            next_month = first.replace(year=first.year + 1, month=1)
+        else:
+            next_month = first.replace(month=first.month + 1)
+        return get_settlement_date(next_month)
+    return settlement
+
+
+def count_trading_days(from_date, to_date):
+    """計算 from_date 到 to_date（含兩端）之間的交易日數（週一到週五）。"""
+    from datetime import timedelta as _td
+    count = 0
+    d = from_date
+    while d <= to_date:
+        if d.weekday() < 5:  # 0=Mon…4=Fri
+            count += 1
+        d += _td(days=1)
+    return count
+
+
+def calc_settlement_ratio(txF, mtxF, bp, sp, settlement, from_date=None):
+    """
+    結算比計算。
+    公式：
+      fut_net  = txF + mtxF/4
+      opt_net  = bp - sp
+      若 opt_net > 3000：pressure = abs(fut_net) + opt_net
+      否則：            pressure = abs(fut_net)
+      ratio = pressure / 結算前剩餘交易日數（不含 from_date 當天，含結算日）
+    settlement: datetime.date 結算日
+    from_date:  計算起點（預設今天，回填歷史時傳入資料日期）
+    回傳 dict {fut_net, opt_net, pressure, tdays, ratio}
+    """
+    from datetime import date as _date, timedelta as _td
+    base = from_date or _date.today()
+    fut_net = txF + mtxF / 4
+    opt_net = bp - sp
+    pressure = abs(fut_net) + (opt_net if opt_net > 3000 else 0)
+    tdays = count_trading_days(base + _td(days=1), settlement)
+    ratio = round(pressure / tdays) if tdays > 0 else 0
+    return {
+        "fut_net":  round(fut_net),
+        "opt_net":  opt_net,
+        "pressure": round(pressure),
+        "tdays":    tdays,
+        "ratio":    ratio,
+    }
+
+
+# ── 結算比歷史資料（每日 append）────────────────────────────────
+
+def fetch_settlement_history_backfill(n_days=30):
+    """
+    用 FinMind 一次性回填結算比歷史。
+    TX/MTX 外資未平倉 + TXO 全機構 PUT BP/SP。
+    """
+    from datetime import date as _date, timedelta as _td, datetime as _dt
+    start = (_date.today() - _td(days=n_days + 15)).strftime("%Y-%m-%d")
+
+    def _get(url):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read()).get("data", [])
+
+    token = _os.getenv("FINMIND_TOKEN", "").strip()
+    tok_param = f"&token={token}" if token else ""
+
+    # 外資期貨
+    def get_fut(ticker):
+        rows = _get(f"https://api.finmindtrade.com/api/v4/data"
+                    f"?dataset=TaiwanFuturesInstitutionalInvestors&data_id={ticker}&start_date={start}{tok_param}")
+        by_date = {}
+        for row in rows:
+            by_date.setdefault(row["date"], []).append(row)
+        result = {}
+        for dt, day_rows in by_date.items():
+            if len(day_rows) >= 3:
+                r = day_rows[2]  # 外資
+                result[dt] = r["long_open_interest_balance_volume"] - r["short_open_interest_balance_volume"]
+        return result
+
+    # 全機構 PUT
+    def get_put():
+        rows = _get(f"https://api.finmindtrade.com/api/v4/data"
+                    f"?dataset=TaiwanOptionInstitutionalInvestors&data_id=TXO&start_date={start}{tok_param}")
+        by_date = {}
+        for row in rows:
+            by_date.setdefault(row["date"], []).append(row)
+        result = {}
+        for dt, day_rows in by_date.items():
+            put_rows = day_rows[3:6] if len(day_rows) >= 6 else []
+            bp = sum(r["long_open_interest_balance_volume"] for r in put_rows)
+            sp = sum(r["short_open_interest_balance_volume"] for r in put_rows)
+            result[dt] = {"bp": bp, "sp": sp}
+        return result
+
+    tx  = get_fut("TX")
+    mtx = get_fut("MTX")
+    put = get_put()
+
+    # 去除週末重複（FinMind 節假日沿用前一天數值）
+    all_days = sorted(set(tx) & set(mtx))
+    prev = None
+    records = []
+    for d in all_days:
+        cur = (tx[d], mtx[d])
+        if cur == prev:
+            continue
+        prev = cur
+        dt_obj = _dt.strptime(d, "%Y-%m-%d")
+        if dt_obj.weekday() >= 5:  # 六日跳過
+            continue
+        o = put.get(d, {})
+        txF  = tx[d]
+        mtxF = mtx.get(d, 0)
+        bp   = o.get("bp", 0)
+        sp   = o.get("sp", 0)
+        d_date     = _dt.strptime(d, "%Y-%m-%d").date()
+        row_settle = get_settlement_date(d_date)
+        sr   = calc_settlement_ratio(txF, mtxF, bp, sp, row_settle, from_date=d_date)
+        records.append({
+            "date":     d,
+            "txF":      txF,
+            "mtxF":     mtxF,
+            "bp":       bp,
+            "sp":       sp,
+            "fut_net":  sr["fut_net"],
+            "opt_net":  sr["opt_net"],
+            "pressure": sr["pressure"],
+            "tdays":    sr["tdays"],
+            "ratio":    sr["ratio"],
+        })
+
+    return records[-n_days:]
+
+
+def build_settlement_history(existing: list, today_entry: dict) -> list:
+    """
+    將今日 TAIFEX openapi 的資料 append 到歷史陣列。
+    若今日已存在則覆蓋（重跑時更新），最多保留 60 筆。
+    """
+    today = today_entry["date"]
+    history = [r for r in existing if r["date"] != today]
+    history.append(today_entry)
+    history.sort(key=lambda r: r["date"])
+    return history[-60:]
+
+
 # ── 主程式 ────────────────────────────────────────────────────
 import os as _os, sys as _sys
 
@@ -270,12 +440,62 @@ except Exception as e:
 tx_vol = build_vol_data(tx_records, "TX")
 nq_vol = build_vol_data(nq_records, "NQ")
 
+# ── 結算比歷史 ───────────────────────────────────────────────
+# 讀取既有 JSON
+existing_json = {}
+try:
+    with open("taifex_data.json", "r", encoding="utf-8") as f:
+        existing_json = json.load(f)
+except Exception:
+    pass
+
+existing_history = existing_json.get("settlement_history", [])
+
+# 若歷史不足 5 筆，用 FinMind 回填
+if len(existing_history) < 5:
+    print("settlement_history 不足，執行 FinMind 回填...")
+    try:
+        existing_history = fetch_settlement_history_backfill(30)
+        print(f"FinMind 回填完成：{len(existing_history)} 筆")
+    except Exception as e:
+        print(f"FinMind 回填失敗：{e}")
+
+# 今日 TAIFEX openapi 資料（只在有期貨資料時 append）
+settlement_date = get_settlement_date()
+print(f"settlement date: {settlement_date}")
+
+if futures and date:
+    today_iso = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    from datetime import date as _date2
+    taifex_date = _date2(int(date[:4]), int(date[4:6]), int(date[6:]))
+    txF  = futures.get("txF", 0)
+    mtxF = futures.get("mtxF", 0)
+    bp   = options.get("bp", 0)
+    sp   = options.get("sp", 0)
+    sr   = calc_settlement_ratio(txF, mtxF, bp, sp, settlement_date, from_date=taifex_date)
+    today_entry = {
+        "date":     today_iso,
+        "txF":      txF,
+        "mtxF":     mtxF,
+        "bp":       bp,
+        "sp":       sp,
+        "fut_net":  sr["fut_net"],
+        "opt_net":  sr["opt_net"],
+        "pressure": sr["pressure"],
+        "tdays":    sr["tdays"],
+        "ratio":    sr["ratio"],
+    }
+    existing_history = build_settlement_history(existing_history, today_entry)
+    print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
+
 result = {
-    "date":       date,
-    "futures":    futures,
-    "options":    options,
-    "volatility": {"tx": tx_vol, "nq": nq_vol},
-    "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "date":               date,
+    "futures":            futures,
+    "options":            options,
+    "settlement_date":    settlement_date.strftime("%Y-%m-%d"),
+    "settlement_history": existing_history,
+    "volatility":         {"tx": tx_vol, "nq": nq_vol},
+    "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
 }
 
 with open("taifex_data.json", "w", encoding="utf-8") as f:
