@@ -33,12 +33,16 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git reset --soft origin/main
           git add taifex_data.json
           if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
           fi
           git commit -m "chore: update TAIFEX data [skip ci]"
-          git push origin main && echo "Push OK"
+          for i in 1 2 3; do
+            git push origin main && echo "Push OK" && exit 0
+            echo "Push failed (attempt $i), pulling and retrying..."
+            git pull --rebase origin main
+          done
+          echo "All push attempts failed"
+          exit 1
