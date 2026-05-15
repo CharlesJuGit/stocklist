@@ -9,7 +9,13 @@
     "mtxD": -3984
   },
   "options": {},
-  "institute": {},
+  "institute": {
+    "date": "20260515",
+    "foreign": -104.3,
+    "trust": -13.7,
+    "dealer": -53.0,
+    "total": -171.0
+  },
   "settlement_date": "2026-05-20",
   "settlement_history": [
     {
@@ -31,11 +37,11 @@
       "yesterday": {
         "date": "2026-05-15",
         "high": 29734,
-        "low": 29142,
-        "range": 592
+        "low": 29090,
+        "range": 644
       },
       "avg20": 441,
-      "category": "大",
+      "category": "高",
       "history": [
         {
           "date": "2026-04-20",
@@ -154,11 +160,11 @@
         {
           "date": "2026-05-15",
           "high": 29734,
-          "low": 29142,
-          "range": 592
+          "low": 29090,
+          "range": 644
         }
       ]
     }
   },
-  "updated_at": "2026-05-15T13:45:14Z"
+  "updated_at": "2026-05-15T14:06:34Z"
 }
