@@ -555,9 +555,14 @@ async function refreshAll() {
   chipCache = {};
   _taifexCache = null;
   _taifexPromise = null;
-  await Promise.all([loadStocks(), loadMarketInfo()]);
-  btn.textContent = '↻ 重新整理';
-  btn.disabled = false;
+  try {
+    await Promise.all([loadStocks(), loadMarketInfo()]);
+  } catch (e) {
+    console.error('refreshAll error:', e);
+  } finally {
+    btn.textContent = '↻ 重新整理';
+    btn.disabled = false;
+  }
 }
 
 loadStocks();
