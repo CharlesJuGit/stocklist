@@ -30,6 +30,7 @@ jobs:
           python fetch_taifex.py || echo "fetch_taifex.py exited with error, continuing anyway"
 
       - name: Commit and push
+        continue-on-error: true
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -42,4 +43,4 @@ jobs:
             exit 0
           fi
           git commit -m "chore: update TAIFEX data [skip ci]"
-          git push origin main && echo "Push OK" || echo "Push failed, skipping"
+          git push origin main && echo "Push OK"
