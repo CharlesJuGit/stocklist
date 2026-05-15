@@ -406,6 +406,14 @@ FUT_URL = ("https://openapi.taifex.com.tw/v1/"
 OPT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate")
 
+# ── 讀取既有 JSON（後面若抓失敗可 fallback）────────────────────
+existing_json = {}
+try:
+    with open("taifex_data.json", "r", encoding="utf-8") as f:
+        existing_json = json.load(f)
+except Exception:
+    pass
+
 # TAIFEX 未平倉
 date, futures, options = None, {}, {}
 try:
@@ -421,6 +429,62 @@ try:
     print(f"options OK  bc={options.get('bc')}")
 except Exception as e:
     print(f"options FAIL: {e}")
+
+# 若期貨/選擇權抓失敗，沿用既有資料（防止空資料覆蓋）
+if not futures or not date:
+    print("futures 抓失敗，沿用既有資料")
+    futures = existing_json.get("futures", {})
+    date    = existing_json.get("date")
+if not options or options.get("bc", 0) + options.get("sp", 0) == 0:
+    print("options 抓失敗或為零，沿用既有資料")
+    options = existing_json.get("options", {})
+
+# ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
+def fetch_institute():
+    from datetime import date as _d, timedelta as _td
+    today = _d.today()
+    for i in range(10):
+        d = today - _td(days=i)
+        if d.weekday() >= 5:
+            continue
+        dt_str = d.strftime("%Y%m%d")
+        url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
+               f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                j = json.loads(r.read())
+            rows = j.get("data", [])
+            if not rows:
+                continue
+            def find(kw1, kw2=None):
+                for row in rows:
+                    if kw1 in row[0] or (kw2 and kw2 in row[0]):
+                        return round(float(row[3].replace(",", "")) / 1e8, 1)
+                return None
+            foreign = find("外資及陸資(不含外資自營商)", "外資")
+            trust   = find("投信")
+            dealer  = find("自營商(自行買賣)", "自營商")
+            if foreign is None and trust is None:
+                continue
+            total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
+            print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}")
+            return {"date": dt_str, "foreign": foreign, "trust": trust,
+                    "dealer": dealer, "total": total}
+        except Exception as e:
+            print(f"institute {dt_str} FAIL: {e}")
+            continue
+    return {}
+
+institute = {}
+try:
+    institute = fetch_institute()
+except Exception as e:
+    print(f"institute FAIL: {e}")
+
+if not institute:
+    print("institute 抓失敗，沿用既有資料")
+    institute = existing_json.get("institute", {})
 
 # 波動資料：TX 用 FinMind position session（日盤+夜盤完整），NQ 用 Yahoo Finance
 tx_records = []
@@ -441,14 +505,6 @@ tx_vol = build_vol_data(tx_records, "TX")
 nq_vol = build_vol_data(nq_records, "NQ")
 
 # ── 結算比歷史 ───────────────────────────────────────────────
-# 讀取既有 JSON
-existing_json = {}
-try:
-    with open("taifex_data.json", "r", encoding="utf-8") as f:
-        existing_json = json.load(f)
-except Exception:
-    pass
-
 existing_history = existing_json.get("settlement_history", [])
 
 # 若歷史不足 5 筆，用 FinMind 回填
@@ -492,6 +548,7 @@ result = {
     "date":               date,
     "futures":            futures,
     "options":            options,
+    "institute":          institute,
     "settlement_date":    settlement_date.strftime("%Y-%m-%d"),
     "settlement_history": existing_history,
     "volatility":         {"tx": tx_vol, "nq": nq_vol},

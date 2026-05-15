@@ -223,9 +223,8 @@ function getRecentTradingDates(n = 5) {
 }
 
 async function loadMarketInfo() {
-  const dates = getRecentTradingDates(10);
   await Promise.all([
-    loadInstitutes(dates),
+    loadInstitutes(),
     loadOptions(),
     loadFutures(),
     loadVolatility(),
@@ -478,43 +477,29 @@ async function loadFutures() {
   }
 }
 
-// 三大法人總買賣超（自動找最近有資料的交易日）
-async function loadInstitutes(dates) {
-  for (const date of dates) {
-    try {
-      const url = `https://www.twse.com.tw/rwd/zh/fund/BFI82U?dayDate=${date}&weekDate=&monthDate=&type=day&response=json`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      const json = await res.json();
-      if (!json.data || json.data.length === 0) continue;
+// 三大法人：優先讀 taifex_data.json（GitHub Actions 每日抓），CORS 問題不存在
+async function loadInstitutes() {
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (val === null || val === undefined) { el.textContent = '--'; return; }
+    el.textContent = (val >= 0 ? '+' : '') + Number(val).toFixed(1) + '億';
+    el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+  };
 
-      const find = (keyword) => {
-        const row = json.data.find(r => r[0].includes(keyword));
-        return row ? parseFloat(row[3].replace(/,/g, '')) / 100000000 : null;
-      };
-
-      const foreign = find('外資及陸資(不含外資自營商)') ?? find('外資');
-      const trust   = find('投信');
-      const dealer  = find('自營商(自行買賣)') ?? find('自營商');
-      const total   = (foreign ?? 0) + (trust ?? 0) + (dealer ?? 0);
-
-      const setEl = (id, val) => {
-        const el = document.getElementById(id);
-        if (val === null) { el.textContent = '--'; return; }
-        el.textContent = (val >= 0 ? '+' : '') + val.toFixed(1) + '億';
-        el.className = val >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
-      };
-
-      setEl('inst-foreign', foreign);
-      setEl('inst-trust',   trust);
-      setEl('inst-dealer',  dealer);
-      setEl('inst-total',   total);
-
-      const fmt = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-      document.getElementById('market-date').textContent =
-        `資料日期：${fmt}（收盤後更新）`;
+  try {
+    const data = await loadTaifexJson();
+    const inst = data.institute;
+    if (inst && (inst.foreign !== null || inst.trust !== null)) {
+      setEl('inst-foreign', inst.foreign);
+      setEl('inst-trust',   inst.trust);
+      setEl('inst-dealer',  inst.dealer);
+      setEl('inst-total',   inst.total);
+      const fmt = inst.date ? inst.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '--';
+      document.getElementById('market-date').textContent = `資料日期：${fmt}（收盤後更新）`;
       return;
-    } catch (e) { continue; }
-  }
+    }
+  } catch (e) { /* fallthrough */ }
+
   ['inst-foreign','inst-trust','inst-dealer','inst-total'].forEach(id => {
     document.getElementById(id).textContent = '--';
   });
