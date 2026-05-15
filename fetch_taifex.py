@@ -276,7 +276,7 @@ def calc_settlement_ratio(txF, mtxF, bp, sp, settlement, from_date=None):
     公式：
       fut_net  = txF + mtxF/4
       opt_net  = bp - sp
-      若 opt_net > 3000：pressure = abs(fut_net) + opt_net
+      若 opt_net > 5000：pressure = abs(fut_net) + bp  ← 用總BP（非淨值）
       否則：            pressure = abs(fut_net)
       ratio = pressure / 結算前剩餘交易日數（不含 from_date 當天，含結算日）
     settlement: datetime.date 結算日
@@ -287,7 +287,7 @@ def calc_settlement_ratio(txF, mtxF, bp, sp, settlement, from_date=None):
     base = from_date or _date.today()
     fut_net = txF + mtxF / 4
     opt_net = bp - sp
-    pressure = abs(fut_net) + (opt_net if opt_net > 3000 else 0)
+    pressure = abs(fut_net) + (bp if opt_net > 5000 else 0)
     tdays = count_trading_days(base + _td(days=1), settlement)
     ratio = round(pressure / tdays) if tdays > 0 else 0
     return {
