@@ -395,15 +395,20 @@ function openSettlementModal() {
           </thead>
           <tbody>
             ${recent.map(r => {
-              const ratioColor = r.ratio <= 0 ? 'text-green-400' : 'text-red-400';
-              const optFlag = r.opt_net > 3000 ? `<span class="text-yellow-400">+${r.opt_net.toLocaleString()}</span>` : `<span class="text-gray-500">${r.opt_net.toLocaleString()}</span>`;
+              const futNet  = r.fut_net  ?? 0;
+              const optNet  = r.opt_net  ?? 0;
+              const pressure= r.pressure ?? 0;
+              const tdays   = r.tdays    ?? 0;
+              const ratio   = r.ratio    ?? 0;
+              const ratioColor = ratio <= 0 ? 'text-green-400' : 'text-red-400';
+              const optFlag = optNet > 3000 ? `<span class="text-yellow-400">+${optNet.toLocaleString()}</span>` : `<span class="text-gray-500">${optNet.toLocaleString()}</span>`;
               return `<tr class="border-b border-gray-800">
                 <td class="text-left py-1 text-gray-300">${r.date}</td>
-                <td class="${r.fut_net <= 0 ? 'text-green-400' : 'text-red-400'}">${r.fut_net.toLocaleString()}</td>
+                <td class="${futNet <= 0 ? 'text-green-400' : 'text-red-400'}">${futNet.toLocaleString()}</td>
                 <td>${optFlag}</td>
-                <td class="text-gray-200">${r.pressure.toLocaleString()}</td>
-                <td class="text-gray-400">${r.tdays}</td>
-                <td class="${ratioColor} font-bold">${r.ratio.toLocaleString()}</td>
+                <td class="text-gray-200">${pressure.toLocaleString()}</td>
+                <td class="text-gray-400">${tdays}</td>
+                <td class="${ratioColor} font-bold">${ratio.toLocaleString()}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -522,7 +527,7 @@ async function loadOptions() {
     const o = data.options;
     if (!o) throw new Error('no options');
 
-    const { bc, sc, bp, sp } = o;
+    const bc = o.bc ?? 0, sc = o.sc ?? 0, bp = o.bp ?? 0, sp = o.sp ?? 0;
     if (bc + sc + bp + sp === 0) throw new Error('all zero');
 
     const callNet = bc - sc;
