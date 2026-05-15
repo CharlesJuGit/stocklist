@@ -494,6 +494,10 @@ try:
 except Exception as e:
     print(f"TX OHLC FAIL: {e}")
 
+if not tx_records:
+    print("TX OHLC 抓失敗，沿用既有資料")
+    tx_records = existing_json.get("volatility", {}).get("tx", {}).get("history", [])
+
 nq_records = []
 try:
     nq_records = fetch_yahoo_ohlc("NQ=F", 25)
@@ -501,14 +505,18 @@ try:
 except Exception as e:
     print(f"NQ OHLC FAIL: {e}")
 
+if not nq_records:
+    print("NQ OHLC 抓失敗，沿用既有資料")
+    nq_records = existing_json.get("volatility", {}).get("nq", {}).get("history", [])
+
 tx_vol = build_vol_data(tx_records, "TX")
 nq_vol = build_vol_data(nq_records, "NQ")
 
 # ── 結算比歷史 ───────────────────────────────────────────────
 existing_history = existing_json.get("settlement_history", [])
 
-# 若歷史不足 5 筆，用 FinMind 回填
-if len(existing_history) < 5:
+# 若歷史完全空白，用 FinMind 回填
+if len(existing_history) == 0:
     print("settlement_history 不足，執行 FinMind 回填...")
     try:
         existing_history = fetch_settlement_history_backfill(30)
