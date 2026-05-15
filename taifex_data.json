@@ -14,17 +14,36 @@
     "bp": 71519,
     "sp": 57693
   },
-  "institute": {},
+  "institute": {
+    "date": "20260515",
+    "foreign": -104.3,
+    "trust": -13.7,
+    "dealer": -53.0,
+    "total": -171.0
+  },
   "settlement_date": "2026-05-20",
-  "settlement_history": [],
+  "settlement_history": [
+    {
+      "date": "2026-05-14",
+      "txF": -51068,
+      "mtxF": 3504,
+      "bp": 71519,
+      "sp": 57693,
+      "fut_net": -50192,
+      "opt_net": 13826,
+      "pressure": 121711,
+      "tdays": 4,
+      "ratio": 30428
+    }
+  ],
   "volatility": {
     "tx": {},
     "nq": {
       "yesterday": {
         "date": "2026-05-15",
         "high": 29734,
-        "low": 29143,
-        "range": 591
+        "low": 29142,
+        "range": 592
       },
       "avg20": 441,
       "category": "大",
@@ -146,11 +165,11 @@
         {
           "date": "2026-05-15",
           "high": 29734,
-          "low": 29143,
-          "range": 591
+          "low": 29142,
+          "range": 592
         }
       ]
     }
   },
-  "updated_at": "2026-05-15T12:53:52Z"
+  "updated_at": "2026-05-15T13:12:06Z"
 }
