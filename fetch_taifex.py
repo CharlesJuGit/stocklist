@@ -11,16 +11,25 @@ from datetime import datetime, timezone, timedelta
 # ── TAIFEX CSV 公用 ───────────────────────────────────────────
 
 def fetch_csv(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        raw = resp.read()
-    try:
-        text = raw.decode("utf-8")
-        if "\ufffd" in text:
-            raise ValueError
-    except (ValueError, UnicodeDecodeError):
-        text = raw.decode("big5", errors="replace")
-    return text
+    import time
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                raw = resp.read()
+            try:
+                text = raw.decode("utf-8")
+                if "\ufffd" in text:
+                    raise ValueError
+            except (ValueError, UnicodeDecodeError):
+                text = raw.decode("big5", errors="replace")
+            return text
+        except Exception as e:
+            if attempt < 2:
+                print(f"fetch_csv attempt {attempt+1} failed: {e}, retrying...")
+                time.sleep(3)
+            else:
+                raise
 
 
 def parse_rows(text):
