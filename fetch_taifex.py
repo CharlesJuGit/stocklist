@@ -78,6 +78,28 @@ def parse_futures(text):
 # ── 選擇權未平倉 ──────────────────────────────────────────────
 
 def parse_options(text):
+    # 優先嘗試 JSON 格式（API 目前回傳 JSON，ContractCode 亂碼但位置固定）
+    try:
+        data = json.loads(text)
+    except Exception:
+        data = None
+
+    if data and isinstance(data, list) and len(data) >= 6:
+        first_code = data[0].get("ContractCode", "")
+        bc = sc = bp = sp = 0
+        for row in data:
+            if row.get("ContractCode", "") != first_code:
+                break
+            cp = row.get("CallPut", "")
+            lo = int(str(row.get("OpenInterest(Long)",  0) or 0).replace(",", ""))
+            so = int(str(row.get("OpenInterest(Short)", 0) or 0).replace(",", ""))
+            if cp == "CALL":
+                bc += lo;  sc += so
+            elif cp == "PUT":
+                bp += lo;  sp += so
+        return {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
+
+    # fallback: 舊版 CSV 格式
     rows = parse_rows(text)
     if not rows:
         return {}
@@ -98,30 +120,42 @@ def parse_options(text):
 
 # ── FinMind 台指期 OHLC ──────────────────────────────────────
 
-def fetch_tx_ohlc(token, n_days=25):
+def fetch_tx_ohlc(n_days=25):
     """
     從 FinMind 抓台指期（TX）近月合約每日高低點。
-    用 after_market session 的 max/min（含日盤+夜盤完整波動）。
+    用 position session（日盤+夜盤合計的最高最低）。
+    FinMind 的 position 日期 = 夜盤收盤日（XQ 慣例的隔天），需往前移一天。
+    無 token 可正常取得資料；有 token 則附上以提升 quota。
     """
-    from datetime import date as _date
-    start = (_date.today() - timedelta(days=60)).strftime("%Y-%m-%d")
+    from datetime import date as _date, datetime as _dt
+    start = (_date.today() - timedelta(days=90)).strftime("%Y-%m-%d")
     url = (f"https://api.finmindtrade.com/api/v4/data"
-           f"?dataset=TaiwanFuturesDaily&data_id=TX&start_date={start}&token={token}")
+           f"?dataset=TaiwanFuturesDaily&data_id=TX&start_date={start}")
+    token = _os.getenv("FINMIND_TOKEN", "").strip()
+    if token:
+        url += f"&token={token}"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read())
 
     rows = data.get("data", [])
-    # 只取近月合約（contract_date 為純 6 位數字，如 202605）的 after_market
+    # position session = 日盤+夜盤完整波動，近月合約（6位 contract_date）成交量最大者
+    # FinMind 日期 = 夜盤結束日（比 XQ 慣例多一天）
+    # 特殊：週五盤（3PM Fri→5AM Sat）FinMind 標為下週一；週日 entry 為轉換期資料
+    # 統一做法：往前移一天，落到週六→再退一天(Fri)，落到週日→再退兩天(Fri)
     by_date = {}
     for row in rows:
-        if (row["trading_session"] == "after_market"
+        if (row["trading_session"] == "position"
                 and len(row["contract_date"]) == 6
                 and row["volume"] > 0):
-            dt = row["date"]
-            # 近月優先：取成交量最大的
-            if dt not in by_date or row["volume"] > by_date[dt]["volume"]:
-                by_date[dt] = row
+            xq_dt = _dt.strptime(row["date"], "%Y-%m-%d") - timedelta(days=1)
+            if xq_dt.weekday() == 5:    # 落到週六 → 退到週五
+                xq_dt -= timedelta(days=1)
+            elif xq_dt.weekday() == 6:  # 落到週日 → 退到週五
+                xq_dt -= timedelta(days=2)
+            xq_date = xq_dt.strftime("%Y-%m-%d")
+            if xq_date not in by_date or row["volume"] > by_date[xq_date]["volume"]:
+                by_date[xq_date] = row
 
     records = []
     for dt in sorted(by_date.keys()):
@@ -218,11 +252,11 @@ try:
 except Exception as e:
     print(f"options FAIL: {e}")
 
-# 波動資料：TX 用 Yahoo Finance ^TWII（無需額外 token，CI 友好）
-twii_records = []
+# 波動資料：TX 用 FinMind position session（日盤+夜盤完整），NQ 用 Yahoo Finance
+tx_records = []
 try:
-    twii_records = fetch_yahoo_ohlc("^TWII", 25)
-    print(f"TX OHLC OK  {len(twii_records)} days")
+    tx_records = fetch_tx_ohlc(25)
+    print(f"TX OHLC OK  {len(tx_records)} days  latest={tx_records[-1] if tx_records else None}")
 except Exception as e:
     print(f"TX OHLC FAIL: {e}")
 
@@ -233,8 +267,8 @@ try:
 except Exception as e:
     print(f"NQ OHLC FAIL: {e}")
 
-tx_vol = build_vol_data(twii_records, "TX")
-nq_vol = build_vol_data(nq_records,   "NQ")
+tx_vol = build_vol_data(tx_records, "TX")
+nq_vol = build_vol_data(nq_records, "NQ")
 
 result = {
     "date":       date,
