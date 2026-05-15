@@ -326,19 +326,27 @@ function daysUntilSettlement() {
 
 // 讀取由 GitHub Actions 每日更新的 taifex_data.json（同源，無 CORS 問題）
 let _taifexCache = null;
+let _taifexPromise = null;
 async function loadTaifexJson() {
   if (_taifexCache) return _taifexCache;
-  const res = await fetch('taifex_data.json');
-  _taifexCache = await res.json();
-
-  // 顯示 TAIFEX 資料更新時間（台灣時間）
-  if (_taifexCache.updated_at) {
-    const tw = new Date(new Date(_taifexCache.updated_at).getTime() + 8 * 3600 * 1000);
-    const fmt = tw.toISOString().slice(0, 16).replace('T', ' ');
-    document.getElementById('taifex-updated').textContent = `期貨/選擇權資料更新：${fmt}（台灣時間）`;
+  // 若已有進行中的 fetch，等同一個 Promise 即可，避免重複請求
+  if (!_taifexPromise) {
+    _taifexPromise = fetch('taifex_data.json')
+      .then(r => r.json())
+      .then(data => {
+        _taifexCache = data;
+        _taifexPromise = null;
+        // 顯示 TAIFEX 資料更新時間（台灣時間）
+        if (data.updated_at) {
+          const tw = new Date(new Date(data.updated_at).getTime() + 8 * 3600 * 1000);
+          const fmt = tw.toISOString().slice(0, 16).replace('T', ' ');
+          document.getElementById('taifex-updated').textContent = `期貨/選擇權資料更新：${fmt}（台灣時間）`;
+        }
+        return data;
+      })
+      .catch(e => { _taifexPromise = null; throw e; });
   }
-
-  return _taifexCache;
+  return _taifexPromise;
 }
 
 // 每天 18:30 台灣時間自動更新市場資訊
@@ -464,7 +472,7 @@ async function loadInstitutes(dates) {
   for (const date of dates) {
     try {
       const url = `https://www.twse.com.tw/rwd/zh/fund/BFI82U?dayDate=${date}&weekDate=&monthDate=&type=day&response=json`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const json = await res.json();
       if (!json.data || json.data.length === 0) continue;
 
@@ -540,6 +548,7 @@ async function refreshAll() {
   btn.disabled = true;
   chipCache = {};
   _taifexCache = null;
+  _taifexPromise = null;
   await Promise.all([loadStocks(), loadMarketInfo()]);
   btn.textContent = '↻ 重新整理';
   btn.disabled = false;
