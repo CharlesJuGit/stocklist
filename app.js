@@ -327,16 +327,18 @@ function daysUntilSettlement() {
 // 讀取由 GitHub Actions 每日更新的 taifex_data.json（同源，無 CORS 問題）
 let _taifexCache = null;
 let _taifexPromise = null;
+
 async function loadTaifexJson() {
   if (_taifexCache) return _taifexCache;
-  // 若已有進行中的 fetch，等同一個 Promise 即可，避免重複請求
   if (!_taifexPromise) {
-    _taifexPromise = fetch('taifex_data.json')
-      .then(r => r.json())
+    _taifexPromise = fetch('taifex_data.json?_=' + Date.now(), { cache: 'no-cache' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => {
         _taifexCache = data;
         _taifexPromise = null;
-        // 顯示 TAIFEX 資料更新時間（台灣時間）
         if (data.updated_at) {
           const tw = new Date(new Date(data.updated_at).getTime() + 8 * 3600 * 1000);
           const fmt = tw.toISOString().slice(0, 16).replace('T', ' ');
@@ -344,7 +346,11 @@ async function loadTaifexJson() {
         }
         return data;
       })
-      .catch(e => { _taifexPromise = null; throw e; });
+      .catch(e => {
+        _taifexPromise = null;
+        console.error('taifex_data.json fetch failed:', e);
+        throw e;
+      });
   }
   return _taifexPromise;
 }
