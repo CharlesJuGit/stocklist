@@ -356,6 +356,55 @@ function scheduleAutoRefresh() {
   }, 60000); // 每分鐘檢查一次
 }
 
+// 結算比歷史彈窗
+function openSettlementModal() {
+  loadTaifexJson().then(data => {
+    const hist = data.settlement_history || [];
+    const recent = hist.slice(-20);
+    const settlementDate = data.settlement_date || '--';
+    document.getElementById('settlement-modal-title').textContent =
+      `結算比歷史（結算日 ${settlementDate}）`;
+    const body = document.getElementById('settlement-modal-body');
+    if (!recent.length) { body.innerHTML = '<div class="text-gray-400">暫無資料</div>'; }
+    else {
+      body.innerHTML = `
+        <table class="w-full text-xs text-right">
+          <thead>
+            <tr class="text-gray-500 border-b border-gray-700">
+              <th class="text-left pb-1">日期</th>
+              <th>期淨</th>
+              <th>選淨</th>
+              <th>壓力</th>
+              <th>剩日</th>
+              <th>結算比</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recent.map(r => {
+              const ratioColor = r.ratio <= 0 ? 'text-green-400' : 'text-red-400';
+              const optFlag = r.opt_net > 3000 ? `<span class="text-yellow-400">+${r.opt_net.toLocaleString()}</span>` : `<span class="text-gray-500">${r.opt_net.toLocaleString()}</span>`;
+              return `<tr class="border-b border-gray-800">
+                <td class="text-left py-1 text-gray-300">${r.date}</td>
+                <td class="${r.fut_net <= 0 ? 'text-green-400' : 'text-red-400'}">${r.fut_net.toLocaleString()}</td>
+                <td>${optFlag}</td>
+                <td class="text-gray-200">${r.pressure.toLocaleString()}</td>
+                <td class="text-gray-400">${r.tdays}</td>
+                <td class="${ratioColor} font-bold">${r.ratio.toLocaleString()}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+    document.getElementById('settlement-modal').classList.remove('hidden');
+  });
+}
+function closeSettlementModal() {
+  document.getElementById('settlement-modal').classList.add('hidden');
+}
+document.getElementById('settlement-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettlementModal();
+});
+
 // 外資期貨未平倉（大台+小台/4）與結算比
 async function loadFutures() {
   try {
@@ -377,9 +426,6 @@ async function loadFutures() {
     const retMtxEq  = mtxRetail / 4;
     const retTotal  = txRetail + retMtxEq;
 
-    const days  = daysUntilSettlement();
-    const ratio = days > 0 ? (futTotal / days).toFixed(1) : '--';
-
     const setVal = (id, val) => {
       const el = document.getElementById(id);
       el.textContent = (val >= 0 ? '+' : '') + Math.round(val).toLocaleString();
@@ -393,11 +439,18 @@ async function loadFutures() {
     setVal('ret-mtx',   retMtxEq);
     setVal('ret-total', retTotal);
 
-    document.getElementById('fut-days').textContent = `${days} 天`;
-    const ratioEl = document.getElementById('fut-ratio');
-    const ratioNum = parseFloat(ratio);
-    ratioEl.textContent = isNaN(ratioNum) ? '--' : (ratioNum >= 0 ? '+' : '') + ratio;
-    ratioEl.className = ratioNum >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+    // 結算比：從 settlement_history 最新一筆讀取
+    const hist = data.settlement_history || [];
+    const latest = hist.length ? hist[hist.length - 1] : null;
+    if (latest) {
+      document.getElementById('fut-days').textContent = `${latest.tdays} 交易日`;
+      const ratioEl = document.getElementById('fut-ratio');
+      ratioEl.textContent = latest.ratio.toLocaleString();
+      ratioEl.className = latest.ratio >= 0 ? 'text-red-400 font-bold' : 'text-green-400 font-bold';
+    } else {
+      document.getElementById('fut-days').textContent = '--';
+      document.getElementById('fut-ratio').textContent = '--';
+    }
   } catch (e) {
     console.error('loadFutures:', e);
     ['fut-tx','fut-mtx','fut-total','fut-days','fut-ratio','ret-tx','ret-mtx','ret-total'].forEach(id => {
