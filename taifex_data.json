@@ -27,13 +27,13 @@
       "date": "2026-05-14",
       "txF": -51068,
       "mtxF": 3504,
-      "bp": 0,
-      "sp": 0,
+      "bp": 71519,
+      "sp": 57693,
       "fut_net": -50192,
-      "opt_net": 0,
-      "pressure": 50192,
+      "opt_net": 13826,
+      "pressure": 121711,
       "tdays": 4,
-      "ratio": 12548
+      "ratio": 30428
     }
   ],
   "volatility": {
