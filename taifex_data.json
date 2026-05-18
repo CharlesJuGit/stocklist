@@ -1,25 +1,25 @@
 {
-  "date": "20260514",
+  "date": "20260515",
   "futures": {
-    "txF": -51068,
-    "txT": 43116,
-    "txD": 622,
-    "mtxF": 3504,
-    "mtxT": 71,
-    "mtxD": -3984
+    "txF": -50963,
+    "txT": 41738,
+    "txD": 734,
+    "mtxF": 4206,
+    "mtxT": 67,
+    "mtxD": -5638
   },
   "options": {
-    "bc": 45087,
-    "sc": 34264,
-    "bp": 71519,
-    "sp": 57693
+    "bc": 42623,
+    "sc": 30239,
+    "bp": 67205,
+    "sp": 52556
   },
   "institute": {
-    "date": "20260515",
-    "foreign": -104.3,
-    "trust": -13.7,
-    "dealer": -53.0,
-    "total": -171.0
+    "date": "20260518",
+    "foreign": -452.4,
+    "trust": 166.6,
+    "dealer": -10.9,
+    "total": -296.7
   },
   "settlement_date": "2026-05-20",
   "settlement_history": [
@@ -34,6 +34,18 @@
       "pressure": 121711,
       "tdays": 4,
       "ratio": 30428
+    },
+    {
+      "date": "2026-05-15",
+      "txF": -50963,
+      "mtxF": 4206,
+      "bp": 67205,
+      "sp": 52556,
+      "fut_net": -49912,
+      "opt_net": 14649,
+      "pressure": 117116,
+      "tdays": 3,
+      "ratio": 39039
     }
   ],
   "volatility": {
@@ -44,7 +56,7 @@
         "low": 40976,
         "range": 1478
       },
-      "avg20": 685,
+      "avg20": 691,
       "category": "高",
       "history": [
         {
@@ -171,20 +183,14 @@
     },
     "nq": {
       "yesterday": {
-        "date": "2026-05-15",
-        "high": 29734,
-        "low": 29090,
-        "range": 644
+        "date": "2026-05-18",
+        "high": 29284,
+        "low": 28926,
+        "range": 358
       },
-      "avg20": 441,
-      "category": "高",
+      "avg20": 451,
+      "category": "中",
       "history": [
-        {
-          "date": "2026-04-20",
-          "high": 26828,
-          "low": 26535,
-          "range": 293
-        },
         {
           "date": "2026-04-21",
           "high": 26902,
@@ -298,9 +304,15 @@
           "high": 29734,
           "low": 29090,
           "range": 644
+        },
+        {
+          "date": "2026-05-18",
+          "high": 29284,
+          "low": 28926,
+          "range": 358
         }
       ]
     }
   },
-  "updated_at": "2026-05-15T14:10:38Z"
+  "updated_at": "2026-05-18T12:39:57Z"
 }
