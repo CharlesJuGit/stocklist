@@ -371,35 +371,7 @@ document.getElementById('vol-modal').addEventListener('click', function(e) {
   if (e.target === this) closeVolModal();
 });
 
-// 計算下一個結算日（每月第三個星期三）
-function getNextSettlementDate() {
-  const today = new Date();
-  let d = new Date(today.getFullYear(), today.getMonth(), 1);
-  let wedCount = 0;
-  while (wedCount < 3) {
-    if (d.getDay() === 3) wedCount++;
-    if (wedCount < 3) d.setDate(d.getDate() + 1);
-  }
-  // 若今天已過本月結算日，找下個月的
-  if (today > d) {
-    d = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    wedCount = 0;
-    while (wedCount < 3) {
-      if (d.getDay() === 3) wedCount++;
-      if (wedCount < 3) d.setDate(d.getDate() + 1);
-    }
-  }
-  return d;
-}
-
-function daysUntilSettlement() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const settlement = getNextSettlementDate();
-  settlement.setHours(0, 0, 0, 0);
-  return Math.ceil((settlement - today) / (1000 * 60 * 60 * 24));
-}
-
+// 結算日與剩餘交易日：後端計算（含國定假日），前端從 taifex_data.json 讀取
 // 讀取由 GitHub Actions 每日更新的 taifex_data.json（同源，無 CORS 問題）
 let _taifexCache = null;
 let _taifexPromise = null;

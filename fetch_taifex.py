@@ -455,8 +455,49 @@ def build_vol_data(records, label):
 
 # ── 結算日與交易日計算 ─────────────────────────────────────────
 
+_holidays_cache = None
+
+
+def fetch_tw_holidays():
+    """
+    從 TWSE 取得本年度休市日，回傳 set('YYYY-MM-DD')，結果快取於模組層。
+    清單中「開始交易日／最後交易日」為說明性條目（當天有開市），須排除。
+    失敗時回傳空集合（結算日計算退回僅排除週末）。
+    """
+    global _holidays_cache
+    if _holidays_cache is not None:
+        return _holidays_cache
+    try:
+        import ssl as _ssl
+        ctx = _ssl._create_unverified_context()
+        url = "https://www.twse.com.tw/rwd/zh/holidaySchedule/holidaySchedule?response=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
+            d = json.loads(r.read().decode("utf-8", errors="replace"))
+        days = set()
+        for row in d.get("data", []):
+            date_str, name = row[0], row[1]
+            if "開始交易" in name or "最後交易" in name:
+                continue
+            days.add(date_str)
+        _holidays_cache = days
+        print(f"TW holidays loaded: {len(days)} days")
+    except Exception as e:
+        print(f"TW holidays fetch fail: {e}（退回僅週末判斷）")
+        _holidays_cache = set()
+    return _holidays_cache
+
+
+def is_trading_day(d):
+    """週一～週五且非台股休市日"""
+    return d.weekday() < 5 and d.strftime("%Y-%m-%d") not in fetch_tw_holidays()
+
+
 def get_settlement_date(ref_date=None):
-    """取得台指期當月結算日（第三個週三）。若已過結算日則取下月。"""
+    """
+    取得台指期當月結算日（第三個週三；遇休市日順延至次一營業日）。
+    若已過結算日則取下月。
+    """
     from datetime import date as _date
     d = ref_date or _date.today()
     # 找當月第三個週三
@@ -473,6 +514,9 @@ def get_settlement_date(ref_date=None):
         if candidate.weekday() == 2:  # 週三
             wednesdays.append(candidate)
     settlement = wednesdays[2] if len(wednesdays) >= 3 else wednesdays[-1]
+    # 結算日遇休市（國定假日）順延至次一營業日
+    while not is_trading_day(settlement):
+        settlement += timedelta(days=1)
     # 若今天已過結算日，取下月
     if d > settlement:
         if first.month == 12:
@@ -484,12 +528,12 @@ def get_settlement_date(ref_date=None):
 
 
 def count_trading_days(from_date, to_date):
-    """計算 from_date 到 to_date（含兩端）之間的交易日數（週一到週五）。"""
+    """計算 from_date 到 to_date（含兩端）之間的交易日數（排除週末與國定假日）。"""
     from datetime import timedelta as _td
     count = 0
     d = from_date
     while d <= to_date:
-        if d.weekday() < 5:  # 0=Mon…4=Fri
+        if is_trading_day(d):
             count += 1
         d += _td(days=1)
     return count

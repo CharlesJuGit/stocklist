@@ -365,12 +365,14 @@
     </a>
   </div>
 
-  <script src="app.js?v=20260612a"></script>
+  <script src="app.js?v=20260612b"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
-    fetch("https://charlesju.goatcounter.com/counter/index.html.json")
-      .then(r => r.json())
+    // TOTAL = GoatCounter 全站累計；需在 GoatCounter 後台勾選
+    // Settings →「Allow adding visitor counts on your website」，否則 API 回 403
+    fetch("https://charlesju.goatcounter.com/counter/TOTAL.json")
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(d => {
         const el = document.getElementById("page-views");
         if (el && d.count !== undefined) el.textContent = d.count.toLocaleString();

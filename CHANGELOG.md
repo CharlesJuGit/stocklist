@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-06-12（結算日假日修正＋瀏覽人次診斷）
+
+**Request：** 結算日要考慮國定假日；瀏覽人次顯示不正常，檢查邏輯
+
+**Feat (Fable)：** `fetch_taifex.py` — 結算日與剩餘交易日納入台股休市日
+- 新增 `fetch_tw_holidays()`：TWSE rwd holidaySchedule API，排除「開始/最後交易日」說明性條目，
+  模組層快取；API 失敗時退回僅排除週末
+- `get_settlement_date()`：第三個週三遇休市順延至次一營業日
+  （實測 2026-02：2/18 春節休市 → 順延至 2/23 週一）
+- `count_trading_days()`：剩餘交易日排除國定假日（影響結算比分母）
+
+**Fix (Fable)：** 瀏覽人次顯示異常 — 兩層問題
+- 根因①：GoatCounter counter API 全部回 403 → 後台未開啟
+  「Allow adding visitor counts on your website」，需 Ball 登入 goatcounter.com 勾選
+- 根因②：`index.html` 抓 `counter/index.html.json`，但網站路徑是 `/stocklist/`，
+  該路徑永遠沒有計數 → 改用 `counter/TOTAL.json`（全站累計，符合「累計人次」本意）
+
+**Fix (Fable)：** `app.js` — 移除前端死碼 `getNextSettlementDate()`/`daysUntilSettlement()`
+（前端實際從 taifex_data.json 讀後端算好的 tdays，留著反而會與假日邏輯不同步）
+
+---
+
 ## 2026-06-12（低風險缺陷清理）
 
 **Request：** 處理 review 發現的低風險問題
