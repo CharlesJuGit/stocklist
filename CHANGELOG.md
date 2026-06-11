@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-06-12（低風險缺陷清理）
+
+**Request：** 處理 review 發現的低風險問題
+
+**Fix (Fable)：** `fetch_taifex.py` — 主程式包進 `main()` 並加 `if __name__ == "__main__"` 保護
+- 原本 `fetch_nq_only.py` 的 import 會誤觸整套抓取＋改寫 JSON（每天 6:30 NQ 排程都多跑一次全量）
+- 已驗證：import 無副作用，`fetch_nq_only.py` 只更新 NQ
+
+**Fix (Fable)：** favicon 回歸修復 — `index.html`/`links.html` 的 SVG data URI（Safari 不支援）
+換回實體 `favicon.png`＋`shortcut icon`（5/30 修過但後來被蓋掉）
+
+**Fix (Fable)：** `app.js` — P/C Ratio 改為數值比較（原為字串 vs 數字）；移除死碼 `getTwseDate()`；
+`index.html` 更新 app.js 版本參數強制瀏覽器更新快取
+
+**Fix (Fable)：** README 籌碼綜合評估說明改為與程式一致的正負分制
+（原文件寫「滿分16、≥12強多」與實作不符）
+
+**Fix (Fable)：** `fetch_yahoo_ohlc` docstring 日分界 5AM → 6AM（程式早已是 6AM，文件未同步）
+
+---
+
 ## 2026-06-11（散戶期貨修正）
 
 **Request：** 散戶期貨淨部位數值與實際不符，查明原因並修正

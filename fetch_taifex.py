@@ -359,9 +359,9 @@ def fetch_tx_ohlc(n_days=25):
 
 def fetch_yahoo_ohlc(symbol, n_days=25):
     """
-    抓 NQ 期貨 1h K 棒，以台灣時間（UTC+8）每天凌晨 5:00 為分界分組。
-    週五的 K 棒跨越週末，包含到週一早上 5:00（NQ 週日晚重新開盤後的那段）。
-    週六/週日的 bar 一律歸入上週五。
+    抓 NQ 期貨 1h K 棒，以台灣時間（UTC+8）每天凌晨 6:00 為分界分組
+    （夏令 5PM EDT＝5AM TWN、冬令 5PM EST＝6AM TWN，6AM 兩種時制均涵蓋收盤）。
+    週五的 K 棒跨越週末，包含到週一早上 6:00 前；週六/週日的 bar 一律歸入上週五。
     """
     from datetime import date as _date, timedelta as _td
     TW = timezone(timedelta(hours=8))
@@ -631,211 +631,216 @@ def build_settlement_history(existing: list, today_entry: dict) -> list:
 
 
 # ── 主程式 ────────────────────────────────────────────────────
-import os as _os, sys as _sys
+import os as _os
 
 FUT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
 OPT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate")
 
-# ── 讀取既有 JSON（後面若抓失敗可 fallback）────────────────────
-existing_json = {}
-try:
-    with open("taifex_data.json", "r", encoding="utf-8") as f:
-        existing_json = json.load(f)
-except Exception:
-    pass
-
-# TAIFEX 未平倉：優先用網頁爬蟲（更新更及時），失敗再用 openapi
-date, futures, options = None, {}, {}
-try:
-    date, futures, options = scrape_taifex_web()
-except Exception as e:
-    print(f"scrape_taifex_web FAIL: {e}")
-
-# 網頁爬蟲失敗，fallback 到 openapi
-if not futures or not date:
-    print("網頁爬蟲失敗，改用 openapi...")
+def main():
+    # ── 讀取既有 JSON（後面若抓失敗可 fallback）────────────────────
+    existing_json = {}
     try:
-        fut_text = fetch_csv(FUT_URL)
-        date, futures = parse_futures(fut_text)
-        print(f"openapi futures OK  date={date}  txF={futures.get('txF')}")
-    except Exception as e:
-        print(f"openapi futures FAIL: {e}")
+        with open("taifex_data.json", "r", encoding="utf-8") as f:
+            existing_json = json.load(f)
+    except Exception:
+        pass
+
+    # TAIFEX 未平倉：優先用網頁爬蟲（更新更及時），失敗再用 openapi
+    date, futures, options = None, {}, {}
     try:
-        opt_text = fetch_csv(OPT_URL)
-        options = parse_options(opt_text)
-        print(f"openapi options OK  bc={options.get('bc')}")
+        date, futures, options = scrape_taifex_web()
     except Exception as e:
-        print(f"openapi options FAIL: {e}")
+        print(f"scrape_taifex_web FAIL: {e}")
 
-# 若全部抓失敗，沿用既有資料（防止空資料覆蓋）
-if not futures or not date:
-    print("全部抓失敗，沿用既有資料")
-    futures = existing_json.get("futures", {})
-    date    = existing_json.get("date")
-if not options or options.get("bc", 0) + options.get("sp", 0) == 0:
-    print("options 抓失敗或為零，沿用既有資料")
-    options = existing_json.get("options", {})
-
-# ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
-def fetch_institute():
-    from datetime import date as _d, timedelta as _td
-    today = _d.today()
-    for i in range(10):
-        d = today - _td(days=i)
-        if d.weekday() >= 5:
-            continue
-        dt_str = d.strftime("%Y%m%d")
-        url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
-               f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
+    # 網頁爬蟲失敗，fallback 到 openapi
+    if not futures or not date:
+        print("網頁爬蟲失敗，改用 openapi...")
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                j = json.loads(r.read())
-            rows = j.get("data", [])
-            if not rows:
-                continue
-            def find(kw1, kw2=None):
-                for row in rows:
-                    if kw1 in row[0] or (kw2 and kw2 in row[0]):
-                        return round(float(row[3].replace(",", "")) / 1e8, 1)
-                return None
-            foreign = find("外資及陸資(不含外資自營商)", "外資")
-            trust   = find("投信")
-            dealer  = find("自營商(自行買賣)", "自營商")
-            if foreign is None and trust is None:
-                continue
-            total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
-            print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}")
-            return {"date": dt_str, "foreign": foreign, "trust": trust,
-                    "dealer": dealer, "total": total}
+            fut_text = fetch_csv(FUT_URL)
+            date, futures = parse_futures(fut_text)
+            print(f"openapi futures OK  date={date}  txF={futures.get('txF')}")
         except Exception as e:
-            print(f"institute {dt_str} FAIL: {e}")
-            continue
-    return {}
+            print(f"openapi futures FAIL: {e}")
+        try:
+            opt_text = fetch_csv(OPT_URL)
+            options = parse_options(opt_text)
+            print(f"openapi options OK  bc={options.get('bc')}")
+        except Exception as e:
+            print(f"openapi options FAIL: {e}")
 
-institute = {}
-try:
-    institute = fetch_institute()
-except Exception as e:
-    print(f"institute FAIL: {e}")
+    # 若全部抓失敗，沿用既有資料（防止空資料覆蓋）
+    if not futures or not date:
+        print("全部抓失敗，沿用既有資料")
+        futures = existing_json.get("futures", {})
+        date    = existing_json.get("date")
+    if not options or options.get("bc", 0) + options.get("sp", 0) == 0:
+        print("options 抓失敗或為零，沿用既有資料")
+        options = existing_json.get("options", {})
 
-if not institute:
-    print("institute 抓失敗，沿用既有資料")
-    institute = existing_json.get("institute", {})
+    # ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
+    def fetch_institute():
+        from datetime import date as _d, timedelta as _td
+        today = _d.today()
+        for i in range(10):
+            d = today - _td(days=i)
+            if d.weekday() >= 5:
+                continue
+            dt_str = d.strftime("%Y%m%d")
+            url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
+                   f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    j = json.loads(r.read())
+                rows = j.get("data", [])
+                if not rows:
+                    continue
+                def find(kw1, kw2=None):
+                    for row in rows:
+                        if kw1 in row[0] or (kw2 and kw2 in row[0]):
+                            return round(float(row[3].replace(",", "")) / 1e8, 1)
+                    return None
+                foreign = find("外資及陸資(不含外資自營商)", "外資")
+                trust   = find("投信")
+                dealer  = find("自營商(自行買賣)", "自營商")
+                if foreign is None and trust is None:
+                    continue
+                total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
+                print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}")
+                return {"date": dt_str, "foreign": foreign, "trust": trust,
+                        "dealer": dealer, "total": total}
+            except Exception as e:
+                print(f"institute {dt_str} FAIL: {e}")
+                continue
+        return {}
 
-# 波動資料：TX 用 FinMind position session（日盤+夜盤完整），NQ 用 Yahoo Finance
-tx_records = []
-try:
-    tx_records = fetch_tx_ohlc(25)
-    print(f"TX OHLC OK  {len(tx_records)} days  latest={tx_records[-1] if tx_records else None}")
-except Exception as e:
-    print(f"TX OHLC FAIL: {e}")
-
-if not tx_records:
-    print("TX OHLC 抓失敗，沿用既有資料")
-    tx_records = existing_json.get("volatility", {}).get("tx", {}).get("history", [])
-
-nq_records = []
-try:
-    nq_records = fetch_yahoo_ohlc("NQ=F", 25)
-    print(f"NQ OHLC OK  {len(nq_records)} days")
-except Exception as e:
-    print(f"NQ OHLC FAIL: {e}")
-
-if not nq_records:
-    print("NQ OHLC 抓失敗，沿用既有資料")
-    nq_records = existing_json.get("volatility", {}).get("nq", {}).get("history", [])
-
-market_volume = []
-try:
-    market_volume = fetch_market_volume(20)
-    print(f"Market volume OK  {len(market_volume)} days  latest={market_volume[-1] if market_volume else None}")
-except Exception as e:
-    print(f"Market volume FAIL: {e}")
-    market_volume = existing_json.get("market_volume", [])
-
-tx_vol = build_vol_data(tx_records, "TX")
-nq_vol = build_vol_data(nq_records, "NQ")
-
-# ── 結算比歷史 ───────────────────────────────────────────────
-existing_history = existing_json.get("settlement_history", [])
-
-# 若歷史完全空白，用 FinMind 回填
-if len(existing_history) == 0:
-    print("settlement_history 不足，執行 FinMind 回填...")
+    institute = {}
     try:
-        existing_history = fetch_settlement_history_backfill(30)
-        print(f"FinMind 回填完成：{len(existing_history)} 筆")
+        institute = fetch_institute()
     except Exception as e:
-        print(f"FinMind 回填失敗：{e}")
+        print(f"institute FAIL: {e}")
 
-# 今日 TAIFEX openapi 資料（只在有期貨資料時 append）
-settlement_date = get_settlement_date()
-print(f"settlement date: {settlement_date}")
+    if not institute:
+        print("institute 抓失敗，沿用既有資料")
+        institute = existing_json.get("institute", {})
 
-if futures and date:
-    today_iso = f"{date[:4]}-{date[4:6]}-{date[6:]}"
-    from datetime import date as _date2
-    taifex_date = _date2(int(date[:4]), int(date[4:6]), int(date[6:]))
-    txF  = futures.get("txF", 0)
-    mtxF = futures.get("mtxF", 0)
-    mtxT = futures.get("mtxT", 0); mtxD = futures.get("mtxD", 0)
-    tmxF = futures.get("tmxF", 0); tmxT = futures.get("tmxT", 0); tmxD = futures.get("tmxD", 0)
-    bp   = options.get("bp", 0)
-    sp   = options.get("sp", 0)
-    bc   = options.get("bc", 0)
-    sc   = options.get("sc", 0)
-    sr   = calc_settlement_ratio(txF, mtxF, bp, sp, settlement_date, from_date=taifex_date)
+    # 波動資料：TX 用 FinMind position session（日盤+夜盤完整），NQ 用 Yahoo Finance
+    tx_records = []
+    try:
+        tx_records = fetch_tx_ohlc(25)
+        print(f"TX OHLC OK  {len(tx_records)} days  latest={tx_records[-1] if tx_records else None}")
+    except Exception as e:
+        print(f"TX OHLC FAIL: {e}")
 
-    # 散戶淨部位
-    mtx_retail = -(mtxF + mtxT + mtxD)
-    tmx_retail = -(tmxF + tmxT + tmxD) / 5
-    retail_total = round(mtx_retail + tmx_retail)
+    if not tx_records:
+        print("TX OHLC 抓失敗，沿用既有資料")
+        tx_records = existing_json.get("volatility", {}).get("tx", {}).get("history", [])
 
-    # 外資選擇權策略
-    THRESHOLD = 1000
-    call_bias = "long" if bc > sc + THRESHOLD else ("short" if sc > bc + THRESHOLD else "neutral")
-    put_bias  = "long" if bp > sp + THRESHOLD else ("short" if sp > bp + THRESHOLD else "neutral")
-    if call_bias == "long"  and put_bias == "long":  opt_strategy = "雙買"
-    elif call_bias == "short" and put_bias == "short": opt_strategy = "雙賣"
-    elif call_bias == "long"  and put_bias == "short": opt_strategy = "看多"
-    elif call_bias == "short" and put_bias == "long":  opt_strategy = "看空"
-    else: opt_strategy = "中性"
+    nq_records = []
+    try:
+        nq_records = fetch_yahoo_ohlc("NQ=F", 25)
+        print(f"NQ OHLC OK  {len(nq_records)} days")
+    except Exception as e:
+        print(f"NQ OHLC FAIL: {e}")
 
-    today_entry = {
-        "date":         today_iso,
-        "txF":          txF,
-        "mtxF":         mtxF,
-        "bp":           bp,
-        "sp":           sp,
-        "bc":           bc,
-        "sc":           sc,
-        "fut_net":      sr["fut_net"],
-        "opt_net":      sr["opt_net"],
-        "pressure":     sr["pressure"],
-        "tdays":        sr["tdays"],
-        "ratio":        sr["ratio"],
-        "retail_total": retail_total,
-        "opt_strategy": opt_strategy,
+    if not nq_records:
+        print("NQ OHLC 抓失敗，沿用既有資料")
+        nq_records = existing_json.get("volatility", {}).get("nq", {}).get("history", [])
+
+    market_volume = []
+    try:
+        market_volume = fetch_market_volume(20)
+        print(f"Market volume OK  {len(market_volume)} days  latest={market_volume[-1] if market_volume else None}")
+    except Exception as e:
+        print(f"Market volume FAIL: {e}")
+        market_volume = existing_json.get("market_volume", [])
+
+    tx_vol = build_vol_data(tx_records, "TX")
+    nq_vol = build_vol_data(nq_records, "NQ")
+
+    # ── 結算比歷史 ───────────────────────────────────────────────
+    existing_history = existing_json.get("settlement_history", [])
+
+    # 若歷史完全空白，用 FinMind 回填
+    if len(existing_history) == 0:
+        print("settlement_history 不足，執行 FinMind 回填...")
+        try:
+            existing_history = fetch_settlement_history_backfill(30)
+            print(f"FinMind 回填完成：{len(existing_history)} 筆")
+        except Exception as e:
+            print(f"FinMind 回填失敗：{e}")
+
+    # 今日 TAIFEX openapi 資料（只在有期貨資料時 append）
+    settlement_date = get_settlement_date()
+    print(f"settlement date: {settlement_date}")
+
+    if futures and date:
+        today_iso = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+        from datetime import date as _date2
+        taifex_date = _date2(int(date[:4]), int(date[4:6]), int(date[6:]))
+        txF  = futures.get("txF", 0)
+        mtxF = futures.get("mtxF", 0)
+        mtxT = futures.get("mtxT", 0); mtxD = futures.get("mtxD", 0)
+        tmxF = futures.get("tmxF", 0); tmxT = futures.get("tmxT", 0); tmxD = futures.get("tmxD", 0)
+        bp   = options.get("bp", 0)
+        sp   = options.get("sp", 0)
+        bc   = options.get("bc", 0)
+        sc   = options.get("sc", 0)
+        sr   = calc_settlement_ratio(txF, mtxF, bp, sp, settlement_date, from_date=taifex_date)
+
+        # 散戶淨部位
+        mtx_retail = -(mtxF + mtxT + mtxD)
+        tmx_retail = -(tmxF + tmxT + tmxD) / 5
+        retail_total = round(mtx_retail + tmx_retail)
+
+        # 外資選擇權策略
+        THRESHOLD = 1000
+        call_bias = "long" if bc > sc + THRESHOLD else ("short" if sc > bc + THRESHOLD else "neutral")
+        put_bias  = "long" if bp > sp + THRESHOLD else ("short" if sp > bp + THRESHOLD else "neutral")
+        if call_bias == "long"  and put_bias == "long":  opt_strategy = "雙買"
+        elif call_bias == "short" and put_bias == "short": opt_strategy = "雙賣"
+        elif call_bias == "long"  and put_bias == "short": opt_strategy = "看多"
+        elif call_bias == "short" and put_bias == "long":  opt_strategy = "看空"
+        else: opt_strategy = "中性"
+
+        today_entry = {
+            "date":         today_iso,
+            "txF":          txF,
+            "mtxF":         mtxF,
+            "bp":           bp,
+            "sp":           sp,
+            "bc":           bc,
+            "sc":           sc,
+            "fut_net":      sr["fut_net"],
+            "opt_net":      sr["opt_net"],
+            "pressure":     sr["pressure"],
+            "tdays":        sr["tdays"],
+            "ratio":        sr["ratio"],
+            "retail_total": retail_total,
+            "opt_strategy": opt_strategy,
+        }
+        existing_history = build_settlement_history(existing_history, today_entry)
+        print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
+
+    result = {
+        "date":               date,
+        "futures":            futures,
+        "options":            options,
+        "institute":          institute,
+        "settlement_date":    settlement_date.strftime("%Y-%m-%d"),
+        "settlement_history": existing_history,
+        "volatility":         {"tx": tx_vol, "nq": nq_vol},
+        "market_volume":      market_volume,
+        "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    existing_history = build_settlement_history(existing_history, today_entry)
-    print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
 
-result = {
-    "date":               date,
-    "futures":            futures,
-    "options":            options,
-    "institute":          institute,
-    "settlement_date":    settlement_date.strftime("%Y-%m-%d"),
-    "settlement_history": existing_history,
-    "volatility":         {"tx": tx_vol, "nq": nq_vol},
-    "market_volume":      market_volume,
-    "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-}
+    with open("taifex_data.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
 
-with open("taifex_data.json", "w", encoding="utf-8") as f:
-    json.dump(result, f, ensure_ascii=False, indent=2)
+    print("taifex_data.json written OK")
 
-print("taifex_data.json written OK")
+
+if __name__ == "__main__":
+    main()

@@ -190,14 +190,6 @@ function fmt(n) {
   return (n >= 0 ? '+' : '') + n.toLocaleString();
 }
 
-function getTwseDate() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}${m}${day}`;
-}
-
 // 點擊背景關閉
 document.getElementById('modal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
@@ -674,22 +666,22 @@ async function loadOptions() {
     el.textContent = `${strategy}　${strategyDesc}`;
     el.className = `text-sm font-bold ${strategyColor}`;
 
-    // P/C Ratio
+    // P/C Ratio（以數值比較，避免字串/數字混用）
     const callTotal = bc + sc;
     const putTotal  = bp + sp;
-    const pcRatio   = callTotal > 0 ? (putTotal / callTotal).toFixed(2) : '--';
+    const pcVal     = callTotal > 0 ? putTotal / callTotal : null;
     let pcDesc, pcColor;
-    if (pcRatio === '--') {
+    if (pcVal === null) {
       pcDesc = ''; pcColor = 'text-gray-400';
-    } else if (pcRatio > 1.2) {
+    } else if (pcVal > 1.2) {
       pcDesc = '偏空恐慌'; pcColor = 'text-green-400';
-    } else if (pcRatio < 0.8) {
+    } else if (pcVal < 0.8) {
       pcDesc = '偏多追漲'; pcColor = 'text-red-400';
     } else {
       pcDesc = '中性'; pcColor = 'text-gray-300';
     }
     const pcEl = document.getElementById('opt-pc-ratio');
-    pcEl.textContent = pcRatio === '--' ? '--' : `${pcRatio}　${pcDesc}`;
+    pcEl.textContent = pcVal === null ? '--' : `${pcVal.toFixed(2)}　${pcDesc}`;
     pcEl.className = `text-sm font-bold ${pcColor}`;
   } catch (e) {
     console.error('loadOptions:', e);
