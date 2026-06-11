@@ -1,0 +1,5 @@
+# local-only tools
+merged_to_json.py
+
+__pycache__/
+*.pyc

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多空標的</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-6">
+
+  <!-- 廣告區（可移除：刪掉此 section 即可） -->
+  <section id="ad-banner" class="mb-4 text-center text-xs text-gray-500">
+    <!-- 替換成你的 AdSense 代碼 -->
+    <div class="bg-gray-800 rounded p-2">廣告位置</div>
+  </section>
+
+  <div class="flex items-center justify-center gap-3 mb-4">
+    <h1 class="text-2xl font-bold">多空標的</h1>
+    <button onclick="refreshAll()" id="refresh-btn"
+      class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-full transition">
+      ↻ 重新整理
+    </button>
+    <button onclick="triggerFetch()" id="fetch-btn"
+      class="bg-blue-700 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-full transition">
+      ⬇ 抓新資料
+    </button>
+    <a href="links.html"
+      class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-full transition">
+      常用連結
+    </a>
+  </div>
+
+  <!-- 市場資訊面板 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4 space-y-3">
+
+    <!-- 資料日期 -->
+    <div class="text-center text-xs text-gray-400" id="market-date">載入中...</div>
+    <div class="text-center text-xs text-gray-500" id="taifex-updated"></div>
+
+    <!-- 三大法人 -->
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <div class="text-xs text-gray-500">三大法人買賣超（億元）</div>
+        <div class="text-xs text-gray-300" id="inst-date"></div>
+      </div>
+      <div class="grid grid-cols-4 gap-2 text-center text-sm" id="institute-row">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">外資</div><div id="inst-foreign">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">投信</div><div id="inst-trust">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">自營商</div><div id="inst-dealer">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計</div><div id="inst-total">--</div></div>
+      </div>
+    </div>
+
+    <!-- 選擇權 -->
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <div class="text-xs text-gray-500">台指選擇權未平倉（口）</div>
+        <div class="text-xs text-gray-300" id="opt-date"></div>
+      </div>
+      <div class="grid grid-cols-4 gap-2 text-center text-sm" id="options-row">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">BC（買Call）</div><div id="opt-bc">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">SC（賣Call）</div><div id="opt-sc">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">BP（買Put）</div><div id="opt-bp">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">SP（賣Put）</div><div id="opt-sp">--</div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-center text-sm mt-2">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Call 淨部位（BC－SC）</div><div id="opt-call-net">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Put 淨部位（BP－SP）</div><div id="opt-put-net">--</div></div>
+      </div>
+      <div class="bg-gray-800 rounded p-2 mt-2 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-gray-400 text-xs whitespace-nowrap">外資策略</span>
+          <span id="opt-strategy" class="text-sm font-bold text-gray-400">--</span>
+        </div>
+        <button onclick="openStrategyModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+      </div>
+      <div class="bg-gray-800 rounded p-2 mt-1 flex items-center gap-2">
+        <span class="text-gray-400 text-xs whitespace-nowrap">P/C Ratio</span>
+        <span id="opt-pc-ratio" class="text-sm font-bold text-gray-400">--</span>
+      </div>
+      <div class="text-right mt-2">
+        <a href="https://www.taifex.com.tw/cht/3/callsAndPutsDate" target="_blank"
+          class="text-xs text-blue-400 hover:text-blue-300 underline">驗算來源 ↗</a>
+      </div>
+    </div>
+
+    <!-- 外資期貨未平倉與結算比 -->
+    <div>
+      <div class="flex justify-between items-center mb-1">
+        <div class="text-xs text-gray-500">外資期貨未平倉（口）</div>
+        <div class="text-xs text-gray-300" id="fut-date"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center text-sm">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">大台淨部位</div><div id="fut-tx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">小台淨部位</div><div id="fut-mtx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計（大台當量）</div><div id="fut-total">--</div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-center text-sm mt-2">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">距結算剩餘交易日</div><div id="fut-days">--</div></div>
+        <div class="bg-gray-800 rounded p-2">
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-gray-400 text-xs">外資結算比</span>
+            <button onclick="openSettlementModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+          </div>
+          <div id="fut-ratio">--</div>
+        </div>
+      </div>
+      <div class="text-right mt-2">
+        <a href="https://www.taifex.com.tw/cht/3/futContractsDate" target="_blank"
+          class="text-xs text-blue-400 hover:text-blue-300 underline">驗算來源 ↗</a>
+      </div>
+      <div class="flex justify-between items-center mt-2 mb-1">
+        <div class="text-xs text-gray-500">散戶期貨淨部位（口）</div>
+        <div class="flex items-center gap-2">
+          <div class="text-xs text-gray-300" id="ret-date"></div>
+          <button onclick="openRetailModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center text-sm">
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">小台</div><div id="ret-mtx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">微台（÷5）</div><div id="ret-tmx">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計（小台當量）</div><div id="ret-total">--</div></div>
+      </div>
+
+      <!-- 綜合評估 -->
+      <div class="bg-gray-800 rounded p-3 mt-3">
+        <div class="text-xs text-gray-500 mb-2">籌碼綜合評估</div>
+        <div id="signal-summary" class="text-sm font-bold text-gray-400 mb-1">--</div>
+        <div id="signal-detail" class="text-xs text-gray-500 space-y-0.5"></div>
+      </div>
+    </div>
+
+    <!-- 參考連結 -->
+    <div>
+      <div class="text-xs text-gray-500 mb-2">參考連結</div>
+      <div class="flex flex-col gap-2">
+        <a href="https://7388chichi.pages.dev/" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">7388chichi 選股參考</a>
+        <a href="https://chengwaye.com/commentary/" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">chengwaye 市場評論</a>
+        <a href="https://www.izaax.net/blog/" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">izaax 部落格</a>
+        <a href="https://www.facebook.com/groups/1983236458784927" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">大台哥</a>
+        <a href="https://www.facebook.com/KeepCalmStayPatient" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">淡定看台指</a>
+        <a href="https://www.ig.com/cn/indices/markets-indices/weekend-us-tech-100-e1" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">周末科技股 100（IG）</a>
+        <a href="https://www.facebook.com/freeman1688" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">自由人</a>
+        <a href="https://www.facebook.com/unclesheepspeech" target="_blank"
+          class="text-blue-400 hover:text-blue-300 text-sm underline">羊叔開講</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 免責聲明 -->
+  <p class="text-center text-xs text-gray-500 mb-6">本網站內容僅供參考，不構成任何投資建議，投資人應自行判斷並負擔風險。</p>
+
+  <!-- 波動區塊 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4">
+    <div class="text-xs text-gray-500 mb-3">每日波動比較（前一日 vs 20日均值）</div>
+    <div class="grid grid-cols-2 gap-4">
+
+      <!-- 台指期（^TWII 代理） -->
+      <div class="bg-gray-800 rounded-lg p-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-bold text-gray-200">台指期 <span id="tx-latest-date" class="text-xs text-gray-500 font-normal"></span></span>
+          <button onclick="openVolModal('tx')"
+            class="text-xs text-blue-400 hover:text-blue-300 underline">前20天 ▸</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-1">
+          前日高：<span id="tx-high" class="text-white">--</span>
+          低：<span id="tx-low" class="text-white">--</span>
+        </div>
+        <div class="flex justify-between items-center mt-2">
+          <div class="text-xs text-gray-400">前日波動</div>
+          <div id="tx-range" class="text-lg font-bold text-white">--</div>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+          <div class="text-xs text-gray-400">20日均值</div>
+          <div id="tx-avg" class="text-sm text-gray-300">--</div>
+        </div>
+        <div class="mt-2 text-center">
+          <span id="tx-cat" class="text-sm font-bold px-3 py-1 rounded-full bg-gray-700">--</span>
+        </div>
+      </div>
+
+      <!-- Nasdaq 期貨 -->
+      <div class="bg-gray-800 rounded-lg p-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm font-bold text-gray-200">Nasdaq 期貨</span>
+          <button onclick="openVolModal('nq')"
+            class="text-xs text-blue-400 hover:text-blue-300 underline">前20天 ▸</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-1">
+          前日高：<span id="nq-high" class="text-white">--</span>
+          低：<span id="nq-low" class="text-white">--</span>
+        </div>
+        <div class="flex justify-between items-center mt-2">
+          <div class="text-xs text-gray-400">前日波動</div>
+          <div id="nq-range" class="text-lg font-bold text-white">--</div>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+          <div class="text-xs text-gray-400">20日均值</div>
+          <div id="nq-avg" class="text-sm text-gray-300">--</div>
+        </div>
+        <div class="mt-2 text-center">
+          <span id="nq-cat" class="text-sm font-bold px-3 py-1 rounded-full bg-gray-700">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 上市櫃成交量 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4">
+    <div class="flex justify-between items-center mb-2">
+      <div class="text-sm font-bold text-gray-200">上市+上櫃 成交量</div>
+      <button onclick="openVolumeModal()"
+        class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+    </div>
+    <div class="text-xs text-gray-400 mb-1">前一日合計（億元）</div>
+    <div class="flex gap-6 items-end">
+      <div>
+        <div class="text-xs text-gray-500">上市</div>
+        <div id="vol-twse" class="text-lg font-bold text-white">--</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500">上櫃</div>
+        <div id="vol-tpex" class="text-lg font-bold text-white">--</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500">合計</div>
+        <div id="vol-total" class="text-xl font-bold text-yellow-300">--</div>
+      </div>
+      <div class="text-xs text-gray-500 self-center" id="vol-date"></div>
+    </div>
+  </div>
+
+  <!-- 散戶期貨歷史彈出視窗 -->
+  <div id="retail-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">散戶期貨淨部位 近20天</h2>
+        <button onclick="document.getElementById('retail-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="retail-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 外資策略歷史彈出視窗 -->
+  <div id="strategy-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">外資選擇權策略 近20天</h2>
+        <button onclick="document.getElementById('strategy-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="strategy-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 成交量歷史彈出視窗 -->
+  <div id="volume-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">上市+上櫃 近20天成交量（億元）</h2>
+        <button onclick="document.getElementById('volume-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="volume-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 結算比歷史彈出視窗 -->
+  <div id="settlement-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="settlement-modal-title" class="text-lg font-bold"></h2>
+        <button onclick="closeSettlementModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="settlement-modal-body" class="text-sm max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 波動歷史彈出視窗 -->
+  <div id="vol-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="vol-modal-title" class="text-lg font-bold"></h2>
+        <button onclick="closeVolModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="vol-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 股票更新時間 -->
+  <div class="text-center text-xs text-gray-500 mb-2" id="stocks-updated"></div>
+
+  <!-- 多空兩欄 -->
+  <div class="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+    <!-- 多頭 -->
+    <div>
+      <h2 class="text-red-400 font-bold text-lg mb-3">▲ 多頭推薦</h2>
+      <div id="long-list" class="space-y-2"></div>
+    </div>
+    <!-- 空頭 -->
+    <div>
+      <h2 class="text-green-400 font-bold text-lg mb-3">▼ 空頭推薦</h2>
+      <div id="short-list" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- 詳細面板（彈出） -->
+  <div id="modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="modal-title" class="text-xl font-bold"></h2>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+
+      <!-- 三大法人 tab -->
+      <div class="flex gap-2 mb-3">
+        <button onclick="switchTab('1d')" id="tab-1d"
+          class="px-3 py-1 rounded text-sm bg-blue-600 text-white">當日</button>
+        <button onclick="switchTab('5d')" id="tab-5d"
+          class="px-3 py-1 rounded text-sm bg-gray-700 text-white">近5日</button>
+      </div>
+
+      <div id="chip-loading" class="text-gray-400 text-sm">載入中...</div>
+      <div id="chip-1d" class="hidden"></div>
+      <div id="chip-5d" class="hidden"></div>
+    </div>
+  </div>
+
+  <!-- 流量統計（Google Analytics，可移除：刪掉此 script） -->
+  <!-- 替換 G-XXXXXXXXXX 為你的 GA4 ID -->
+  <!--
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
+  -->
+
+  <!-- 瀏覽人次 -->
+  <div class="text-center mt-10 mb-3">
+    <span class="text-xs text-gray-500">瀏覽人次：</span>
+    <span id="page-views" class="text-xs text-gray-400">--</span>
+  </div>
+
+  <!-- Buy Me a Coffee（替換 YOUR_USERNAME 為你的帳號） -->
+  <div class="text-center mt-2">
+    <a href="https://buymeacoffee.com/YOUR_USERNAME" target="_blank"
+      class="inline-block bg-yellow-400 hover:bg-yellow-300 text-black font-bold px-5 py-2 rounded-full text-sm transition">
+      ☕ Buy me a coffee
+    </a>
+  </div>
+
+  <script src="app.js?v=20260530a"></script>
+  <script data-goatcounter="https://charlesju.goatcounter.com/count"
+          async src="https://gc.zgo.at/count.js"></script>
+  <script>
+    fetch("https://charlesju.goatcounter.com/counter/index.html.json")
+      .then(r => r.json())
+      .then(d => {
+        const el = document.getElementById("page-views");
+        if (el && d.count !== undefined) el.textContent = d.count.toLocaleString();
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>
