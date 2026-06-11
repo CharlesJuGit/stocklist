@@ -45,6 +45,8 @@ stockweb/
   - opt_net > 5000：bp_add = BP × 0.8
   - 否則：bp_add = 0
 - 除以剩餘交易日數，得每日需結清口數
+- 結算日＝每月第三個週三，遇休市順延次一營業日；剩餘交易日排除週末與國定假日
+  （休市日來源：TWSE holidaySchedule API，失敗時退回僅排除週末）
 - 近20天趨勢可彈窗查看
 
 ### 波動分析
@@ -65,12 +67,15 @@ stockweb/
 ### 上市+上櫃成交量
 - TWSE：`www.twse.com.tw/rwd/zh/afterTrading/FMTQIK`（rwd 端點，避免 SSL 問題）
 - TPEx：`www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex`
+- 兩來源都是月表：每次抓「上月＋本月」、各月重試 3 次（API 會偶發沉默回空）
+- 按日期與既有資料合併（新值非零才覆蓋），保留 30 天——單次抓取失敗不會清掉歷史
 - 單位：億元，顯示前一日，近20天歷史可彈窗查看
 
 ### 瀏覽人次
-- GoatCounter 追蹤（`charlesju.goatcounter.com`）
+- GoatCounter 追蹤（`charlesju.goatcounter.com`），2026-06-07 起算
+- 顯示：`counter/TOTAL.json`（全站累計）；後台需開啟
+  「Allow adding visitor counts on your website」，否則 API 回 403
 - 顯示於頁面底部 Buy Me a Coffee 按鈕上方
-- 統計後台：charlesju.goatcounter.com
 
 ### 籌碼綜合評估
 正負分制（多方加分、空方減分），各項訊號分 × 權重後加總：
