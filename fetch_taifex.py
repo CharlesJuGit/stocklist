@@ -75,39 +75,45 @@ def scrape_taifex_web():
         m = re.search(r"(\d{4}/\d{2}/\d{2})", html)
         return m.group(1).replace("/", "") if m else None
 
-    # 期貨 TXF
+    def _fut_nets(cid):
+        """
+        抓單一商品頁，回傳 (html, 自營淨OI, 投信淨OI, 外資淨OI)。
+        頁面結構（2026-06-11 實證）：每機構 6 個數字
+          [交易買口, 交易賣口, 交易淨口, 未平倉買口, 未平倉賣口, 未平倉淨口]
+        淨OI索引：自營=5、投信=11、外資=17；全部數字的 index 40 為三大法人淨OI合計（驗算用）
+        """
+        html = _post("/cht/3/futContractsDate", {
+            "queryStartDate": "", "queryEndDate": "", "commodityId": cid})
+        nums = _nums_all(html)
+        if len(nums) < 18:
+            raise ValueError(f"{cid} 頁面數字不足（{len(nums)} 個）")
+        d, t, f = nums[5], nums[11], nums[17]
+        # 驗算：三者和應等於頁面的三大法人合計
+        if len(nums) > 40 and d + t + f != nums[40]:
+            print(f"scrape {cid} 驗算警告: 自營{d}+投信{t}+外資{f} != 合計{nums[40]}")
+        return html, d, t, f
+
+    # 期貨 TXF（大台）
     try:
-        html_txf = _post("/cht/3/futContractsDate", {
-            "queryStartDate": "", "queryEndDate": "", "commodityId": "TXF"})
+        html_txf, txD, txT, txF = _fut_nets("TXF")
         date = _date(html_txf)
-        txf_nums = _nums(html_txf)
-        # 每機構9個數值，外資=第3組(idx18:27)，淨部位在 index 6 of each group
-        # 結構: [買多口數,賣多口數,買多契約金額,賣多契約金額,買空口數,賣空口數,淨部位,...]
-        # 外資淨部位 = txf_nums[17] (每組9個，外資第3組，第7個=index6)
-        txF = txf_nums[17] if len(txf_nums) > 17 else 0
     except Exception as e:
         print(f"scrape TXF fail: {e}")
         return None, {}, {}
 
     # 期貨 MXF（小台）
     try:
-        html_mxf = _post("/cht/3/futContractsDate", {
-            "queryStartDate": "", "queryEndDate": "", "commodityId": "MXF"})
-        mxf_nums = _nums(html_mxf)
-        mtxF = mxf_nums[17] if len(mxf_nums) > 17 else 0
+        _, mtxD, mtxT, mtxF = _fut_nets("MXF")
     except Exception as e:
         print(f"scrape MXF fail: {e}")
-        mtxF = 0
+        mtxD = mtxT = mtxF = 0
 
     # 期貨 TMF（微台）
     try:
-        html_tmf = _post("/cht/3/futContractsDate", {
-            "queryStartDate": "", "queryEndDate": "", "commodityId": "TMF"})
-        tmf_nums = _nums(html_tmf)
-        tmxF = tmf_nums[17] if len(tmf_nums) > 17 else 0
+        _, tmxD, tmxT, tmxF = _fut_nets("TMF")
     except Exception as e:
         print(f"scrape TMF fail: {e}")
-        tmxF = 0
+        tmxD = tmxT = tmxF = 0
 
     # 選擇權 TXO
     # 網頁結構：CALL表(3機構×6欄) + PUT表(3機構×6欄) = 36個數字
@@ -133,12 +139,13 @@ def scrape_taifex_web():
         bc = sc = bp = sp = 0
 
     futures = {
-        "txF": txF, "txT": 0, "txD": 0,
-        "mtxF": mtxF, "mtxT": 0, "mtxD": 0,
-        "tmxF": tmxF, "tmxT": 0, "tmxD": 0,
+        "txF": txF, "txT": txT, "txD": txD,
+        "mtxF": mtxF, "mtxT": mtxT, "mtxD": mtxD,
+        "tmxF": tmxF, "tmxT": tmxT, "tmxD": tmxD,
     }
     options = {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
-    print(f"scrape_taifex_web OK: date={date} txF={txF} mtxF={mtxF} tmxF={tmxF} bc={bc} bp={bp}")
+    print(f"scrape_taifex_web OK: date={date} txF={txF} "
+          f"mtx(D/T/F)={mtxD}/{mtxT}/{mtxF} tmx(D/T/F)={tmxD}/{tmxT}/{tmxF} bc={bc} bp={bp}")
     return date, futures, options
 
 
@@ -146,9 +153,10 @@ def scrape_taifex_web():
 
 def parse_futures(text):
     # API 目前回傳 JSON（英文欄位名），中文 ContractCode/Item 有亂碼
-    # 固定位置索引（順序不變）：
+    # 固定位置索引（順序不變，2026-06-11 以 FinMind 數值實證）：
     #   臺股期貨：    idx[0]=自營 [1]=投信 [2]=外資
     #   小型臺指期貨：idx[9]=自營 [10]=投信 [11]=外資
+    #   微型臺指期貨：idx[12]=自營 [13]=投信 [14]=外資
     try:
         data = json.loads(text)
     except Exception:
@@ -163,6 +171,7 @@ def parse_futures(text):
         return date, {
             "txF": get_net(2), "txT": get_net(1), "txD": get_net(0),
             "mtxF": get_net(11), "mtxT": get_net(10), "mtxD": get_net(9),
+            "tmxF": get_net(14), "tmxT": get_net(13), "tmxD": get_net(12),
         }
 
     # fallback: 舊版 CSV 格式
@@ -182,6 +191,8 @@ def parse_futures(text):
         "txD": find_net("臺股期貨", "自營"),
         "mtxF": find_net("小型臺指期貨", "外資"), "mtxT": find_net("小型臺指期貨", "投信"),
         "mtxD": find_net("小型臺指期貨", "自營"),
+        "tmxF": find_net("微型臺指期貨", "外資"), "tmxT": find_net("微型臺指期貨", "投信"),
+        "tmxD": find_net("微型臺指期貨", "自營"),
     }
 
 

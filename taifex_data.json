@@ -2,14 +2,14 @@
   "date": "20260611",
   "futures": {
     "txF": -63168,
-    "txT": 0,
-    "txD": 0,
+    "txT": 55312,
+    "txD": 4155,
     "mtxF": 4930,
     "mtxT": 0,
-    "mtxD": 0,
+    "mtxD": -15220,
     "tmxF": 12330,
     "tmxT": 0,
-    "tmxD": 0
+    "tmxD": -47336
   },
   "options": {
     "bc": 12716,
@@ -36,7 +36,8 @@
       "opt_net": 13826,
       "pressure": 121711,
       "tdays": 4,
-      "ratio": 30428
+      "ratio": 30428,
+      "retail_total": 4622
     },
     {
       "date": "2026-05-15",
@@ -48,7 +49,8 @@
       "opt_net": 14649,
       "pressure": 117116,
       "tdays": 3,
-      "ratio": 39039
+      "ratio": 39039,
+      "retail_total": 8029
     },
     {
       "date": "2026-05-18",
@@ -60,7 +62,8 @@
       "opt_net": 23443,
       "pressure": 125171,
       "tdays": 2,
-      "ratio": 62586
+      "ratio": 62586,
+      "retail_total": 8855
     },
     {
       "date": "2026-05-19",
@@ -72,7 +75,8 @@
       "opt_net": 18036,
       "pressure": 108797,
       "tdays": 1,
-      "ratio": 108797
+      "ratio": 108797,
+      "retail_total": 15697
     },
     {
       "date": "2026-05-20",
@@ -84,7 +88,8 @@
       "opt_net": 783,
       "pressure": 42754,
       "tdays": 20,
-      "ratio": 2138
+      "ratio": 2138,
+      "retail_total": 14565
     },
     {
       "date": "2026-05-21",
@@ -96,7 +101,8 @@
       "opt_net": 6343,
       "pressure": 75678,
       "tdays": 19,
-      "ratio": 3983
+      "ratio": 3983,
+      "retail_total": 4687
     },
     {
       "date": "2026-05-25",
@@ -108,7 +114,8 @@
       "opt_net": 5433,
       "pressure": 71090,
       "tdays": 17,
-      "ratio": 4182
+      "ratio": 4182,
+      "retail_total": 9404
     },
     {
       "date": "2026-05-26",
@@ -120,7 +127,8 @@
       "opt_net": 7043,
       "pressure": 77622,
       "tdays": 16,
-      "ratio": 4851
+      "ratio": 4851,
+      "retail_total": 17839
     },
     {
       "date": "2026-05-27",
@@ -132,7 +140,8 @@
       "opt_net": 4136,
       "pressure": 55967,
       "tdays": 15,
-      "ratio": 3731
+      "ratio": 3731,
+      "retail_total": 10441
     },
     {
       "date": "2026-05-28",
@@ -144,7 +153,8 @@
       "opt_net": 6343,
       "pressure": 77122,
       "tdays": 14,
-      "ratio": 5509
+      "ratio": 5509,
+      "retail_total": 16789
     },
     {
       "date": "2026-05-29",
@@ -159,7 +169,7 @@
       "pressure": 77503,
       "tdays": 13,
       "ratio": 5962,
-      "retail_total": -2166,
+      "retail_total": 10681,
       "opt_strategy": "雙買"
     },
     {
@@ -175,7 +185,7 @@
       "pressure": 84692,
       "tdays": 12,
       "ratio": 7058,
-      "retail_total": 87,
+      "retail_total": 14989,
       "opt_strategy": "雙買"
     },
     {
@@ -191,7 +201,7 @@
       "pressure": 89057,
       "tdays": 11,
       "ratio": 8096,
-      "retail_total": 1700,
+      "retail_total": 19221,
       "opt_strategy": "雙買"
     },
     {
@@ -207,7 +217,7 @@
       "pressure": 85496,
       "tdays": 10,
       "ratio": 8550,
-      "retail_total": -1476,
+      "retail_total": 13350,
       "opt_strategy": "雙買"
     },
     {
@@ -223,7 +233,7 @@
       "pressure": 90798,
       "tdays": 9,
       "ratio": 10089,
-      "retail_total": 2680,
+      "retail_total": 22184,
       "opt_strategy": "雙買"
     },
     {
@@ -239,7 +249,7 @@
       "pressure": 88276,
       "tdays": 8,
       "ratio": 11034,
-      "retail_total": 240,
+      "retail_total": 24929,
       "opt_strategy": "雙買"
     },
     {
@@ -255,7 +265,7 @@
       "pressure": 85655,
       "tdays": 7,
       "ratio": 12236,
-      "retail_total": -5605,
+      "retail_total": 18656,
       "opt_strategy": "雙買"
     },
     {
@@ -271,7 +281,7 @@
       "pressure": 85553,
       "tdays": 6,
       "ratio": 14259,
-      "retail_total": -5877,
+      "retail_total": 15665,
       "opt_strategy": "雙買"
     },
     {
@@ -287,7 +297,7 @@
       "pressure": 80466,
       "tdays": 5,
       "ratio": 16093,
-      "retail_total": -9014,
+      "retail_total": 13439,
       "opt_strategy": "雙買"
     },
     {
@@ -303,7 +313,7 @@
       "pressure": 83214,
       "tdays": 4,
       "ratio": 20803,
-      "retail_total": -7396,
+      "retail_total": 17291,
       "opt_strategy": "雙買"
     }
   ],
@@ -312,11 +322,11 @@
       "yesterday": {
         "date": "2026-06-11",
         "high": 43973,
-        "low": 42460,
-        "range": 1513
+        "low": 42050,
+        "range": 1923
       },
-      "avg20": 1602,
-      "category": "中",
+      "avg20": 1574,
+      "category": "大",
       "history": [
         {
           "date": "2026-05-15",
@@ -435,17 +445,17 @@
         {
           "date": "2026-06-11",
           "high": 43973,
-          "low": 42460,
-          "range": 1513
+          "low": 42050,
+          "range": 1923
         }
       ]
     },
     "nq": {
       "yesterday": {
         "date": "2026-06-11",
-        "high": 28936,
+        "high": 29050,
         "low": 28266,
-        "range": 670
+        "range": 784
       },
       "avg20": 618,
       "category": "大",
@@ -566,9 +576,9 @@
         },
         {
           "date": "2026-06-11",
-          "high": 28936,
+          "high": 29050,
           "low": 28266,
-          "range": 670
+          "range": 784
         }
       ]
     }
@@ -629,5 +639,5 @@
       "total": 2792
     }
   ],
-  "updated_at": "2026-06-11T13:59:26Z"
+  "updated_at": "2026-06-11T15:41:24Z"
 }
