@@ -241,45 +241,68 @@ def parse_options(text):
 
 # ── 上市+上櫃 成交量（億元） ─────────────────────────────────
 
-def fetch_market_volume(n_days=20):
+def fetch_market_volume(n_days=45):
     """
     抓取上市（TWSE）＋上櫃（TPEx）每日成交金額，單位：億元。
-    TWSE: openapi.twse.com.tw/v1/exchangeReport/FMTQIK
-    TPEx: www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex
+    兩來源都是月表，抓「上月＋本月」避免月初只剩少數天數。
+    來源偶發回空資料（無例外的沉默失敗），各月最多重試 3 次並印警告。
+    TWSE: www.twse.com.tw/rwd FMTQIK
+    TPEx: www.tpex.org.tw tradingIndex
     """
+    import time as _time
+    import ssl as _ssl
     from datetime import date as _date, timedelta as _td
 
+    ctx = _ssl._create_unverified_context()
+    today = _date.today()
+    prev_month_day = today.replace(day=1) - _td(days=1)
+
     twse_by_date = {}
-    try:
-        import ssl as _ssl
-        ctx = _ssl._create_unverified_context()
-        url = "https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?response=json"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-            d = json.loads(resp.read().decode("utf-8", errors="replace"))
-        for r in d.get("data", []):
-            # r[0]='115/05/27', r[2]=成交金額
-            parts = r[0].split("/")
-            date_str = f"{int(parts[0])+1911}-{parts[1]}-{parts[2]}"
-            val = int(r[2].replace(",", "")) // 100_000_000
-            twse_by_date[date_str] = val
-    except Exception as e:
-        print(f"TWSE volume fail: {e}")
+    for ym in (prev_month_day, today):
+        url = (f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK"
+               f"?date={ym.strftime('%Y%m01')}&response=json")
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+                    d = json.loads(resp.read().decode("utf-8", errors="replace"))
+                rows = d.get("data", [])
+                if not rows:
+                    raise ValueError(f"回應無資料（stat={d.get('stat')}）")
+                for r in rows:
+                    # r[0]='115/05/27', r[2]=成交金額（元）
+                    parts = r[0].split("/")
+                    date_str = f"{int(parts[0])+1911}-{parts[1]}-{parts[2]}"
+                    twse_by_date[date_str] = int(r[2].replace(",", "")) // 100_000_000
+                break
+            except Exception as e:
+                print(f"TWSE volume {ym.strftime('%Y-%m')} 第{attempt+1}次失敗: {e}")
+                _time.sleep(3)
+    if not twse_by_date:
+        print("TWSE volume 完全失敗（merge 後沿用既有資料）")
 
     tpex_by_date = {}
-    try:
-        url = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            d = json.loads(resp.read())
-        for r in d["tables"][0]["data"]:
-            parts = r[0].split("/")          # '115/05/27'
-            year = int(parts[0]) + 1911
-            date_str = f"{year}-{parts[1]}-{parts[2]}"
-            val = int(r[2].replace(",", "")) * 1000 // 100_000_000
-            tpex_by_date[date_str] = val
-    except Exception as e:
-        print(f"TPEx volume fail: {e}")
+    for ym in (prev_month_day, today):
+        roc = f"{ym.year - 1911}/{ym.month:02d}/01"
+        url = f"https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingIndex?date={roc}&response=json"
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+                    d = json.loads(resp.read())
+                rows = d["tables"][0]["data"]
+                if not rows:
+                    raise ValueError("回應無資料")
+                for r in rows:
+                    parts = r[0].split("/")          # '115/05/27'
+                    date_str = f"{int(parts[0])+1911}-{parts[1]}-{parts[2]}"
+                    tpex_by_date[date_str] = int(r[2].replace(",", "")) * 1000 // 100_000_000
+                break
+            except Exception as e:
+                print(f"TPEx volume {ym.strftime('%Y-%m')} 第{attempt+1}次失敗: {e}")
+                _time.sleep(3)
+    if not tpex_by_date:
+        print("TPEx volume 完全失敗（merge 後沿用既有資料）")
 
     all_dates = sorted(set(twse_by_date) | set(tpex_by_date))
     records = []
@@ -293,6 +316,20 @@ def fetch_market_volume(n_days=20):
         records.append({"date": dt, "twse": twse, "tpex": tpex, "total": twse + tpex})
 
     return records[-n_days:] if len(records) >= n_days else records
+
+
+def merge_market_volume(existing: list, fetched: list, keep: int = 30) -> list:
+    """
+    以日期合併新舊成交量記錄：新值非零才覆蓋，零或缺漏沿用舊值。
+    單次抓取失敗（沉默回空/回零）不會再清掉整串歷史。
+    """
+    by_date = {r["date"]: dict(r) for r in existing if r.get("date")}
+    for r in fetched:
+        old = by_date.get(r["date"], {})
+        twse = r["twse"] or old.get("twse", 0)
+        tpex = r["tpex"] or old.get("tpex", 0)
+        by_date[r["date"]] = {"date": r["date"], "twse": twse, "tpex": tpex, "total": twse + tpex}
+    return [by_date[d] for d in sorted(by_date)][-keep:]
 
 
 # ── FinMind 台指期 OHLC ──────────────────────────────────────
@@ -793,13 +830,15 @@ def main():
         print("NQ OHLC 抓失敗，沿用既有資料")
         nq_records = existing_json.get("volatility", {}).get("nq", {}).get("history", [])
 
-    market_volume = []
+    fetched_volume = []
     try:
-        market_volume = fetch_market_volume(20)
-        print(f"Market volume OK  {len(market_volume)} days  latest={market_volume[-1] if market_volume else None}")
+        fetched_volume = fetch_market_volume(45)
+        print(f"Market volume fetched {len(fetched_volume)} days  latest={fetched_volume[-1] if fetched_volume else None}")
     except Exception as e:
         print(f"Market volume FAIL: {e}")
-        market_volume = existing_json.get("market_volume", [])
+    # 按日期合併既有資料，單次失敗不會清掉歷史
+    market_volume = merge_market_volume(existing_json.get("market_volume", []), fetched_volume)
+    print(f"Market volume merged → {len(market_volume)} days")
 
     tx_vol = build_vol_data(tx_records, "TX")
     nq_vol = build_vol_data(nq_records, "NQ")
