@@ -20,9 +20,9 @@
   "institute": {
     "date": "20260612",
     "foreign": 286.9,
-    "trust": 129.4,
+    "trust": 142.3,
     "dealer": 28.4,
-    "total": 444.7
+    "total": 457.6
   },
   "settlement_date": "2026-06-17",
   "settlement_history": [
@@ -781,5 +781,5 @@
       "total": 13982
     }
   ],
-  "updated_at": "2026-06-12T10:58:54Z"
+  "updated_at": "2026-06-12T12:25:01Z"
 }
