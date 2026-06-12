@@ -1,28 +1,28 @@
 {
-  "date": "20260611",
+  "date": "20260612",
   "futures": {
-    "txF": -63168,
-    "txT": 55312,
-    "txD": 4155,
-    "mtxF": 4930,
-    "mtxT": 0,
-    "mtxD": -15220,
-    "tmxF": 12330,
+    "txF": -65039,
+    "txT": 57111,
+    "txD": 3568,
+    "mtxF": 5734,
+    "mtxT": 7,
+    "mtxD": -15542,
+    "tmxF": 15432,
     "tmxT": 0,
-    "tmxD": -47336
+    "tmxD": -44278
   },
   "options": {
-    "bc": 12716,
-    "sc": 10128,
-    "bp": 26598,
-    "sp": 21185
+    "bc": 11507,
+    "sc": 9160,
+    "bp": 26873,
+    "sp": 20925
   },
   "institute": {
-    "date": "20260611",
-    "foreign": -357.8,
-    "trust": 132.4,
-    "dealer": 7.3,
-    "total": -218.1
+    "date": "20260612",
+    "foreign": 286.9,
+    "trust": 129.4,
+    "dealer": 28.4,
+    "total": 444.7
   },
   "settlement_date": "2026-06-17",
   "settlement_history": [
@@ -315,6 +315,22 @@
       "ratio": 20803,
       "retail_total": 17291,
       "opt_strategy": "雙買"
+    },
+    {
+      "date": "2026-06-12",
+      "txF": -65039,
+      "mtxF": 5734,
+      "bp": 26873,
+      "sp": 20925,
+      "bc": 11507,
+      "sc": 9160,
+      "fut_net": -63606,
+      "opt_net": 5948,
+      "pressure": 85104,
+      "tdays": 3,
+      "ratio": 28368,
+      "retail_total": 15570,
+      "opt_strategy": "雙買"
     }
   ],
   "volatility": {
@@ -325,7 +341,7 @@
         "low": 42050,
         "range": 1923
       },
-      "avg20": 1574,
+      "avg20": 1602,
       "category": "大",
       "history": [
         {
@@ -453,12 +469,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-06-12",
-        "high": 29590,
-        "low": 29443,
-        "range": 147
+        "high": 29675,
+        "low": 29260,
+        "range": 415
       },
       "avg20": 656,
-      "category": "低",
+      "category": "小",
       "history": [
         {
           "date": "2026-05-15",
@@ -576,9 +592,9 @@
         },
         {
           "date": "2026-06-12",
-          "high": 29590,
-          "low": 29443,
-          "range": 147
+          "high": 29675,
+          "low": 29260,
+          "range": 415
         }
       ]
     }
@@ -757,7 +773,13 @@
       "twse": 13385,
       "tpex": 2792,
       "total": 16177
+    },
+    {
+      "date": "2026-06-12",
+      "twse": 11691,
+      "tpex": 2291,
+      "total": 13982
     }
   ],
-  "updated_at": "2026-06-11T23:57:56Z"
+  "updated_at": "2026-06-12T10:58:54Z"
 }
