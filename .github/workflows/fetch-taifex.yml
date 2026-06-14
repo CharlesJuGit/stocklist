@@ -7,6 +7,11 @@ on:
     - cron: '0 12 * * 1-5'  # 20:00 TWN
   workflow_dispatch:
 
+# 與 update-nq 共用同一 group，避免兩個 workflow 同時推送 taifex_data.json 撞車（排隊不取消）
+concurrency:
+  group: taifex-data-push
+  cancel-in-progress: false
+
 jobs:
   fetch:
     runs-on: ubuntu-latest

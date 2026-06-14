@@ -5,6 +5,11 @@ on:
     - cron: '30 22 * * 0-4'  # 22:30 UTC = 6:30 AM TWN（週一到週五）
   workflow_dispatch:
 
+# 與 fetch-taifex 共用同一 group，避免兩個 workflow 同時推送 taifex_data.json 撞車（排隊不取消）
+concurrency:
+  group: taifex-data-push
+  cancel-in-progress: false
+
 jobs:
   update-nq:
     runs-on: ubuntu-latest

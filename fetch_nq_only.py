@@ -16,7 +16,7 @@ if not nq_records:
     raise SystemExit(1)
 
 nq_vol = build_vol_data(nq_records, "NQ")
-data["volatility"]["nq"] = nq_vol
+data.setdefault("volatility", {})["nq"] = nq_vol   # 防 volatility 鍵不存在時 KeyError
 data["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 with open("taifex_data.json", "w", encoding="utf-8") as f:

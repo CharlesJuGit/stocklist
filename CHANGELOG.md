@@ -48,7 +48,14 @@
 - 原存 localStorage（持久、跨工作階段、易受 XSS/共用機器讀取）→ 改 sessionStorage，關閉瀏覽器即清除
 - 代價：每個瀏覽器工作階段首次觸發抓取需重輸一次 token
 
-**注意：** settlement_history 既有的 05/14~05/19 斷崖 4 筆為舊定義產物，程式修好後不再產生，會隨每日 append 於約 4 個交易日後滾出近20天視窗（或可手動清重建，未做）。GitHub Actions workflows / csv_to_json / merged_to_json 尚未稽核。
+**Fix (Opus)：** workflows / fetch_nq_only 健壯性（稽核第二批，低優先）
+- 兩個 workflow 加共用 `concurrency: taifex-data-push`（cancel-in-progress: false），避免 fetch-taifex 與 update-nq 同時推送 taifex_data.json 撞車（原僅靠 rebase 重試化解）
+- `fetch_nq_only.py` 改 `data.setdefault("volatility", {})["nq"]`，防 volatility 鍵不存在時 KeyError
+- 已稽核未改（判斷後保留）：workflow 的 `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION`（移除有風險、需測）、`csv_to_json` 股名來源（非主板/未交易股名空白，純顯示）
+
+**稽核完成：** 專案二全檔（fetch_taifex.py / app.js / 2 workflows / csv_to_json / fetch_nq_only / merged_to_json）已由 Opus 完整 review。
+
+**注意：** settlement_history 既有的 05/14~05/19 斷崖 4 筆為舊定義產物，程式修好後不再產生，會隨每日 append 於約 4 個交易日後滾出近20天視窗（或可手動清重建，未做）。
 
 ---
 
