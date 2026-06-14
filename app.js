@@ -69,11 +69,13 @@ async function fetchT86(date) {
 }
 
 // 從 T86 資料列取得個股數值
+// T86 欄位：[4]外陸資買賣超(不含外資自營商) [7]外資自營商買賣超 [10]投信買賣超 [11]自營商買賣超 [18]三大法人合計
 function parseStockRow(row) {
+  const v = (i) => parseInt(row[i].replace(/,/g, '')) || 0;
   return {
-    foreign: parseInt(row[4].replace(/,/g, '')) || 0,
-    trust:   parseInt(row[7].replace(/,/g, '')) || 0,
-    dealer:  parseInt(row[8].replace(/,/g, '')) || 0,
+    foreign: v(4) + v(7),   // 完整外資（含外資自營商），與市場層三大法人口徑一致
+    trust:   v(10),          // 投信買賣超（原誤用 row[7]=外資自營商，恆為相異值）
+    dealer:  v(11),          // 自營商買賣超合計（原誤用 row[8]=投信「買進量」，非淨額）
   };
 }
 
@@ -182,7 +184,8 @@ async function buildChip5d(stockId, dates) {
 }
 
 function chipRow(label, val) {
-  const color = val >= 0 ? 'text-green-400' : 'text-red-400';
+  // 台股慣例：買超紅、賣超綠（原為反色，與同表合計列、5日表不一致）
+  const color = val >= 0 ? 'text-red-400' : 'text-green-400';
   return `<tr><td class="py-1 text-gray-300">${label}</td><td class="text-right py-1 ${color}">${fmt(val)}</td></tr>`;
 }
 
@@ -708,7 +711,8 @@ async function loadSignalSummary() {
     const bc = o.bc ?? 0, sc = o.sc ?? 0, bp = o.bp ?? 0, sp = o.sp ?? 0;
     if (bc + sc > 0) {
       const pcr = (bp + sp) / (bc + sc);
-      const s = pcr > 1.5 ? -1 : pcr < 0.7 ? 1 : 0;
+      // 門檻與顯示用（loadOptions）一致：>1.2 偏空、<0.8 偏多，避免「顯示偏空恐慌卻不計分」
+      const s = pcr > 1.2 ? -1 : pcr < 0.8 ? 1 : 0;
       score += s;
       signals.push(`P/C Ratio ${pcr.toFixed(2)} → ${s < 0 ? '偏空恐慌' : s > 0 ? '偏多追漲' : '中性'}`);
     }
@@ -800,12 +804,13 @@ async function triggerFetch() {
     }
   } catch (e) {}
 
-  let pat = localStorage.getItem('gh_pat') || '';
+  // PAT 改存 sessionStorage（關閉瀏覽器即清除，降低持久暴露；代價：每個瀏覽器工作階段需重輸一次）
+  let pat = sessionStorage.getItem('gh_pat') || '';
   if (!pat) {
     pat = prompt('請輸入 GitHub Personal Access Token（需要 workflow 權限）：');
     if (!pat) { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; return; }
-    localStorage.setItem('gh_pat', pat.trim());
     pat = pat.trim();
+    sessionStorage.setItem('gh_pat', pat);
   }
 
   btn.textContent = '觸發中...';
@@ -827,7 +832,7 @@ async function triggerFetch() {
       btn.textContent = '✓ 已觸發';
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 3000);
     } else if (res.status === 401) {
-      localStorage.removeItem('gh_pat');
+      sessionStorage.removeItem('gh_pat');
       btn.textContent = 'Token 錯誤';
       alert('Token 無效或已過期，已清除，請重試。');
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 2000);

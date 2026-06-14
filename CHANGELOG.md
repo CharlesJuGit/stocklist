@@ -32,7 +32,23 @@
 - `fetch_institute` 補 unverified SSL context（與 market_volume 一致）
 - 整理選擇權索引那段前後矛盾的註解；CSV fallback 加註 legacy 說明
 
-**注意：** settlement_history 既有的 05/14~05/19 斷崖 4 筆為舊定義產物，程式修好後不再產生，會隨每日 append 於約 4 個交易日後滾出近20天視窗（或可手動清重建，未做）。app.js / workflows 尚未稽核。
+**Fix (Opus)：** `app.js` 個股三大法人 modal（T86）欄位索引錯誤（沉默錯數字）
+- `parseStockRow` 取 trust=row[7]、dealer=row[8]，但 T86 實際 [7]=外資自營商買賣超、[8]=投信「買進量」（非淨額）→ 個股「投信/自營商」兩欄一直顯示錯值（連正負都可能相反）
+- **實證(6/12)：** 2330 修前顯示 投信=0/自營=173000，正確應為 投信=-149460/自營=-180577；修正為 foreign=row[4]+[7]、trust=row[10]、dealer=row[11]，三檔(2330/2317/2454)合計均=官方[18]三大法人買賣超
+- 同步：外資改含外資自營商，與市場層三大法人 B 修正口徑一致
+
+**Fix (Opus)：** `app.js` `chipRow` 顏色反置
+- 1d 個股表三法人列用「正值=綠」，與同表合計列、5日表、台股慣例（買超紅/賣超綠）相反 → 改為正值紅、負值綠
+
+**Fix (Opus)：** `app.js` P/C Ratio 門檻統一
+- 顯示用 1.2/0.8（loadOptions）、評分用 1.5/0.7（loadSignalSummary）不一致 → 同一比值可能「顯示偏空恐慌卻不計分」
+- 評分門檻改為 1.2/0.8，與顯示一致（如需調回評分敏感度可改此處）
+
+**Fix (Opus)：** `app.js` GitHub PAT 改存 sessionStorage
+- 原存 localStorage（持久、跨工作階段、易受 XSS/共用機器讀取）→ 改 sessionStorage，關閉瀏覽器即清除
+- 代價：每個瀏覽器工作階段首次觸發抓取需重輸一次 token
+
+**注意：** settlement_history 既有的 05/14~05/19 斷崖 4 筆為舊定義產物，程式修好後不再產生，會隨每日 append 於約 4 個交易日後滾出近20天視窗（或可手動清重建，未做）。GitHub Actions workflows / csv_to_json / merged_to_json 尚未稽核。
 
 ---
 
