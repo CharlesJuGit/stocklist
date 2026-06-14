@@ -60,12 +60,6 @@ def scrape_taifex_web():
         with urllib.request.urlopen(req, timeout=15) as r:
             return r.read().decode("utf-8", errors="replace")
 
-    def _nums(html):
-        """期貨頁：頁面有兩組相同數字（上下表），只取前半。"""
-        raw = re.findall(r'class="(?:blue|red)">\s*([-\d,]+)\s*</span>', html)
-        half = len(raw) // 2
-        return [int(n.replace(",", "")) for n in raw[:half]]
-
     def _nums_all(html):
         """選擇權頁：取全部數字，不做截半。"""
         raw = re.findall(r'class="(?:blue|red)">\s*([-\d,]+)\s*</span>', html)
@@ -115,14 +109,11 @@ def scrape_taifex_web():
         print(f"scrape TMF fail: {e}")
         tmxD = tmxT = tmxF = 0
 
-    # 選擇權 TXO
-    # 網頁結構：CALL表(3機構×6欄) + PUT表(3機構×6欄) = 36個數字
-    # 每機構6欄：[交易買口, 交易買金額, 交易賣口, 交易賣金額, 未平倉買口, 未平倉賣口]
-    # 欄位 index 4=未平倉買口(BC/BP), 5=未平倉賣口(SC/SP)
-    # 外資 = 第3行(row 2)，CALL: idx 2*6+4=16(BC), 2*6+5=17(SC)...
-    # 等等，重新確認：6欄順序為[交易買口數, 交易賣口數, 交易買金額, 交易賣金額, 未平倉買口數, 未平倉賣口數]
-    # 依用戶確認：BC=nums[15], SC=nums[16] (CALL外資 index 2*6+3, 2*6+4)
-    # PUT外資：BP=nums[33], SP=nums[34] (index 18+2*6+3, 18+2*6+4)
+    # 選擇權 TXO（只取外資未平倉，與 institute/結算比一致）
+    # 網頁數字序：CALL 表 3 機構各 6 欄(共18) + PUT 表 3 機構各 6 欄(共18)。
+    # 外資為各表第 3 機構。實證對應索引：
+    #   CALL 外資未平倉買=BC=nums[15]、賣=SC=nums[16]
+    #   PUT  外資未平倉買=BP=nums[33]、賣=SP=nums[34]
     try:
         html_opt = _post("/cht/3/callsAndPutsDate", {
             "queryStartDate": "", "queryEndDate": "", "commodityId": "TXO"})
@@ -152,26 +143,26 @@ def scrape_taifex_web():
 # ── 期貨未平倉 ────────────────────────────────────────────────
 
 def parse_futures(text):
-    # API 目前回傳 JSON（英文欄位名），中文 ContractCode/Item 有亂碼
-    # 固定位置索引（順序不變，2026-06-11 以 FinMind 數值實證）：
-    #   臺股期貨：    idx[0]=自營 [1]=投信 [2]=外資
-    #   小型臺指期貨：idx[9]=自營 [10]=投信 [11]=外資
-    #   微型臺指期貨：idx[12]=自營 [13]=投信 [14]=外資
+    # API 回傳 JSON，ContractCode/Item 為乾淨中文（2026-06-14 實證）。
+    # 依「商品名＋身份別」比對 OpenInterest(Net)，取代原本的固定位置索引，
+    # 避免 TAIFEX 調整列順序或新增商品時整批錯位（沉默抓錯）。
     try:
         data = json.loads(text)
     except Exception:
         data = None
 
     if data and isinstance(data, list) and len(data) > 2:
-        def get_net(idx):
-            row = data[idx] if idx < len(data) else {}
-            val = row.get("OpenInterest(Net)", "0") or "0"
-            return int(str(val).replace(",", ""))
+        def net(product, investor):
+            for row in data:
+                if row.get("ContractCode") == product and investor in str(row.get("Item", "")):
+                    val = row.get("OpenInterest(Net)", "0") or "0"
+                    return int(str(val).replace(",", ""))
+            return 0
         date = data[0].get("Date", "")
         return date, {
-            "txF": get_net(2), "txT": get_net(1), "txD": get_net(0),
-            "mtxF": get_net(11), "mtxT": get_net(10), "mtxD": get_net(9),
-            "tmxF": get_net(14), "tmxT": get_net(13), "tmxD": get_net(12),
+            "txF":  net("臺股期貨", "外資"),   "txT":  net("臺股期貨", "投信"),   "txD":  net("臺股期貨", "自營商"),
+            "mtxF": net("小型臺指期貨", "外資"), "mtxT": net("小型臺指期貨", "投信"), "mtxD": net("小型臺指期貨", "自營商"),
+            "tmxF": net("微型臺指期貨", "外資"), "tmxT": net("微型臺指期貨", "投信"), "tmxD": net("微型臺指期貨", "自營商"),
         }
 
     # fallback: 舊版 CSV 格式
@@ -206,11 +197,15 @@ def parse_options(text):
         data = None
 
     if data and isinstance(data, list) and len(data) >= 6:
+        # 只取「外資」身份別，與網頁爬蟲（主來源）一致；
+        # 原本加總自營+投信+外資是三大法人合計，與外資策略/PC 標籤不符（量級約 3 倍）
         first_code = data[0].get("ContractCode", "")
         bc = sc = bp = sp = 0
         for row in data:
             if row.get("ContractCode", "") != first_code:
                 break
+            if "外資" not in str(row.get("Item", "")):
+                continue
             cp = row.get("CallPut", "")
             lo = int(str(row.get("OpenInterest(Long)",  0) or 0).replace(",", ""))
             so = int(str(row.get("OpenInterest(Short)", 0) or 0).replace(",", ""))
@@ -220,7 +215,8 @@ def parse_options(text):
                 bp += lo;  sp += so
         return {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
 
-    # fallback: 舊版 CSV 格式
+    # fallback: 舊版 CSV 格式（openapi 已改回 JSON，此路目前不會觸發；
+    # 為 legacy 保留，未做外資過濾，若 API 退回 CSV 需重新確認身份別欄位）
     rows = parse_rows(text)
     if not rows:
         return {}
@@ -644,7 +640,7 @@ def fetch_settlement_history_backfill(n_days=30):
                 result[dt] = r["long_open_interest_balance_volume"] - r["short_open_interest_balance_volume"]
         return result
 
-    # 全機構 PUT
+    # 外資 PUT（與網頁爬蟲/今日 entry 一致；列序實證：0-2=買權自營/投信/外資，3-5=賣權自營/投信/外資）
     def get_put():
         rows = _get(f"https://api.finmindtrade.com/api/v4/data"
                     f"?dataset=TaiwanOptionInstitutionalInvestors&data_id=TXO&start_date={start}{tok_param}")
@@ -653,10 +649,10 @@ def fetch_settlement_history_backfill(n_days=30):
             by_date.setdefault(row["date"], []).append(row)
         result = {}
         for dt, day_rows in by_date.items():
-            put_rows = day_rows[3:6] if len(day_rows) >= 6 else []
-            bp = sum(r["long_open_interest_balance_volume"] for r in put_rows)
-            sp = sum(r["short_open_interest_balance_volume"] for r in put_rows)
-            result[dt] = {"bp": bp, "sp": sp}
+            if len(day_rows) >= 6:
+                foreign_put = day_rows[5]   # 賣權外資
+                result[dt] = {"bp": foreign_put["long_open_interest_balance_volume"],
+                              "sp": foreign_put["short_open_interest_balance_volume"]}
         return result
 
     tx  = get_fut("TX")
@@ -762,7 +758,9 @@ def main():
 
     # ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
     def fetch_institute():
+        import ssl as _ssl
         from datetime import date as _d, timedelta as _td
+        ctx = _ssl._create_unverified_context()   # 與 market_volume 一致，避免部分環境 TWSE 憑證問題
         today = _d.today()
         for i in range(10):
             d = today - _td(days=i)
@@ -773,23 +771,35 @@ def main():
                    f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=10) as r:
+                with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
                     j = json.loads(r.read())
                 rows = j.get("data", [])
                 if not rows:
                     continue
-                def find(kw1, kw2=None):
+                # 依列首精準取值（startswith 避免「外資及陸資(不含外資自營商)」被子字串誤配）
+                def comp(prefix):
                     for row in rows:
-                        if kw1 in row[0] or (kw2 and kw2 in row[0]):
-                            return round(float(row[3].replace(",", "")) / 1e8, 1)
+                        if row[0].strip().startswith(prefix):
+                            try:
+                                return float(row[3].replace(",", "")) / 1e8
+                            except (ValueError, IndexError):
+                                return None
                     return None
-                foreign = find("外資及陸資(不含外資自營商)", "外資")
-                trust   = find("投信")
-                dealer  = find("自營商(自行買賣)", "自營商")
+
+                def total_of(*prefixes):
+                    vals = [comp(p) for p in prefixes]
+                    if all(v is None for v in vals):
+                        return None
+                    return round(sum(v or 0 for v in vals), 1)
+
+                # 標準三大法人：自營商=自行買賣+避險、外資=外資及陸資+外資自營商、投信（對齊 TWSE 合計）
+                dealer  = total_of("自營商(自行買賣)", "自營商(避險)")
+                trust   = total_of("投信")
+                foreign = total_of("外資及陸資", "外資自營商")
                 if foreign is None and trust is None:
                     continue
                 total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
-                print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}")
+                print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}  total={total}")
                 return {"date": dt_str, "foreign": foreign, "trust": trust,
                         "dealer": dealer, "total": total}
             except Exception as e:
