@@ -2,9 +2,11 @@ name: Fetch TAIFEX Data
 
 on:
   schedule:
-    - cron: '0 9 * * 1-5'   # 17:00 TWN
-    - cron: '0 10 * * 1-5'  # 18:00 TWN
-    - cron: '0 12 * * 1-5'  # 20:00 TWN
+    # 避開整點 :00（GitHub 排程尖峰最易被跳過），改 :17
+    - cron: '17 9 * * 1-5'   # 17:17 TWN
+    - cron: '17 10 * * 1-5'  # 18:17 TWN
+    - cron: '17 12 * * 1-5'  # 20:17 TWN
+    - cron: '17 13 * * 1-5'  # 21:17 TWN（保險：前面若全被跳過仍能補上當日資料）
   workflow_dispatch:
 
 # 與 update-nq 共用同一 group，避免兩個 workflow 同時推送 taifex_data.json 撞車（排隊不取消）
