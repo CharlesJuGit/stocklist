@@ -352,34 +352,38 @@ def fetch_tx_ohlc(n_days=25):
 
     rows = data.get("data", [])
 
-    # 分別取 after_market 和 position，近月合約（6位）成交量最大者
-    am_by_date = {}   # after_market（夜盤）
-    pos_by_date = {}  # position（日盤）
-
+    # 每個日期先選「當天總成交量最大的單一近月合約」，再只取該合約的日盤+夜盤。
+    # 否則結算日（每月第三個週三）會把結算前夜盤(舊月)＋結算後日盤(新月)混進同一天，
+    # max高/min低跨月配對污染 range（2026-05-20 實證）。月價差近結算雖小，仍以單一合約為準。
+    vol_by = {}    # (date, contract) -> 總量
+    row_by = {}    # (date, contract, session) -> row（同 session 取量大者）
     for row in rows:
-        session = row["trading_session"]
-        if len(row["contract_date"]) == 6 and row["volume"] > 0:
-            dt = row["date"]
-            if session == "after_market":
-                if dt not in am_by_date or row["volume"] > am_by_date[dt]["volume"]:
-                    am_by_date[dt] = row
-            elif session == "position":
-                if dt not in pos_by_date or row["volume"] > pos_by_date[dt]["volume"]:
-                    pos_by_date[dt] = row
+        cd = row["contract_date"]
+        if len(cd) != 6 or row["volume"] <= 0:
+            continue
+        dt = row["date"]; sess = row["trading_session"]
+        vol_by[(dt, cd)] = vol_by.get((dt, cd), 0) + row["volume"]
+        k = (dt, cd, sess)
+        if k not in row_by or row["volume"] > row_by[k]["volume"]:
+            row_by[k] = row
 
-    # 合併兩個 session：max high, min low
-    all_dates = sorted(set(am_by_date) | set(pos_by_date))
-    # 只取週一到週五
-    all_dates = [d for d in all_dates if _dt.strptime(d, "%Y-%m-%d").weekday() < 5]
+    best_contract = {}   # date -> 當天主力合約
+    for (dt, cd), v in vol_by.items():
+        if dt not in best_contract or v > vol_by[(dt, best_contract[dt])]:
+            best_contract[dt] = cd
+
+    all_dates = sorted(d for d in best_contract
+                       if _dt.strptime(d, "%Y-%m-%d").weekday() < 5)
 
     records = []
     for dt in all_dates:
-        am = am_by_date.get(dt)
-        pos = pos_by_date.get(dt)
-        if not am and not pos:
+        cd = best_contract[dt]
+        am  = row_by.get((dt, cd, "after_market"))
+        pos = row_by.get((dt, cd, "position"))
+        highs = [r["max"] for r in (am, pos) if r]
+        lows  = [r["min"] for r in (am, pos) if r]
+        if not highs:
             continue
-        highs = [r["max"] for r in [am, pos] if r]
-        lows  = [r["min"] for r in [am, pos] if r]
         h, l = round(max(highs)), round(min(lows))
         if h == 0 and l == 0:
             continue
