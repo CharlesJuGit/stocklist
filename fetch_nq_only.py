@@ -5,12 +5,12 @@ fetch_nq_only.py
 """
 import json
 from datetime import datetime, timezone
-from fetch_taifex import fetch_yahoo_ohlc, build_vol_data
+from fetch_taifex import fetch_yahoo_ohlc, build_vol_data, nq_front_contract
 
 with open("taifex_data.json", encoding="utf-8") as f:
     data = json.load(f)
 
-nq_records = fetch_yahoo_ohlc("NQ=F", 25)
+nq_records = fetch_yahoo_ohlc(nq_front_contract(), 25)
 if not nq_records:
     print("NQ fetch 失敗，不更新")
     raise SystemExit(1)

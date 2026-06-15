@@ -390,6 +390,27 @@ def fetch_tx_ohlc(n_days=25):
 
 # ── Yahoo Finance OHLC（NQ 期貨）────────────────────────────
 
+def nq_front_contract(ref_date=None):
+    """回傳 NQ 近月合約的 Yahoo 符號（如 NQU26.CME）。
+    季月 H/M/U/Z = 3/6/9/12，到期=當月第三個週五；到期前 4 天起轉倉至次季月。
+    用明確合約取代 NQ=F：每格交易日只含單一合約，避免 Yahoo 連續合約盤中換月把
+    「前月低＋次月高」拼在同一天、灌大 range（2026-06-15 四巫日轉倉實證的污染）。
+    """
+    from datetime import date as _date, timedelta as _td
+    d = ref_date or _date.today()
+    code = {3: "H", 6: "M", 9: "U", 12: "Z"}
+
+    def third_friday(y, m):
+        first = _date(y, m, 1)
+        return first + _td(days=(4 - first.weekday()) % 7) + _td(days=14)
+
+    for yr in (d.year, d.year + 1):
+        for m in (3, 6, 9, 12):
+            if third_friday(yr, m) - _td(days=4) > d:
+                return f"NQ{code[m]}{yr % 100:02d}.CME"
+    return "NQ=F"   # 理論上不會到這
+
+
 def fetch_yahoo_ohlc(symbol, n_days=25):
     """
     抓 NQ 期貨 1h K 棒，以台灣時間（UTC+8）每天凌晨 6:00 為分界分組
@@ -831,8 +852,9 @@ def main():
 
     nq_records = []
     try:
-        nq_records = fetch_yahoo_ohlc("NQ=F", 25)
-        print(f"NQ OHLC OK  {len(nq_records)} days")
+        nq_sym = nq_front_contract()
+        nq_records = fetch_yahoo_ohlc(nq_sym, 25)
+        print(f"NQ OHLC OK  {nq_sym}  {len(nq_records)} days")
     except Exception as e:
         print(f"NQ OHLC FAIL: {e}")
 

@@ -365,6 +365,14 @@
     </a>
   </div>
 
+  <!-- 快速捲動：回最上 / 到最下（固定右側） -->
+  <div class="fixed right-3 bottom-4 z-50 flex flex-col gap-2">
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到最上"
+      class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↑</button>
+    <button onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})" title="到最下"
+      class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
+  </div>
+
   <script src="app.js?v=20260615"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
