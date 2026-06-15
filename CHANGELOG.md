@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-06-15（PAT 儲存回退）
+
+**Request：** 手機點「抓新資料」一直要求重輸 token
+
+**Fix (Opus)：** GitHub PAT 改回 localStorage（回退 6-14 的 sessionStorage 改動）
+- sessionStorage 在手機上分頁被回收即清除，導致頻繁重輸 → 對「手機常用」情境體驗差
+- 個人單人儀表板、靜態網頁無使用者輸入，XSS 風險低，localStorage 持久記住較合適（先前安全性顧慮屬修過頭）
+- 註：平常看數據用「↻ 重新整理」(不需 token)，「⬇ 抓新資料」才需 PAT
+
+---
+
 ## 2026-06-14（Opus reviewer 第一輪：選擇權/三大法人口徑一致化）
 
 **Request：** Opus 接手 reviewer，首次獨立稽核 stockweb 後端 fetch_taifex.py

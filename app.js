@@ -804,13 +804,13 @@ async function triggerFetch() {
     }
   } catch (e) {}
 
-  // PAT 改存 sessionStorage（關閉瀏覽器即清除，降低持久暴露；代價：每個瀏覽器工作階段需重輸一次）
-  let pat = sessionStorage.getItem('gh_pat') || '';
+  // PAT 存 localStorage：個人儀表板、手機常用，記住免重輸（靜態網頁無使用者輸入，XSS 風險低）
+  let pat = localStorage.getItem('gh_pat') || '';
   if (!pat) {
     pat = prompt('請輸入 GitHub Personal Access Token（需要 workflow 權限）：');
     if (!pat) { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; return; }
     pat = pat.trim();
-    sessionStorage.setItem('gh_pat', pat);
+    localStorage.setItem('gh_pat', pat);
   }
 
   btn.textContent = '觸發中...';
@@ -832,7 +832,7 @@ async function triggerFetch() {
       btn.textContent = '✓ 已觸發';
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 3000);
     } else if (res.status === 401) {
-      sessionStorage.removeItem('gh_pat');
+      localStorage.removeItem('gh_pat');
       btn.textContent = 'Token 錯誤';
       alert('Token 無效或已過期，已清除，請重試。');
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 2000);
