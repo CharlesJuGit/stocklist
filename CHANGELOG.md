@@ -14,7 +14,7 @@
 
 **Feat (Opus)：** `index.html` 嵌入 investing.com 即時經濟行事曆 widget（A 案）
 - 放在「上市+上櫃成交量」區塊下方，沿用 max-w-2xl 卡片樣式
-- calType=week、importance=2,3（中+高）、開啟 datepicker/timezone/filters 控制項、timeZone=88（GMT+8 台北，**待 Ball 現場確認**）、lang=英文（CPI/NFP 等標準名稱）
+- calType=week、importance=2,3（中+高）、開啟 datepicker/timezone/filters 控制項、timeZone=88（GMT+8 台北，2026-06-15 Ball 確認正確）、lang=英文（CPI/NFP 等標準名稱）
 - 即時公布實際值（actual/forecast/previous），純靜態站可行（純前端 iframe，無後端）
 - 限制：外觀為 widget 本身（淺色）、含 Investing.com 標註；時區/國家 ID 為數字，預設需驗證，使用者亦可在 widget 內自行切換
 
