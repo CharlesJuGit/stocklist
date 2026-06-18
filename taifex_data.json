@@ -19,10 +19,10 @@
   },
   "institute": {
     "date": "20260618",
-    "foreign": 211.3,
-    "trust": -56.4,
+    "foreign": 211.5,
+    "trust": -53.6,
     "dealer": 154.9,
-    "total": 309.8
+    "total": 312.8
   },
   "settlement_date": "2026-07-15",
   "settlement_history": [
@@ -533,12 +533,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-06-18",
-        "high": 30500,
+        "high": 30620,
         "low": 30096,
-        "range": 404
+        "range": 524
       },
       "avg20": 675,
-      "category": "小",
+      "category": "中",
       "history": [
         {
           "date": "2026-05-21",
@@ -656,9 +656,9 @@
         },
         {
           "date": "2026-06-18",
-          "high": 30500,
+          "high": 30620,
           "low": 30096,
-          "range": 404
+          "range": 524
         }
       ]
     }
@@ -845,5 +845,5 @@
       "total": 18745
     }
   ],
-  "updated_at": "2026-06-18T12:33:16Z"
+  "updated_at": "2026-06-18T13:46:58Z"
 }
