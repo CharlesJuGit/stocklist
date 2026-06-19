@@ -391,8 +391,8 @@
       "fut_net": -67791,
       "opt_net": 3822,
       "pressure": 67791,
-      "tdays": 18,
-      "ratio": 3766,
+      "tdays": 19,
+      "ratio": 3568,
       "retail_total": 8136,
       "opt_strategy": "看空"
     }
@@ -845,5 +845,5 @@
       "total": 18745
     }
   ],
-  "updated_at": "2026-06-19T12:54:55Z"
+  "updated_at": "2026-06-19T13:51:34Z"
 }
