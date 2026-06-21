@@ -376,18 +376,23 @@ def fetch_tx_ohlc(n_days=25):
                        if _dt.strptime(d, "%Y-%m-%d").weekday() < 5)
 
     records = []
+    skipped = []
     for dt in all_dates:
         cd = best_contract[dt]
         am  = row_by.get((dt, cd, "after_market"))
         pos = row_by.get((dt, cd, "position"))
-        highs = [r["max"] for r in (am, pos) if r]
-        lows  = [r["min"] for r in (am, pos) if r]
-        if not highs:
+        # 完整交易日需「日盤+夜盤」皆到齊；只有單一 session（如盤中/夜盤進行中、
+        # 或日盤資料尚未回補）視為不完整，不輸出，避免最新一筆顯示半天的低估 range。
+        if am is None or pos is None:
+            skipped.append(dt)
             continue
-        h, l = round(max(highs)), round(min(lows))
+        h, l = round(max(am["max"], pos["max"])), round(min(am["min"], pos["min"]))
         if h == 0 and l == 0:
             continue
         records.append({"date": dt, "high": h, "low": l, "range": h - l})
+
+    if skipped:
+        print(f"TX OHLC 略過不完整日（缺日盤或夜盤）：{', '.join(skipped[-3:])}")
 
     return records[-n_days:] if len(records) >= n_days else records
 
