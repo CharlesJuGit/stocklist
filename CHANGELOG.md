@@ -8,7 +8,15 @@
 
 ---
 
-## 2026-06-21（TX 波動：不完整當日剔除）
+## 2026-06-21（TX 波動：Actions 抓取停更 + 不完整當日剔除）
+
+**Fix (Opus)：** `fetch_tx_ohlc` 加重試 3 次 + timeout 15→30（修 TX 波動在線上無聲停更）
+- 現象：線上 taifex_data.json 中 volatility.tx 停在 6/11（停 10 天），但 institute/volume(TWSE)、NQ(Yahoo) 皆更新到 6/18~6/19
+- 根因：main() 裡唯一每日呼叫 FinMind 的就是 TX；Actions 連 FinMind 偶發慢/回空→單次抓取失敗→main 沿用舊 history→TX 無聲凍結。本機（台灣）連 FinMind 正常、能到 6/18 → 典型 CI 環境差異
+- 修正：比照 fetch_csv 既有重試模式，3 次重試、timeout 拉長到 30、回空也重試
+- 註：Actions log 需 auth 無法從本機直證，根因為證據鏈推斷（唯一 FinMind 源、唯一停更）；線上既有 6/11~ 的歷史需另行補回最新
+
+
 
 **Request：** review 台指波動功能
 

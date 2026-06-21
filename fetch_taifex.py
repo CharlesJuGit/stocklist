@@ -346,11 +346,23 @@ def fetch_tx_ohlc(n_days=25):
     token = _os.getenv("FINMIND_TOKEN", "").strip()
     if token:
         url += f"&token={token}"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read())
+    # 重試 3 次 + 較長 timeout：GitHub Actions 連 FinMind 偶發慢/回空會讓單次抓取失敗，
+    # main() 隨即沿用舊 history → TX 波動會無聲凍結（2026-06 線上停在 6/11、本機正常即此因）
+    import time as _time
+    data = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+            if data.get("data"):
+                break
+            print(f"fetch_tx_ohlc 第{attempt+1}次回空資料，重試...")
+        except Exception as e:
+            print(f"fetch_tx_ohlc 第{attempt+1}次失敗: {e}")
+        _time.sleep(3)
 
-    rows = data.get("data", [])
+    rows = (data or {}).get("data", [])
 
     # 每個日期先選「當天總成交量最大的單一近月合約」，再只取該合約的日盤+夜盤。
     # 否則結算日（每月第三個週三）會把結算前夜盤(舊月)＋結算後日盤(新月)混進同一天，
