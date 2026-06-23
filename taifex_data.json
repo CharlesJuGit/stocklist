@@ -1,28 +1,28 @@
 {
-  "date": "20260622",
+  "date": "20260623",
   "futures": {
-    "txF": -70290,
-    "txT": 61196,
-    "txD": -563,
-    "mtxF": 3381,
-    "mtxT": 22,
-    "mtxD": -6499,
-    "tmxF": 6865,
+    "txF": -76502,
+    "txT": 60180,
+    "txD": 930,
+    "mtxF": -3553,
+    "mtxT": 20,
+    "mtxD": -8002,
+    "tmxF": -178,
     "tmxT": 0,
-    "tmxD": -7928
+    "tmxD": -29891
   },
   "options": {
-    "bc": 4591,
-    "sc": 4842,
-    "bp": 12692,
-    "sp": 8134
+    "bc": 7512,
+    "sc": 6437,
+    "bp": 16415,
+    "sp": 9643
   },
   "institute": {
-    "date": "20260622",
-    "foreign": 684.6,
-    "trust": -105.2,
-    "dealer": 121.0,
-    "total": 700.4
+    "date": "20260623",
+    "foreign": -385.9,
+    "trust": 72.4,
+    "dealer": -169.8,
+    "total": -483.3
   },
   "settlement_date": "2026-07-15",
   "settlement_history": [
@@ -411,6 +411,22 @@
       "ratio": 4085,
       "retail_total": 3309,
       "opt_strategy": "中性"
+    },
+    {
+      "date": "2026-06-23",
+      "txF": -76502,
+      "mtxF": -3553,
+      "bp": 16415,
+      "sp": 9643,
+      "bc": 7512,
+      "sc": 6437,
+      "fut_net": -77390,
+      "opt_net": 6772,
+      "pressure": 90522,
+      "tdays": 16,
+      "ratio": 5658,
+      "retail_total": 17549,
+      "opt_strategy": "雙買"
     }
   ],
   "volatility": {
@@ -421,7 +437,7 @@
         "low": 47404,
         "range": 1836
       },
-      "avg20": 1688,
+      "avg20": 1687,
       "category": "大",
       "history": [
         {
@@ -550,11 +566,11 @@
       "yesterday": {
         "date": "2026-06-23",
         "high": 30701,
-        "low": 30545,
-        "range": 156
+        "low": 29752,
+        "range": 949
       },
       "avg20": 688,
-      "category": "低",
+      "category": "大",
       "history": [
         {
           "date": "2026-05-27",
@@ -673,19 +689,13 @@
         {
           "date": "2026-06-23",
           "high": 30701,
-          "low": 30545,
-          "range": 156
+          "low": 29752,
+          "range": 949
         }
       ]
     }
   },
   "market_volume": [
-    {
-      "date": "2026-05-11",
-      "twse": 11704,
-      "tpex": 3036,
-      "total": 14740
-    },
     {
       "date": "2026-05-12",
       "twse": 14462,
@@ -859,7 +869,13 @@
       "twse": 15158,
       "tpex": 2809,
       "total": 17967
+    },
+    {
+      "date": "2026-06-23",
+      "twse": 16723,
+      "tpex": 3176,
+      "total": 19899
     }
   ],
-  "updated_at": "2026-06-22T23:47:32Z"
+  "updated_at": "2026-06-23T12:16:34Z"
 }
