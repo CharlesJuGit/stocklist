@@ -437,7 +437,7 @@
         "low": 47404,
         "range": 1836
       },
-      "avg20": 1687,
+      "avg20": 1688,
       "category": "大",
       "history": [
         {
@@ -566,11 +566,11 @@
       "yesterday": {
         "date": "2026-06-23",
         "high": 30701,
-        "low": 29752,
-        "range": 949
+        "low": 29706,
+        "range": 995
       },
       "avg20": 688,
-      "category": "大",
+      "category": "高",
       "history": [
         {
           "date": "2026-05-27",
@@ -689,8 +689,8 @@
         {
           "date": "2026-06-23",
           "high": 30701,
-          "low": 29752,
-          "range": 949
+          "low": 29706,
+          "range": 995
         }
       ]
     }
@@ -877,5 +877,11 @@
       "total": 19899
     }
   ],
-  "updated_at": "2026-06-23T12:16:34Z"
+  "_finmind_diag": {
+    "ok": true,
+    "status": 200,
+    "rows": 44,
+    "elapsed": 0.6
+  },
+  "updated_at": "2026-06-23T12:47:54Z"
 }
