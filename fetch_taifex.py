@@ -332,73 +332,72 @@ def merge_market_volume(existing: list, fetched: list, keep: int = 30) -> list:
 
 def fetch_tx_ohlc(n_days=25):
     """
-    從 FinMind 抓台指期（TX）每日高低點。
-    XQ 定義：一天 = 當日下午 3:00（夜盤開）到隔日下午 1:45（日盤收）
-    對應 FinMind 兩個 session 取 max high / min low：
-      - after_market：夜盤（3PM~5AM），日期 = 開始當天
-      - position：日盤（8:45AM~1:45PM），日期 = 當天
-    XQ date D = combine(after_market[D], position[D])
+    從 TAIFEX 官方期貨每日行情（www.taifex.com.tw/cht/3/futDataDown）抓台指期（TX）每日高低點。
+    改用 TAIFEX 取代 FinMind：GitHub Actions 連 FinMind 硬失敗（2026-06 TX 波動無聲凍結即此因），
+    而 www.taifex.com.tw 在 Actions 一直可連（同 scrape_taifex_web）。
+    CSV「交易時段」：一般=日盤、盤後=夜盤；XQ date D = combine(日盤[D], 夜盤[D]) 取 max高/min低。
+    口徑與原 FinMind 版逐日實證一致（2026-06-23，近25日 8/8 吻合）。
+    沿用兩項修正：每日取「當天總量最大的單一近月合約」（6-15 跨合約污染）、
+    需日盤+夜盤皆到齊才算完整日（6-21 跨 session 不完整）。
     """
-    from datetime import date as _date, datetime as _dt
-    start = (_date.today() - timedelta(days=90)).strftime("%Y-%m-%d")
-    url = (f"https://api.finmindtrade.com/api/v4/data"
-           f"?dataset=TaiwanFuturesDaily&data_id=TX&start_date={start}")
-    token = _os.getenv("FINMIND_TOKEN", "").strip()
-    if token:
-        url += f"&token={token}"
-    # 重試 3 次 + 較長 timeout：GitHub Actions 連 FinMind 偶發慢/回空會讓單次抓取失敗，
-    # main() 隨即沿用舊 history → TX 波動會無聲凍結（2026-06 線上停在 6/11、本機正常即此因）
-    import time as _time
-    data = None
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read())
-            if data.get("data"):
-                break
-            print(f"fetch_tx_ohlc 第{attempt+1}次回空資料，重試...")
-        except Exception as e:
-            print(f"fetch_tx_ohlc 第{attempt+1}次失敗: {e}")
-        _time.sleep(3)
+    import time as _time, ssl as _ssl, collections
+    import urllib.parse as _up
+    from datetime import date as _date, timedelta as _td
+    ctx = _ssl._create_unverified_context()
 
-    rows = (data or {}).get("data", [])
+    def _fetch_batch(s, e):
+        body = _up.urlencode({"down_type": "1", "commodity_id": "TX",
+                              "queryStartDate": s, "queryEndDate": e}).encode()
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(
+                    "https://www.taifex.com.tw/cht/3/futDataDown", data=body,
+                    headers={"User-Agent": "Mozilla/5.0",
+                             "Content-Type": "application/x-www-form-urlencoded"})
+                with urllib.request.urlopen(req, timeout=30, context=ctx) as r:
+                    return r.read().decode("big5", errors="replace")
+            except Exception as ex:
+                print(f"fetch_tx_ohlc TAIFEX {s}~{e} 第{attempt+1}次失敗: {ex}")
+                _time.sleep(3)
+        return ""
 
-    # 每個日期先選「當天總成交量最大的單一近月合約」，再只取該合約的日盤+夜盤。
-    # 否則結算日（每月第三個週三）會把結算前夜盤(舊月)＋結算後日盤(新月)混進同一天，
-    # max高/min低跨月配對污染 range（2026-05-20 實證）。月價差近結算雖小，仍以單一合約為準。
-    vol_by = {}    # (date, contract) -> 總量
-    row_by = {}    # (date, contract, session) -> row（同 session 取量大者）
-    for row in rows:
-        cd = row["contract_date"]
-        if len(cd) != 6 or row["volume"] <= 0:
-            continue
-        dt = row["date"]; sess = row["trading_session"]
-        vol_by[(dt, cd)] = vol_by.get((dt, cd), 0) + row["volume"]
-        k = (dt, cd, sess)
-        if k not in row_by or row["volume"] > row_by[k]["volume"]:
-            row_by[k] = row
+    # futDataDown 單次查詢上限約 22 天，分批往前抓再拼接（每批 20 天、往前數批覆蓋足夠交易日）
+    vol_by = collections.defaultdict(int)   # (date, contract) -> 總量
+    row_by = {}                             # (date, contract, session) -> (high, low)
+    cur = _date.today()
+    for _ in range(max(4, n_days // 6)):
+        s = (cur - _td(days=20)).strftime("%Y/%m/%d")
+        e = cur.strftime("%Y/%m/%d")
+        for line in _fetch_batch(s, e).splitlines():
+            p = [c.strip() for c in line.split(",")]
+            if len(p) < 18 or p[1] != "TX":
+                continue
+            try:
+                hi, lo, v = float(p[4]), float(p[5]), int(p[9])
+            except ValueError:
+                continue
+            dt = p[0].replace("/", "-"); cd = p[2]; sess = p[17]
+            vol_by[(dt, cd)] += v
+            row_by[(dt, cd, sess)] = (hi, lo)
+        cur = cur - _td(days=21)
+        _time.sleep(0.3)
 
-    best_contract = {}   # date -> 當天主力合約
+    best_contract = {}   # date -> 當天主力合約（總量最大，避免結算日跨月污染）
     for (dt, cd), v in vol_by.items():
         if dt not in best_contract or v > vol_by[(dt, best_contract[dt])]:
             best_contract[dt] = cd
 
-    all_dates = sorted(d for d in best_contract
-                       if _dt.strptime(d, "%Y-%m-%d").weekday() < 5)
-
     records = []
     skipped = []
-    for dt in all_dates:
+    for dt in sorted(best_contract):
         cd = best_contract[dt]
-        am  = row_by.get((dt, cd, "after_market"))
-        pos = row_by.get((dt, cd, "position"))
-        # 完整交易日需「日盤+夜盤」皆到齊；只有單一 session（如盤中/夜盤進行中、
-        # 或日盤資料尚未回補）視為不完整，不輸出，避免最新一筆顯示半天的低估 range。
-        if am is None or pos is None:
+        day   = row_by.get((dt, cd, "一般"))   # 日盤
+        night = row_by.get((dt, cd, "盤後"))   # 夜盤
+        # 完整交易日需日盤+夜盤皆到齊；只有單一 session（盤中/夜盤進行中）視為不完整，不輸出
+        if day is None or night is None:
             skipped.append(dt)
             continue
-        h, l = round(max(am["max"], pos["max"])), round(min(am["min"], pos["min"]))
+        h, l = round(max(day[0], night[0])), round(min(day[1], night[1]))
         if h == 0 and l == 0:
             continue
         records.append({"date": dt, "high": h, "low": l, "range": h - l})
@@ -960,6 +959,24 @@ def main():
         existing_history = build_settlement_history(existing_history, today_entry)
         print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
 
+    # ── root cause 暫時診斷：直證 Actions 連 FinMind 的實際狀態（確認後移除）──
+    # TX 已改走 TAIFEX，此處純粹探測 FinMind 從 Actions 環境的連線結果（log 需 auth 看不到）
+    finmind_diag = {}
+    try:
+        import time as _t
+        _t0 = _t.time()
+        _req = urllib.request.Request(
+            "https://api.finmindtrade.com/api/v4/data"
+            "?dataset=TaiwanFuturesDaily&data_id=TX&start_date=2026-06-20",
+            headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(_req, timeout=30) as _r:
+            _j = json.loads(_r.read())
+        finmind_diag = {"ok": True, "status": _j.get("status"),
+                        "rows": len(_j.get("data", [])), "elapsed": round(_t.time() - _t0, 1)}
+    except Exception as _e:
+        finmind_diag = {"ok": False, "error": f"{type(_e).__name__}: {str(_e)[:200]}"}
+    print(f"[diag] FinMind 連線測試: {finmind_diag}")
+
     result = {
         "date":               date,
         "futures":            futures,
@@ -969,6 +986,7 @@ def main():
         "settlement_history": existing_history,
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
+        "_finmind_diag":      finmind_diag,
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 

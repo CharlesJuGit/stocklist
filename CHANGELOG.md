@@ -8,6 +8,25 @@
 
 ---
 
+## 2026-06-23（TX 波動換資料源 FinMind→TAIFEX 根治停更 + root cause 診斷）
+
+**Request：** TX 又停更（6-21 加的重試沒救回）；先應急、再根治(A)、root cause 也查清楚
+
+**確認 root cause（證據鏈）：** 線上只有 TX 停在 6/18，其他區塊(TWSE/Yahoo 源)更新到 6/22~6/23；Actions 6/22 跑 5 次皆 success 但 TX 未動；本機 fetch_tx_ohlc 正常到 6/23、FinMind 有完整資料、我 6-21 的「剔除不完整日」非元兇 → 確認 **Actions 環境連 FinMind 硬失敗**（非偶發，重試無效）。main() 裡唯一靠 FinMind 的就是 TX，故只有它停。
+
+**Fix (Opus)：** `fetch_tx_ohlc` 資料源 FinMind → TAIFEX 官方（A 案，根治）
+- 改用 `www.taifex.com.tw/cht/3/futDataDown`（Actions 已驗證可連，同 scrape_taifex_web 網域）
+- CSV「交易時段」一般=日盤、盤後=夜盤；沿用兩項既有修正（單一主力合約、日夜盤皆到齊才算完整日）
+- futDataDown 單次約 22 天上限 → 分批（每批20天往前數批）拼接覆蓋 25 交易日
+- **實證：** 近25日(5/19~6/23) 逐日 H/L 與原 FinMind 版 **8/8 完全一致**；函數簽名不變，main/fetch_nq_only 無需改
+- 應急：先本機補 TX 至 6/23 上線（38610eb）
+
+**Fix (Opus)：** 加臨時 `_finmind_diag` 診斷欄位（root cause 直證用）
+- Actions log 需 auth 無法下載；改在 main() 探測一次 FinMind 連線，結果(ok/status/error/elapsed)寫入 JSON
+- 下次 Actions 跑後讀線上 `_finmind_diag` 即可確認 Actions 上 FinMind 的確切錯誤（timeout/403/連線拒絕…），**確認後移除此欄位**
+
+---
+
 ## 2026-06-21（TX 波動：Actions 抓取停更 + 不完整當日剔除）
 
 **Fix (Opus)：** `fetch_tx_ohlc` 加重試 3 次 + timeout 15→30（修 TX 波動在線上無聲停更）
