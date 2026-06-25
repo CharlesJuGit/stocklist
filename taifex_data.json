@@ -597,12 +597,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-06-25",
-        "high": 30219,
-        "low": 29924,
-        "range": 295
+        "high": 30264,
+        "low": 29296,
+        "range": 968
       },
       "avg20": 745,
-      "category": "低",
+      "category": "大",
       "history": [
         {
           "date": "2026-05-29",
@@ -720,9 +720,9 @@
         },
         {
           "date": "2026-06-25",
-          "high": 30219,
-          "low": 29924,
-          "range": 295
+          "high": 30264,
+          "low": 29296,
+          "range": 968
         }
       ]
     }
@@ -913,7 +913,7 @@
     "ok": true,
     "status": 200,
     "rows": 92,
-    "elapsed": 0.7
+    "elapsed": 0.5
   },
-  "updated_at": "2026-06-25T12:33:45Z"
+  "updated_at": "2026-06-25T15:14:45Z"
 }
