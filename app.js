@@ -224,6 +224,7 @@ async function loadMarketInfo() {
     loadFutures(),
     loadVolatility(),
     loadMarketVolume(),
+    loadEarnings(),
   ]);
   await loadSignalSummary();
 }
@@ -763,6 +764,21 @@ async function loadSignalSummary() {
   } catch (e) {
     console.error('loadSignalSummary:', e);
   }
+}
+
+async function loadEarnings() {
+  try {
+    const data = await loadTaifexJson();
+    const list = (data && data.earnings && data.earnings.list) || [];
+    const box = document.getElementById('earnings-box');
+    if (!list.length) { box.textContent = '暫無資料'; return; }
+    const NAME = {NVDA:'輝達',AAPL:'蘋果',MSFT:'微軟',GOOGL:'Google',AMZN:'亞馬遜',META:'Meta',TSLA:'特斯拉',TSM:'台積電'};
+    box.innerHTML = list.map(r => `
+      <div class="flex justify-between py-1 border-b border-gray-800">
+        <span class="text-gray-300">${r.sym} ${NAME[r.sym]||''}</span>
+        <span class="text-yellow-300">${r.next || '--'}</span>
+      </div>`).join('');
+  } catch (e) { console.error('loadEarnings:', e); }
 }
 
 async function refreshAll() {
