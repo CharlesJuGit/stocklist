@@ -879,12 +879,34 @@ function openUpdateLogModal() {
         </table>
         <div class="text-[10px] text-gray-500 mt-2">綠=該次已更新到最新交易日(${md(newest)})、灰=仍為較舊資料。最近 ${log.length} 次。</div>`;
     }
+    // 已解鎖則直接顯示管理區（GitHub 連結）
+    if (sessionStorage.getItem('admin') === '1') {
+      document.getElementById('admin-area').classList.remove('hidden');
+      document.getElementById('admin-toggle').classList.add('hidden');
+    }
     document.getElementById('updatelog-modal').classList.remove('hidden');
   });
 }
 document.getElementById('updatelog-modal').addEventListener('click', function(e) {
   if (e.target === this) this.classList.add('hidden');
 });
+// 管理密碼門（僅視覺遮擋：靜態公開站，密碼明文於原始碼，可被繞過，非真正安全防護）
+function unlockAdmin() {
+  if (sessionStorage.getItem('admin') === '1') {
+    document.getElementById('admin-area').classList.remove('hidden');
+    document.getElementById('admin-toggle').classList.add('hidden');
+    return;
+  }
+  const pw = prompt('請輸入管理密碼：');
+  if (pw === null) return;
+  if (pw === '11111111') {
+    sessionStorage.setItem('admin', '1');
+    document.getElementById('admin-area').classList.remove('hidden');
+    document.getElementById('admin-toggle').classList.add('hidden');
+  } else {
+    alert('密碼錯誤');
+  }
+}
 
 loadStocks();
 loadMarketInfo();

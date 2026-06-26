@@ -325,6 +325,15 @@
           class="text-gray-400 hover:text-white text-2xl">&times;</button>
       </div>
       <div id="updatelog-body" class="text-xs max-h-96 overflow-y-auto"></div>
+      <div class="mt-3 text-center">
+        <button onclick="unlockAdmin()" id="admin-toggle"
+          class="text-[10px] text-gray-600 hover:text-gray-400">管理</button>
+        <div id="admin-area" class="hidden mt-2">
+          <a href="https://github.com/CharlesJuGit/stocklist/actions/workflows/fetch-taifex.yml"
+             target="_blank" rel="noopener"
+             class="text-xs text-blue-400 hover:text-blue-300 underline">🔗 GitHub 執行紀錄</a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -401,7 +410,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260626"></script>
+  <script src="app.js?v=20260626b"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
