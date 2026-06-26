@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-06-23（行事曆改繁體中文）
+
+**Request：** 行事曆 widget 想用繁體中文
+
+**Feat (Opus)：** investing.com 行事曆 widget `lang=1`(英文) → `lang=55`(繁體中文)
+- lang=55 取自 hk.investing.com（investing 繁中站）的 widget 生成器；timeZone=113 不變
+- 註：investing 內容端的繁中翻譯可能不完整，冷門事件或仍顯示英文（非本站可控）
+
+---
+
 ## 2026-06-23（TX 波動換資料源 FinMind→TAIFEX 根治停更 + root cause 診斷）
 
 **Request：** TX 又停更（6-21 加的重試沒救回）；先應急、再根治(A)、root cause 也查清楚
