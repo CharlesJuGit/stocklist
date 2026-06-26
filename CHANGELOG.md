@@ -8,6 +8,22 @@
 
 ---
 
+## 2026-06-26（更新紀錄監控 + 下午排程）
+
+**Request：** 常八點多才更新（下午早排程沒觸發）；加機制檢查觸發是否成功、網頁顯示每次定期/手動更新狀況；排程加 4:30 前後
+
+**Feat (Opus)：** 網頁「更新紀錄」彈窗 + 後端 `update_log`
+- main() 每次執行 append 一筆（時間、觸發方式、三大法人/期貨/TX 抓到的日期），保留最近 12 筆；workflow 傳入 `github.event_name` 區分「定期/手動」
+- 前端「更新紀錄 ▸」彈窗：列最近 12 次，綠=已更新到最新交易日、灰=仍為舊資料，附 GitHub Actions 連結 → 不進 GitHub 就能監控每次觸發是否正確更新
+- 修：update_log 日期統一 YYYY-MM-DD（institute/date 原 YYYYMMDD、tx/nq 為 YYYY-MM-DD，混用會排序/顯示錯亂——驗證時發現）
+
+**Feat (Opus)：** workflow 加 `33 8 * * 1-5`（16:33 TWN）排程
+- 下午三大法人/期貨出爐後首抓；GitHub 早時段能否準時觸發以「更新紀錄」觀察，再決定是否上外部 cron（治本備案）
+- 避開整點；app.js cache-buster 20260615→20260626
+- 註：update_log 於下次 Actions 執行後才開始累積，首次彈窗可能僅少數筆
+
+---
+
 ## 2026-06-23（行事曆改繁體中文）
 
 **Request：** 行事曆 widget 想用繁體中文

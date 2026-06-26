@@ -977,6 +977,23 @@ def main():
         finmind_diag = {"ok": False, "error": f"{type(_e).__name__}: {str(_e)[:200]}"}
     print(f"[diag] FinMind 連線測試: {finmind_diag}")
 
+    # 更新紀錄：每次執行 append 一筆（含觸發方式與各資料抓到的日期），供前端「更新紀錄」顯示
+    # 用於觀察定期/手動觸發後是否正確更新到當日，保留最近 12 筆
+    tw_now = datetime.now(timezone.utc) + timedelta(hours=8)
+    # institute.date / date 為 YYYYMMDD、tx/nq 為 YYYY-MM-DD，統一成 YYYY-MM-DD 供前端比較/顯示
+    def _ymd(d):
+        return f"{d[:4]}-{d[4:6]}-{d[6:]}" if d and len(d) == 8 else (d or "")
+    update_log = existing_json.get("update_log", [])
+    update_log.append({
+        "at":      tw_now.strftime("%Y-%m-%d %H:%M"),
+        "trigger": _os.getenv("TRIGGER_TYPE", "manual"),
+        "inst":    _ymd(institute.get("date", "") if institute else ""),
+        "fut":     _ymd(date or ""),
+        "tx":      (tx_vol.get("yesterday") or {}).get("date", ""),
+        "nq":      (nq_vol.get("yesterday") or {}).get("date", ""),
+    })
+    update_log = update_log[-12:]
+
     result = {
         "date":               date,
         "futures":            futures,
@@ -987,6 +1004,7 @@ def main():
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
         "_finmind_diag":      finmind_diag,
+        "update_log":         update_log,
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 

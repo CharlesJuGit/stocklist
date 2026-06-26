@@ -2,7 +2,8 @@ name: Fetch TAIFEX Data
 
 on:
   schedule:
-    # 避開整點 :00（GitHub 排程尖峰最易被跳過），改 :17
+    # 避開整點 :00（GitHub 排程尖峰最易被跳過）
+    - cron: '33 8 * * 1-5'   # 16:33 TWN（下午三大法人/期貨出爐後首抓，能否準時觸發以網頁「更新紀錄」觀察）
     - cron: '17 9 * * 1-5'   # 17:17 TWN
     - cron: '17 10 * * 1-5'  # 18:17 TWN
     - cron: '17 12 * * 1-5'  # 20:17 TWN
@@ -35,6 +36,7 @@ jobs:
       - name: Fetch TAIFEX data
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          TRIGGER_TYPE: ${{ github.event_name }}
         run: |
           python fetch_taifex.py || echo "fetch_taifex.py exited with error, continuing anyway"
 

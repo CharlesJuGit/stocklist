@@ -847,6 +847,45 @@ async function triggerFetch() {
   }
 }
 
+// 更新紀錄彈窗：顯示最近每次（定期/手動）觸發抓到的各資料日期，綠=已更新到最新、灰=仍為舊資料
+function openUpdateLogModal() {
+  loadTaifexJson().then(data => {
+    const log = data?.update_log || [];
+    const body = document.getElementById('updatelog-body');
+    if (!log.length) {
+      body.innerHTML = '<div class="text-gray-400">暫無紀錄</div>';
+    } else {
+      const allDates = log.flatMap(r => [r.inst, r.fut, r.tx]).filter(Boolean).sort();
+      const newest = allDates.length ? allDates[allDates.length - 1] : '';
+      const md = d => d ? d.slice(5) : '--';
+      const cell = d => `<td class="px-1 py-1 text-right ${d === newest ? 'text-green-400' : 'text-gray-500'}">${md(d)}</td>`;
+      const tlabel = t => t === 'schedule' ? '定期' : (t === 'workflow_dispatch' ? '手動' : (t || '--'));
+      const rows = [...log].reverse().map(r => `
+        <tr class="border-b border-gray-800">
+          <td class="px-1 py-1 text-gray-300 whitespace-nowrap">${r.at || ''}</td>
+          <td class="px-1 py-1 text-gray-400">${tlabel(r.trigger)}</td>
+          ${cell(r.inst)}${cell(r.fut)}${cell(r.tx)}
+        </tr>`).join('');
+      body.innerHTML = `
+        <table class="w-full">
+          <thead><tr class="text-gray-500 border-b border-gray-700">
+            <th class="px-1 py-1 text-left">時間</th>
+            <th class="px-1 py-1 text-left">方式</th>
+            <th class="px-1 py-1 text-right">三大法人</th>
+            <th class="px-1 py-1 text-right">期貨</th>
+            <th class="px-1 py-1 text-right">TX波動</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="text-[10px] text-gray-500 mt-2">綠=該次已更新到最新交易日(${md(newest)})、灰=仍為較舊資料。最近 ${log.length} 次。</div>`;
+    }
+    document.getElementById('updatelog-modal').classList.remove('hidden');
+  });
+}
+document.getElementById('updatelog-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
 loadStocks();
 loadMarketInfo();
 scheduleAutoRefresh();
