@@ -1,28 +1,28 @@
 {
-  "date": "20260625",
+  "date": "20260626",
   "futures": {
-    "txF": -81051,
-    "txT": 60921,
-    "txD": 3003,
-    "mtxF": 1615,
-    "mtxT": 19,
-    "mtxD": -8098,
-    "tmxF": 2966,
+    "txF": -76391,
+    "txT": 61247,
+    "txD": 4641,
+    "mtxF": -268,
+    "mtxT": 13,
+    "mtxD": -6807,
+    "tmxF": 2709,
     "tmxT": 0,
-    "tmxD": -49684
+    "tmxD": -64948
   },
   "options": {
-    "bc": 6210,
-    "sc": 7184,
-    "bp": 16695,
-    "sp": 12779
+    "bc": 4655,
+    "sc": 5677,
+    "bp": 16003,
+    "sp": 11491
   },
   "institute": {
-    "date": "20260625",
-    "foreign": -405.1,
-    "trust": 174.2,
-    "dealer": -70.0,
-    "total": -300.9
+    "date": "20260626",
+    "foreign": -1431.9,
+    "trust": 84.0,
+    "dealer": -707.3,
+    "total": -2055.2
   },
   "settlement_date": "2026-07-15",
   "settlement_history": [
@@ -459,25 +459,35 @@
       "ratio": 5761,
       "retail_total": 15808,
       "opt_strategy": "中性"
+    },
+    {
+      "date": "2026-06-26",
+      "txF": -76391,
+      "mtxF": -268,
+      "bp": 16003,
+      "sp": 11491,
+      "bc": 4655,
+      "sc": 5677,
+      "fut_net": -76458,
+      "opt_net": 4512,
+      "pressure": 76458,
+      "tdays": 13,
+      "ratio": 5881,
+      "retail_total": 19510,
+      "opt_strategy": "看空"
     }
   ],
   "volatility": {
     "tx": {
       "yesterday": {
-        "date": "2026-06-25",
-        "high": 46997,
-        "low": 45063,
-        "range": 1934
+        "date": "2026-06-26",
+        "high": 46884,
+        "low": 44264,
+        "range": 2620
       },
-      "avg20": 1714,
-      "category": "大",
+      "avg20": 1735,
+      "category": "高",
       "history": [
-        {
-          "date": "2026-05-28",
-          "high": 45632,
-          "low": 43458,
-          "range": 2174
-        },
         {
           "date": "2026-05-29",
           "high": 45471,
@@ -591,6 +601,12 @@
           "high": 46997,
           "low": 45063,
           "range": 1934
+        },
+        {
+          "date": "2026-06-26",
+          "high": 46884,
+          "low": 44264,
+          "range": 2620
         }
       ]
     },
@@ -598,11 +614,11 @@
       "yesterday": {
         "date": "2026-06-26",
         "high": 29893,
-        "low": 29606,
-        "range": 287
+        "low": 29160,
+        "range": 733
       },
       "avg20": 764,
-      "category": "低",
+      "category": "中",
       "history": [
         {
           "date": "2026-06-01",
@@ -721,19 +737,13 @@
         {
           "date": "2026-06-26",
           "high": 29893,
-          "low": 29606,
-          "range": 287
+          "low": 29160,
+          "range": 733
         }
       ]
     }
   },
   "market_volume": [
-    {
-      "date": "2026-05-14",
-      "twse": 12753,
-      "tpex": 3057,
-      "total": 15810
-    },
     {
       "date": "2026-05-15",
       "twse": 13748,
@@ -907,13 +917,29 @@
       "twse": 13680,
       "tpex": 2408,
       "total": 16088
+    },
+    {
+      "date": "2026-06-26",
+      "twse": 16728,
+      "tpex": 2618,
+      "total": 19346
     }
   ],
   "_finmind_diag": {
     "ok": true,
     "status": 200,
-    "rows": 92,
+    "rows": 119,
     "elapsed": 0.5
   },
-  "updated_at": "2026-06-25T23:49:05Z"
+  "update_log": [
+    {
+      "at": "2026-06-26 17:47",
+      "trigger": "workflow_dispatch",
+      "inst": "2026-06-26",
+      "fut": "2026-06-26",
+      "tx": "2026-06-26",
+      "nq": "2026-06-26"
+    }
+  ],
+  "updated_at": "2026-06-26T09:47:57Z"
 }
