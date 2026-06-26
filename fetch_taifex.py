@@ -994,6 +994,41 @@ def main():
     })
     update_log = update_log[-12:]
 
+    # 財報行事曆（AlphaVantage，每天只抓一次省額度；無 key 則跳過、沿用既有）
+    av_key = _os.getenv("ALPHAVANTAGE_KEY", "").strip()
+    earnings = existing_json.get("earnings", {})
+    if av_key and earnings.get("fetched") != tw_now.strftime("%Y-%m-%d"):
+        try:
+            import time as _et
+            WANT = ["NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "TSM"]
+            cal = urllib.request.urlopen(urllib.request.Request(
+                f"https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey={av_key}",
+                headers={"User-Agent": "Mozilla/5.0"}), timeout=25).read().decode("utf-8", "replace")
+            nxt = {}
+            for line in cal.strip().split("\n")[1:]:
+                p = line.split(",")
+                if len(p) >= 5 and p[0] in WANT:
+                    nxt[p[0]] = {"date": p[2], "est": p[4]}
+            elist = []
+            for sym in WANT:
+                try:
+                    ed = json.loads(urllib.request.urlopen(urllib.request.Request(
+                        f"https://www.alphavantage.co/query?function=EARNINGS&symbol={sym}&apikey={av_key}",
+                        headers={"User-Agent": "Mozilla/5.0"}), timeout=25).read())
+                    q = (ed.get("quarterlyEarnings") or [{}])[0]
+                    n = nxt.get(sym, {})
+                    elist.append({"sym": sym, "next": n.get("date", ""), "nextEst": n.get("est", ""),
+                                  "lastDate": q.get("reportedDate", ""), "lastEPS": q.get("reportedEPS", ""),
+                                  "lastEst": q.get("estimatedEPS", ""), "surprisePct": q.get("surprisePercentage", "")})
+                    _et.sleep(13)   # AlphaVantage 免費 5 次/分鐘
+                except Exception:
+                    pass
+            if elist:
+                earnings = {"fetched": tw_now.strftime("%Y-%m-%d"), "list": elist}
+                print(f"earnings fetched: {len(elist)} 家")
+        except Exception as e:
+            print(f"earnings FAIL: {e}")
+
     result = {
         "date":               date,
         "futures":            futures,
@@ -1005,6 +1040,7 @@ def main():
         "market_volume":      market_volume,
         "_finmind_diag":      finmind_diag,
         "update_log":         update_log,
+        "earnings":           earnings,
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
