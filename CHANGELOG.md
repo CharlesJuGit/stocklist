@@ -8,6 +8,18 @@
 
 ---
 
+## 2026-06-26（移除臨時 `_finmind_diag` 診斷欄位）
+
+**Request：** root cause 已取得證據，移除臨時診斷欄位
+
+**Fix (Opus)：** 移除 `fetch_taifex.py` 的 `_finmind_diag` 探測區塊與 result 欄位
+- 背景：06-23 加此欄位直證「Actions 連 FinMind」狀態（log 需 auth 看不到）。線上已收到證據 —— 最後一次（手動觸發）`_finmind_diag = {ok:true, status:200, rows:119, elapsed:0.5}`，即 Actions 環境**能**連到 FinMind。故原「硬失敗」更像**間歇性**，且 TX 已改走 TAIFEX 不再依賴 FinMind，診斷任務完成 → 拔除
+- 改動：刪 main() 內探測區塊（urlopen FinMind + finmind_diag 組裝/print）＋ result dict 的 `"_finmind_diag"` 鍵；前端 app.js 未讀此欄位，無需動
+- **實證（前後對照）：** before＝線上 JSON 頂層含 `_finmind_diag`（11 keys）；本機實跑 `python fetch_taifex.py`（真實抓取，date=20260626 全區塊正常產出）後，新 JSON 頂層 keys 不含 `_finmind_diag`、`update_log`/`earnings` 等其餘 10 欄完整保留；`grep finmind_diag` 全檔 0 筆殘留；`py_compile` 通過
+- 註：尚未 push；待 Ball 確認後上線（cache-buster 無需 bump，純後端）
+
+---
+
 ## 2026-06-26（GitHub 連結改密碼門遮擋）
 
 **Request：** GitHub 連結不想給訪客看，做個簡單密碼視窗（密碼 11111111）

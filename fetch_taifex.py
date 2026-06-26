@@ -959,24 +959,6 @@ def main():
         existing_history = build_settlement_history(existing_history, today_entry)
         print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
 
-    # ── root cause 暫時診斷：直證 Actions 連 FinMind 的實際狀態（確認後移除）──
-    # TX 已改走 TAIFEX，此處純粹探測 FinMind 從 Actions 環境的連線結果（log 需 auth 看不到）
-    finmind_diag = {}
-    try:
-        import time as _t
-        _t0 = _t.time()
-        _req = urllib.request.Request(
-            "https://api.finmindtrade.com/api/v4/data"
-            "?dataset=TaiwanFuturesDaily&data_id=TX&start_date=2026-06-20",
-            headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(_req, timeout=30) as _r:
-            _j = json.loads(_r.read())
-        finmind_diag = {"ok": True, "status": _j.get("status"),
-                        "rows": len(_j.get("data", [])), "elapsed": round(_t.time() - _t0, 1)}
-    except Exception as _e:
-        finmind_diag = {"ok": False, "error": f"{type(_e).__name__}: {str(_e)[:200]}"}
-    print(f"[diag] FinMind 連線測試: {finmind_diag}")
-
     # 更新紀錄：每次執行 append 一筆（含觸發方式與各資料抓到的日期），供前端「更新紀錄」顯示
     # 用於觀察定期/手動觸發後是否正確更新到當日，保留最近 12 筆
     tw_now = datetime.now(timezone.utc) + timedelta(hours=8)
@@ -1025,7 +1007,6 @@ def main():
         "settlement_history": existing_history,
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
-        "_finmind_diag":      finmind_diag,
         "update_log":         update_log,
         "earnings":           earnings,
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
