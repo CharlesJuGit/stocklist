@@ -799,7 +799,7 @@ def main():
 
     # ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
     def fetch_institute():
-        import ssl as _ssl
+        import ssl as _ssl, time as _time
         from datetime import date as _d, timedelta as _td
         ctx = _ssl._create_unverified_context()   # 與 market_volume 一致，避免部分環境 TWSE 憑證問題
         today = _d.today()
@@ -810,42 +810,49 @@ def main():
             dt_str = d.strftime("%Y%m%d")
             url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
                    f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
-                    j = json.loads(r.read())
-                rows = j.get("data", [])
-                if not rows:
-                    continue
-                # 依列首精準取值（startswith 避免「外資及陸資(不含外資自營商)」被子字串誤配）
-                def comp(prefix):
-                    for row in rows:
-                        if row[0].strip().startswith(prefix):
-                            try:
-                                return float(row[3].replace(",", "")) / 1e8
-                            except (ValueError, IndexError):
-                                return None
+            # 單日 transient 失敗重試 3 次（比照 fetch_market_volume），三次皆敗才退往前一天，
+            # 避免一次網路抖動就沉默退回昨日資料
+            j = None
+            for attempt in range(3):
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
+                        j = json.loads(r.read())
+                    break
+                except Exception as e:
+                    print(f"institute {dt_str} 第{attempt+1}次失敗: {e}")
+                    _time.sleep(3)
+            if j is None:
+                continue  # 三次皆 transient 失敗 → 換前一天（最後手段）
+            rows = j.get("data", [])
+            if not rows:
+                continue  # 非交易日/尚無資料（非錯誤，不需重試）→ 換前一天
+            # 依列首精準取值（startswith 避免「外資及陸資(不含外資自營商)」被子字串誤配）
+            def comp(prefix):
+                for row in rows:
+                    if row[0].strip().startswith(prefix):
+                        try:
+                            return float(row[3].replace(",", "")) / 1e8
+                        except (ValueError, IndexError):
+                            return None
+                return None
+
+            def total_of(*prefixes):
+                vals = [comp(p) for p in prefixes]
+                if all(v is None for v in vals):
                     return None
+                return round(sum(v or 0 for v in vals), 1)
 
-                def total_of(*prefixes):
-                    vals = [comp(p) for p in prefixes]
-                    if all(v is None for v in vals):
-                        return None
-                    return round(sum(v or 0 for v in vals), 1)
-
-                # 標準三大法人：自營商=自行買賣+避險、外資=外資及陸資+外資自營商、投信（對齊 TWSE 合計）
-                dealer  = total_of("自營商(自行買賣)", "自營商(避險)")
-                trust   = total_of("投信")
-                foreign = total_of("外資及陸資", "外資自營商")
-                if foreign is None and trust is None:
-                    continue
-                total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
-                print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}  total={total}")
-                return {"date": dt_str, "foreign": foreign, "trust": trust,
-                        "dealer": dealer, "total": total}
-            except Exception as e:
-                print(f"institute {dt_str} FAIL: {e}")
+            # 標準三大法人：自營商=自行買賣+避險、外資=外資及陸資+外資自營商、投信（對齊 TWSE 合計）
+            dealer  = total_of("自營商(自行買賣)", "自營商(避險)")
+            trust   = total_of("投信")
+            foreign = total_of("外資及陸資", "外資自營商")
+            if foreign is None and trust is None:
                 continue
+            total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
+            print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}  total={total}")
+            return {"date": dt_str, "foreign": foreign, "trust": trust,
+                    "dealer": dealer, "total": total}
         return {}
 
     institute = {}
@@ -978,7 +985,12 @@ def main():
 
     # 財報行事曆（AlphaVantage EARNINGS_CALENDAR，只取下次財報「日期」；每天抓一次，1 請求）
     # 無自設 key 時用 demo（CALENDAR 端點 demo 即可抓全市場），確保時間一定抓得到
-    av_key = _os.getenv("ALPHAVANTAGE_KEY", "").strip() or "demo"
+    av_key = _os.getenv("ALPHAVANTAGE_KEY", "").strip()
+    if av_key:
+        print("[earnings] 使用自有 ALPHAVANTAGE_KEY")
+    else:
+        av_key = "demo"
+        print("[earnings] ⚠ 未設 ALPHAVANTAGE_KEY，改用共享 demo key（可用性無保證，建議設 GitHub secret）")
     earnings = existing_json.get("earnings", {})
     if earnings.get("fetched") != tw_now.strftime("%Y-%m-%d"):
         try:
