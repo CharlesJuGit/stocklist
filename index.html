@@ -221,6 +221,27 @@
     </div>
   </div>
 
+  <!-- 台指期正價差 -->
+  <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4">
+    <div class="flex justify-between items-center mb-2">
+      <div class="text-sm font-bold text-gray-200">台指期正價差</div>
+      <button onclick="openBasisModal()"
+        class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+    </div>
+    <div class="text-xs text-gray-400 mb-1">期貨收盤 − 加權指數（點）；正=升水偏多</div>
+    <div class="flex gap-6 items-end">
+      <div>
+        <div class="text-xs text-gray-500">近月<span id="basis-near-m"></span></div>
+        <div id="basis-near" class="text-xl font-bold text-white">--</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500">次月<span id="basis-next-m"></span></div>
+        <div id="basis-next" class="text-lg font-bold text-white">--</div>
+      </div>
+      <div class="text-xs text-gray-500 self-center" id="basis-date"></div>
+    </div>
+  </div>
+
   <!-- 上市櫃成交量 -->
   <div class="max-w-2xl mx-auto mb-6 bg-gray-900 rounded-xl p-4">
     <div class="flex justify-between items-center mb-2">
@@ -289,6 +310,17 @@
   </div>
 
   <!-- 成交量歷史彈出視窗 -->
+  <div id="basis-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-800 rounded-xl p-5 max-w-lg w-full mx-4">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-bold text-gray-100">台指期正價差 · 近20天</h2>
+        <button onclick="document.getElementById('basis-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-xl leading-none">✕</button>
+      </div>
+      <div id="basis-modal-body" class="text-sm"></div>
+    </div>
+  </div>
+
   <div id="volume-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
       <div class="flex justify-between items-center mb-4">
@@ -416,7 +448,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260626c"></script>
+  <script src="app.js?v=20260703b"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

@@ -408,6 +408,104 @@ def fetch_tx_ohlc(n_days=25):
     return records[-n_days:] if len(records) >= n_days else records
 
 
+# ── 台指期正價差（近月/次月/季月 vs 加權指數現貨）──────────────
+BASIS_MIN_VOL = 100  # 量 < 此值視為流動性薄，不顯示（避免舊掛單失真）
+
+def fetch_basis(n_days=20):
+    """近 n 交易日的台指期正價差：期貨各合約收盤 − 現貨加權指數。
+    現貨＝TWSE FMTQIK 的發行量加權股價指數收盤（可靠，market_volume 同源）；
+    期貨＝TAIFEX futDataDown 各到期月合約收盤（一般時段）。量薄合約不顯示。
+    回傳 {date, spot, curve:[{label,basis}], history:[{date,spot,near,next,quarter}]}。"""
+    import urllib.request as _u, urllib.parse as _up, collections, time as _time, ssl as _ssl
+    ctx = _ssl._create_unverified_context()
+    today = datetime.now()
+    prev = today.replace(day=1) - timedelta(days=1)
+
+    # 1) 現貨收盤（發行量加權股價指數 = r[4]）
+    spot = {}
+    for ym in (prev, today):
+        url = (f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK"
+               f"?date={ym.strftime('%Y%m01')}&response=json")
+        for attempt in range(3):
+            try:
+                req = _u.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with _u.urlopen(req, timeout=15, context=ctx) as r:
+                    j = json.loads(r.read().decode("utf-8", "replace"))
+                for row in j.get("data", []):
+                    p = row[0].split("/")
+                    dt = f"{int(p[0])+1911}/{p[1]}/{p[2]}"
+                    spot[dt] = float(row[4].replace(",", ""))
+                break
+            except Exception as e:
+                print(f"basis 現貨 {ym.strftime('%Y-%m')} 第{attempt+1}次失敗: {e}")
+                _time.sleep(2)
+
+    # 2) 期貨各合約收盤＋量（一般時段、純月份合約）
+    fut = collections.defaultdict(dict)   # date -> {month: (close, vol)}
+    for b in range(2):
+        e_b = today - timedelta(days=b * 20)
+        s_b = e_b - timedelta(days=20)
+        body = _up.urlencode({"down_type": "1", "commodity_id": "TX",
+                              "queryStartDate": s_b.strftime("%Y/%m/%d"),
+                              "queryEndDate": e_b.strftime("%Y/%m/%d")})
+        raw = ""
+        for attempt in range(3):
+            try:
+                req = _u.Request("https://www.taifex.com.tw/cht/3/futDataDown",
+                                 data=body.encode(), headers={"User-Agent": "Mozilla/5.0"})
+                with _u.urlopen(req, timeout=30, context=ctx) as r:
+                    raw = r.read().decode("big5", "replace")
+                break
+            except Exception as e:
+                print(f"basis 期貨批{b} 第{attempt+1}次失敗: {e}")
+                _time.sleep(2)
+        for ln in raw.strip().split("\n")[1:]:
+            p = [c.strip() for c in ln.split(",")]
+            if len(p) < 18 or p[1] != "TX" or p[17] != "一般" or "/" in p[2]:
+                continue
+            try:
+                fut[p[0]][p[2]] = (float(p[6]), int(p[9]))
+            except ValueError:
+                continue
+        _time.sleep(0.3)
+
+    # 3) 每日 near/next/quarter 正價差（量薄→None）
+    def basis_or_none(day, month):
+        if month not in day:
+            return None
+        close, vol = day[month]
+        return round(close - s) if vol >= BASIS_MIN_VOL else None
+
+    history = []
+    latest_curve, latest_dt, latest_spot = [], None, None
+    for dt in sorted(fut):
+        if dt not in spot:
+            continue
+        s = spot[dt]
+        day = fut[dt]
+        near_m = max(day, key=lambda m: day[m][1])          # 量最大＝近月主力
+        months = sorted(m for m in day if m >= near_m)      # 近月及之後
+        next_m = months[1] if len(months) > 1 else None
+        quarter_m = next((m for m in months if m[4:6] in ("03", "06", "09", "12") and m > (next_m or near_m)), None)
+        rec = {"date": dt, "spot": round(s),
+               "near": basis_or_none(day, near_m),
+               "next": basis_or_none(day, next_m) if next_m else None,
+               "quarter": basis_or_none(day, quarter_m) if quarter_m else None}
+        history.append(rec)
+        # 最新一日的期限結構曲線（量足的合約）
+        latest_dt, latest_spot = dt, round(s)
+        latest_curve = [{"label": f"{m[4:6]}月" if m[:4] == str(today.year) else f"{m[2:4]}/{m[4:6]}",
+                         "basis": round(day[m][0] - s)}
+                        for m in sorted(day) if day[m][1] >= BASIS_MIN_VOL]
+
+    history = history[-n_days:]
+    if latest_dt is None:
+        print("basis：無可用資料")
+        return {}
+    print(f"basis OK  {latest_dt}  spot={latest_spot}  近月價差={history[-1]['near']}  次月={history[-1]['next']}  曲線{len(latest_curve)}點")
+    return {"date": latest_dt, "spot": latest_spot, "curve": latest_curve, "history": history}
+
+
 # ── Yahoo Finance OHLC（NQ 期貨）────────────────────────────
 
 def nq_front_contract(ref_date=None):
@@ -983,6 +1081,16 @@ def main():
     })
     update_log = update_log[-12:]
 
+    # 台指期正價差（近月/次月/季月 vs 加權指數現貨）；抓失敗沿用既有，避免空資料覆蓋
+    basis = {}
+    try:
+        basis = fetch_basis()
+    except Exception as e:
+        print(f"basis FAIL: {e}")
+    if not basis or not basis.get("history"):
+        print("basis 抓失敗，沿用既有資料")
+        basis = existing_json.get("basis", {})
+
     # 財報行事曆（AlphaVantage EARNINGS_CALENDAR，只取下次財報「日期」；每天抓一次，1 請求）
     # 無自設 key 時用 demo（CALENDAR 端點 demo 即可抓全市場），確保時間一定抓得到
     av_key = _os.getenv("ALPHAVANTAGE_KEY", "").strip()
@@ -1019,6 +1127,7 @@ def main():
         "settlement_history": existing_history,
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
+        "basis":              basis,
         "update_log":         update_log,
         "earnings":           earnings,
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

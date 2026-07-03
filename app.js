@@ -223,6 +223,7 @@ async function loadMarketInfo() {
     loadOptions(),
     loadFutures(),
     loadVolatility(),
+    loadBasis(),
     loadMarketVolume(),
     loadEarnings(),
   ]);
@@ -237,25 +238,111 @@ async function loadMarketVolume() {
     const hist = data?.market_volume;
     if (!hist || !hist.length) return;
     const last = hist[hist.length - 1];
-    document.getElementById('vol-twse').textContent  = last.twse?.toLocaleString() ?? '--';
-    document.getElementById('vol-tpex').textContent  = last.tpex?.toLocaleString() ?? '--';
-    document.getElementById('vol-total').textContent = last.total?.toLocaleString() ?? '--';
+    // 單邊缺值（後端沉默回 0，如某日上市尚未出爐）顯示「—」，合計只加已到的一邊，不撒謊
+    const twseOk = last.twse > 0, tpexOk = last.tpex > 0;
+    document.getElementById('vol-twse').textContent  = twseOk ? last.twse.toLocaleString() : '—';
+    document.getElementById('vol-tpex').textContent  = tpexOk ? last.tpex.toLocaleString() : '—';
+    document.getElementById('vol-total').textContent =
+      (twseOk && tpexOk) ? (last.total?.toLocaleString() ?? '--')
+      : (twseOk || tpexOk) ? ((twseOk ? last.twse : 0) + (tpexOk ? last.tpex : 0)).toLocaleString()
+      : '--';
     document.getElementById('vol-date').textContent  = last.date ?? '';
   } catch (e) { console.error('loadMarketVolume:', e); }
 }
+
+// ── 台指期正價差 ──────────────────────────────────────────────
+
+const basisColor = v => (v == null ? 'text-gray-500' : v < 0 ? 'text-green-400' : 'text-red-400');
+const basisTxt   = v => (v == null ? '—' : (v > 0 ? '+' : '') + v);
+
+async function loadBasis() {
+  try {
+    const data = await loadTaifexJson();
+    const b = data?.basis;
+    if (!b || !b.curve || !b.curve.length) return;
+    const near = b.curve[0], next = b.curve[1];
+    document.getElementById('basis-near-m').textContent = near ? ` ${near.label}` : '';
+    document.getElementById('basis-near').textContent = near ? basisTxt(near.basis) : '--';
+    document.getElementById('basis-near').className = 'text-xl font-bold ' + basisColor(near?.basis);
+    document.getElementById('basis-next-m').textContent = next ? ` ${next.label}` : '';
+    document.getElementById('basis-next').textContent = next ? basisTxt(next.basis) : '--';
+    document.getElementById('basis-next').className = 'text-lg font-bold ' + basisColor(next?.basis);
+    document.getElementById('basis-date').textContent = b.date ?? '';
+  } catch (e) { console.error('loadBasis:', e); }
+}
+
+// 期限結構曲線 SVG（由 curve 陣列繪製，含正/逆分界零線）
+function basisCurveSVG(curve) {
+  const w = 440, h = 170, pl = 40, pr = 14, pt = 24, pb = 30;
+  const iw = w - pl - pr, ih = h - pt - pb;
+  const vals = curve.map(c => c.basis);
+  let vmax = Math.max(...vals, 0), vmin = Math.min(...vals, 0);
+  const pad = (vmax - vmin) * 0.15 || 10; vmax += pad; vmin -= pad;
+  const n = curve.length;
+  const X = i => pl + (n === 1 ? iw / 2 : iw * i / (n - 1));
+  const Y = v => pt + ih * (1 - (v - vmin) / (vmax - vmin || 1));
+  let s = `<svg width="100%" viewBox="0 0 ${w} ${h}" font-family="system-ui,sans-serif">`;
+  if (vmin < 0 && vmax > 0)
+    s += `<line x1="${pl}" y1="${Y(0).toFixed(1)}" x2="${w-pr}" y2="${Y(0).toFixed(1)}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="4 3"/>`
+       + `<text x="${w-pr}" y="${(Y(0)-3).toFixed(1)}" font-size="9" fill="#f59e0b" text-anchor="end">正/逆分界</text>`;
+  const pts = curve.map((c, i) => `${X(i).toFixed(1)},${Y(c.basis).toFixed(1)}`).join(' ');
+  if (n > 1) s += `<polyline points="${pts}" fill="none" stroke="#a78bfa" stroke-width="2.5"/>`;
+  curve.forEach((c, i) => {
+    s += `<circle cx="${X(i).toFixed(1)}" cy="${Y(c.basis).toFixed(1)}" r="4" fill="#a78bfa"/>`;
+    s += `<text x="${X(i).toFixed(1)}" y="${(Y(c.basis)-9).toFixed(1)}" font-size="11" font-weight="700" fill="#e5e7eb" text-anchor="middle">${basisTxt(c.basis)}</text>`;
+    s += `<text x="${X(i).toFixed(1)}" y="${h-pb+16}" font-size="10" fill="#9ca3af" text-anchor="middle">${c.label}</text>`;
+  });
+  s += `</svg>`;
+  return s;
+}
+
+function openBasisModal() {
+  loadTaifexJson().then(data => {
+    const b = data?.basis;
+    const body = document.getElementById('basis-modal-body');
+    if (!b || !b.history?.length) { body.innerHTML = '<div class="text-gray-400">暫無資料</div>'; }
+    else {
+      const rows = [...b.history].reverse().map(r => {
+        const cell = v => `<td class="px-1 py-1 text-right ${basisColor(v)}">${basisTxt(v)}</td>`;
+        return `<tr class="border-b border-gray-800">
+          <td class="px-1 py-1 text-gray-300">${r.date.slice(5)}</td>
+          <td class="px-1 py-1 text-right text-gray-400">${r.spot.toLocaleString()}</td>
+          ${cell(r.near)}${cell(r.next)}${cell(r.quarter)}</tr>`;
+      }).join('');
+      body.innerHTML = `
+        <div class="text-xs text-gray-400 mb-1">期限結構（${b.date}）· 期貨收盤 − 加權指數</div>
+        <div class="bg-gray-900 rounded-lg p-2 mb-3">${basisCurveSVG(b.curve)}</div>
+        <table class="w-full">
+          <thead><tr class="text-gray-500 border-b border-gray-700">
+            <th class="px-1 py-1 text-left">日期</th><th class="px-1 py-1 text-right">現貨</th>
+            <th class="px-1 py-1 text-right">近月</th><th class="px-1 py-1 text-right">次月</th>
+            <th class="px-1 py-1 text-right">季月</th>
+          </tr></thead><tbody>${rows}</tbody></table>
+        <div class="text-[10px] text-gray-500 mt-2">紅=正價差(升水/偏多)、綠=逆價差；—＝該合約量薄不顯示。</div>`;
+    }
+    document.getElementById('basis-modal').classList.remove('hidden');
+  });
+}
+document.getElementById('basis-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
+});
 
 function openVolumeModal() {
   loadTaifexJson().then(data => {
     const hist = data?.market_volume;
     if (!hist?.length) return;
-    const rows = [...hist].reverse().map(r =>
-      `<div class="flex justify-between py-1 border-b border-gray-700">
+    const vcell = v => (v > 0 ? v.toLocaleString() : '—');  // 單邊缺值顯示「—」
+    const rows = [...hist].reverse().map(r => {
+      const tw = r.twse > 0, tp = r.tpex > 0;
+      const tot = (tw && tp) ? (r.total?.toLocaleString() ?? '—')
+        : (tw || tp) ? ((tw ? r.twse : 0) + (tp ? r.tpex : 0)).toLocaleString() : '—';
+      return `<div class="flex justify-between py-1 border-b border-gray-700">
         <span class="text-gray-400">${r.date}</span>
-        <span class="text-gray-300">${r.twse?.toLocaleString()}</span>
-        <span class="text-gray-300">${r.tpex?.toLocaleString()}</span>
-        <span class="font-bold text-yellow-300">${r.total?.toLocaleString()}</span>
-      </div>`
-    ).join('');
+        <span class="text-gray-300">${vcell(r.twse)}</span>
+        <span class="text-gray-300">${vcell(r.tpex)}</span>
+        <span class="font-bold text-yellow-300">${tot}</span>
+      </div>`;
+    }).join('');
     document.getElementById('volume-modal-body').innerHTML =
       `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
         <span>日期</span><span>上市</span><span>上櫃</span><span>合計(億)</span>
@@ -871,8 +958,10 @@ function openUpdateLogModal() {
     if (!log.length) {
       body.innerHTML = '<div class="text-gray-400">暫無紀錄</div>';
     } else {
-      const allDates = log.flatMap(r => [r.inst, r.fut, r.tx]).filter(Boolean).sort();
-      const newest = allDates.length ? allDates[allDates.length - 1] : '';
+      // 綠標基準改用頂層 date（本次實際抓到的期貨交易日），非 log 內自我參照的最大值——
+      // 否則全部 stale 時最舊的也會誤標綠。頂層 date 為 YYYYMMDD，轉 YYYY-MM-DD 對齊 log 欄位
+      const td = data?.date || '';
+      const newest = td.length === 8 ? `${td.slice(0,4)}-${td.slice(4,6)}-${td.slice(6)}` : td;
       const md = d => d ? d.slice(5) : '--';
       const cell = d => `<td class="px-1 py-1 text-right ${d === newest ? 'text-green-400' : 'text-gray-500'}">${md(d)}</td>`;
       const tlabel = t => t === 'schedule' ? '定期' : (t === 'workflow_dispatch' ? '手動' : (t || '--'));
