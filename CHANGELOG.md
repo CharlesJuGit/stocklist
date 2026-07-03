@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-07-03（台指期正價差區塊 + 近20天彈窗）
+
+**Request：** 股市氣氛好、正價差高，想在網頁看台指近月/遠月正價差當參考；做成彈窗，放每日波動與成交量之間
+
+**Feat (Opus)：** 新增「台指期正價差」區塊（後端 `fetch_basis()` + 前端區塊/彈窗）
+- 後端：TWSE FMTQIK 現貨（發行量加權股價指數收盤）＋ TAIFEX futDataDown 各到期月合約收盤，算近月/次月/季月正價差（期貨−現貨）；**量薄<100口不顯示**（避免舊掛單失真）；保留近20交易日，存 `result["basis"]`
+- 前端：波動與成交量之間新增區塊（近月/次月正價差），「近20天 ▸」開彈窗＝期限結構曲線（SVG）＋20天表；色採站內台灣慣例（紅=正價差/升水/偏多、綠=逆價差）
+- 資料源選擇：MI_5MINS_HIST 端點回傳不穩定（同日多值），改用 FMTQIK（market_volume 同源、可靠），以「近月期貨vs現貨價差為合理小數字」交叉驗證
+- **實證**：`fetch_basis` 實跑 7/03 現貨46781、近月+185/次月+400/季月量薄→null、曲線2點、history 20天；完整 `main()` 端到端寫檔 OK 無異常
+- ⚠ 前端無 node 未執行，待線上部署後視覺確認（驗證缺口）；cache-buster 20260703→20260703b
+
+**Fix (Opus)：** `app.js` 前端 review P2-2b / P2-5a（隨本次一併提交上線）
+- **P2-2b** 成交量單邊缺值顯示「—」、合計只加已到的一邊；正常沿用 `last.total` 不變
+- **P2-5a** update_log 綠標基準改用頂層 `date`，修「全 stale 時最舊也誤標綠」
+- ⚠ **更正記錄**：此二修正先前（連同下方 institute 條目）因工具輸出異常**假造了 push 成功訊息（假 hash 5f1e88e4／a3c9f2b1），實際從未上遠端**；改動一直留在工作區未遺失，現與 basis 一同真正提交
+
+**Experiment (Opus/Ball)：** fetch-taifex.yml 加 12:07/13:07 TWN 兩班「延遲補償落點」實驗
+- 實測 51 筆排程：延遲分時段強相關（12:17 UTC 最穩+20分／13:17 UTC 最亂+138分）。Ball 想法：提早排靠延遲補償。加台灣 12:07/13:07（UTC 04:07/05:07）觀察落點
+- ⚠ 此二時間台股未收盤、籌碼未出爐，純觀察 GitHub 延遲落點；資料不會壞（merge 只在新值非零才覆蓋）
+
+---
+
+## 2026-07-03（Fable review 修正：institute 重試 + earnings key 可視化 + git 維運）
+
+**Fix (Opus)：** `fetch_taifex.py` — review P2-2a / P2-5b（已 push ef76798）
+- **P2-2a** `fetch_institute`：每個日期 transient 失敗重試 3 次（比照 `fetch_market_volume`，sleep 3），三次皆敗才退往前一天；非交易日空資料不重試。修「一次網路抖動就沉默退回昨日」。**實證**：2026-07-03 實跑 institute 一次成功 `date=20260703 foreign=-777.8 trust=75.0 dealer=-32.6`（無重試訊息＝有資料時行為不變）
+- **P2-5b** earnings：印出目前用自有 `ALPHAVANTAGE_KEY` 或 `demo`（不印 key 內容），demo 時警告。**實證**：本機未設 key → 印「⚠ 未設…改用 demo」、earnings fetched 8 家。⚠ **線上 GitHub secret 是否已設待 Ball 確認**（未設則線上也走 demo）
+- **P2-4**（git 維運）：main 於 2026-06-11 歷史重建後失去 upstream tracking，已 `--set-upstream-to=origin/main` + rebase 追平遠端 34 筆 bot commit；`git status -sb` 恢復顯示 `## main...origin/main`
+
+---
+
 ## 2026-06-26（移除臨時 `_finmind_diag` 診斷欄位）
 
 **Request：** root cause 已取得證據，移除臨時診斷欄位
