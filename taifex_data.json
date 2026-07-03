@@ -1005,15 +1005,163 @@
       "total": 13427
     }
   ],
+  "basis": {
+    "date": "2026/07/03",
+    "spot": 46781,
+    "curve": [
+      {
+        "label": "07月",
+        "basis": 185
+      },
+      {
+        "label": "08月",
+        "basis": 400
+      }
+    ],
+    "history": [
+      {
+        "date": "2026/06/05",
+        "spot": 45071,
+        "near": 140,
+        "next": 213,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/08",
+        "spot": 43503,
+        "near": -423,
+        "next": -396,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/09",
+        "spot": 44704,
+        "near": -39,
+        "next": 25,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/10",
+        "spot": 43226,
+        "near": 196,
+        "next": 231,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/11",
+        "spot": 43149,
+        "near": 92,
+        "next": 154,
+        "quarter": 295
+      },
+      {
+        "date": "2026/06/12",
+        "spot": 44169,
+        "near": 19,
+        "next": 145,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/15",
+        "spot": 45397,
+        "near": 183,
+        "next": 420,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/16",
+        "spot": 45809,
+        "near": -37,
+        "next": 40,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/17",
+        "spot": 45877,
+        "near": 154,
+        "next": null,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/18",
+        "spot": 46465,
+        "near": 304,
+        "next": 537,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/22",
+        "spot": 47742,
+        "near": 671,
+        "next": 918,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/23",
+        "spot": 47101,
+        "near": 335,
+        "next": 629,
+        "quarter": 833
+      },
+      {
+        "date": "2026/06/24",
+        "spot": 46044,
+        "near": 343,
+        "next": 610,
+        "quarter": 806
+      },
+      {
+        "date": "2026/06/25",
+        "spot": 46255,
+        "near": 289,
+        "next": 528,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/26",
+        "spot": 44572,
+        "near": -199,
+        "next": 93,
+        "quarter": 322
+      },
+      {
+        "date": "2026/06/29",
+        "spot": 45000,
+        "near": 550,
+        "next": 803,
+        "quarter": null
+      },
+      {
+        "date": "2026/06/30",
+        "spot": 46126,
+        "near": 604,
+        "next": 822,
+        "quarter": null
+      },
+      {
+        "date": "2026/07/01",
+        "spot": 47019,
+        "near": 212,
+        "next": 393,
+        "quarter": null
+      },
+      {
+        "date": "2026/07/02",
+        "spot": 46744,
+        "near": -145,
+        "next": 72,
+        "quarter": null
+      },
+      {
+        "date": "2026/07/03",
+        "spot": 46781,
+        "near": 185,
+        "next": 400,
+        "quarter": null
+      }
+    ]
+  },
   "update_log": [
-    {
-      "at": "2026-07-01 20:17",
-      "trigger": "schedule",
-      "inst": "2026-07-01",
-      "fut": "2026-07-01",
-      "tx": "2026-07-01",
-      "nq": "2026-07-01"
-    },
     {
       "at": "2026-07-01 20:48",
       "trigger": "schedule",
@@ -1101,6 +1249,14 @@
       "fut": "2026-07-03",
       "tx": "2026-07-03",
       "nq": "2026-07-03"
+    },
+    {
+      "at": "2026-07-03 22:28",
+      "trigger": "workflow_dispatch",
+      "inst": "2026-07-03",
+      "fut": "2026-07-03",
+      "tx": "2026-07-03",
+      "nq": "2026-07-03"
     }
   ],
   "earnings": {
@@ -1140,5 +1296,5 @@
       }
     ]
   },
-  "updated_at": "2026-07-03T12:20:44Z"
+  "updated_at": "2026-07-03T14:28:19Z"
 }
