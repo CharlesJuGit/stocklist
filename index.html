@@ -309,18 +309,19 @@
     </div>
   </div>
 
-  <!-- 成交量歷史彈出視窗 -->
+  <!-- 台指期正價差彈出視窗 -->
   <div id="basis-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
-    <div class="bg-gray-800 rounded-xl p-5 max-w-lg w-full mx-4">
+    <div class="bg-gray-800 rounded-xl p-5 w-full max-w-lg mx-4">
       <div class="flex justify-between items-center mb-3">
         <h2 class="text-lg font-bold text-gray-100">台指期正價差 · 近20天</h2>
         <button onclick="document.getElementById('basis-modal').classList.add('hidden')"
-          class="text-gray-400 hover:text-white text-xl leading-none">✕</button>
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
       </div>
-      <div id="basis-modal-body" class="text-sm"></div>
+      <div id="basis-modal-body" class="text-sm max-h-96 overflow-y-auto"></div>
     </div>
   </div>
 
+  <!-- 成交量歷史彈出視窗 -->
   <div id="volume-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
       <div class="flex justify-between items-center mb-4">
