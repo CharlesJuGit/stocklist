@@ -2,7 +2,7 @@ name: Update NQ Data
 
 on:
   schedule:
-    - cron: '30 22 * * 0-4'  # 22:30 UTC = 6:30 AM TWN（週一到週五）
+    - cron: '30 22 * * 0-5'  # 22:30 UTC = 6:30 AM TWN（週一到週六）；週五UTC=週六6:30TWN收尾班，補NQ週五時段收在台灣週六清晨5:00的缺口（P2-8）
   workflow_dispatch:
 
 # 與 fetch-taifex 共用同一 group，避免兩個 workflow 同時推送 taifex_data.json 撞車（排隊不取消）

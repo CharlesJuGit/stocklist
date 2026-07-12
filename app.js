@@ -1093,7 +1093,7 @@ async function idxMxf(iy, settlementStr) {
   // fallback：後端 index_ytd.mxf 日更值（MTX 最新收盤）
   const m = iy && iy.mxf;
   if (!m || m.last == null || m.high == null) throw new Error("no mxf");
-  return { name: "台指期 小台", price: m.last, yearHigh: m.high, time: (m.date || "") + " 收", daily: true };
+  return { name: "台指期 小台", price: m.last, yearHigh: m.high, time: (m.date || "").slice(5) + " 收", daily: true };
 }
 async function loadIndexYtd() {
   const body = document.getElementById("idx-body"), note = document.getElementById("idx-note");
@@ -1116,7 +1116,7 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-200">${idxNum(d.price)}</td>
       <td class="text-right font-bold ${idxColor(pct)}">${pct == null ? "—" : (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
-      <td class="text-right text-gray-600 text-xs">${idxTime(d.time)}</td></tr>`;
+      <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
   if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走Deno代理即時，未設/失敗時退後端日更收盤(標「日」)。";
 }
