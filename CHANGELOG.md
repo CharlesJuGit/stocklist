@@ -18,7 +18,7 @@
 - **③基本資料**：`enrich_stocks.py`（轉檔器本機跑）補 stocks.json 公開擴欄——FinMind(產業/市場)、TWSE t187ap05_L+TPEx(月營收 千元→億/YoY)、t187ap14_L(季EPS)、TDCC(400張大戶最新週**水位**)；openapi flaky 加重試；覆蓋 mkt94/ind94/rev79/eps57/big400 91（缺者顯示—）
 - **④外部連結**：Yahoo股市/Goodinfo/財報狗（用 mkt 組後綴、`rel=noopener`）
 - **隱私**：stocks.json 欄位僅公開資料、**大戶只 big400 水位（無 pp/變化量/排名）**、彈窗段無 EMA/金叉/角度/票/間距/加速；cache-buster v=20260712g
-- ⚠ **biz(簡介)欄暫缺**：規格假設 t187ap03_L 有「主要經營業務」欄，實測該表與 FinMind **皆無**（spec gap）→ v1 依「缺欄省略」略過，待 Ball/Fable 定案來源
+- **biz(簡介)欄**：規格假設 t187ap03_L 有「主要經營業務」欄，實測該表與 FinMind **皆無**（spec gap）→ **Ball 2026-07-13 定案(a)接受無簡介、日後再議**，維持缺欄省略
 
 ---
 
