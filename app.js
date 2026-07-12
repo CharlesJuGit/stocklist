@@ -1231,7 +1231,8 @@ async function idxMxf(iy, settlementStr) {
       scan(j);
       if (d && d.CLastPrice != null && parseFloat(d.CLastPrice) > 0) {
         const price = parseFloat(d.CLastPrice), todayHigh = parseFloat(d.CHighPrice);
-        return { name: "台指期 小台" + (night ? "（夜盤）" : ""), price, yearHigh: Math.max(iy?.mxf?.high || 0, todayHigh || 0, price), time: (d.CTime || "").slice(0, 5) };
+        const ct = String(d.CTime || '').padStart(6, '0');   // HHMMSS → HH:MM
+        return { name: "台指期 小台" + (night ? "（夜盤）" : ""), price, yearHigh: Math.max(iy?.mxf?.high || 0, todayHigh || 0, price), time: ct.slice(0, 2) + ':' + ct.slice(2, 4) };
       }
     } catch (e) { /* 退 fallback */ }
   }
@@ -1271,7 +1272,15 @@ function scheduleIndexRefresh() {
   idxTimer = setInterval(() => { if (!document.hidden) loadIndexYtd(); }, 60000);
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) loadIndexYtd(); });
-document.getElementById("idx-refresh")?.addEventListener("click", loadIndexYtd);
+document.getElementById("idx-refresh")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget, orig = btn.textContent;
+  btn.textContent = "更新中…"; btn.disabled = true; btn.classList.add("opacity-60");
+  try { await loadIndexYtd(); } finally {
+    btn.textContent = "↻ 已更新 " + new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" });
+    btn.disabled = false; btn.classList.remove("opacity-60");
+    setTimeout(() => { btn.textContent = orig; }, 2500);   // 2.5秒後還原按鈕字樣
+  }
+});
 
 // ── P2-11 自選股（localStorage 每裝置一份、不上傳；只存清單本身）──────────
 const WATCH_KEY = 'watchlist_v1', WATCH_NOTICE = 'watchlist_notice_v1', WATCH_MAX = 50;
