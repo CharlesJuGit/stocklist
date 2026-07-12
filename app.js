@@ -1186,9 +1186,18 @@ function idxColor(pct) {   // 台灣慣例紅多：貼近年高=紅、深回檔=
 }
 function idxNum(n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function idxTime(v) {
+  // 統一台灣時間「上午/下午 HH:MM」12小時制（Yahoo=epoch、OTC/小台=HH:MM字串，全部一致）
   if (v == null) return "—";
-  if (typeof v === "number") return new Date(v * 1000).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
-  return String(v).slice(0, 5);
+  let hh, mm;
+  if (typeof v === "number") {
+    const tw = new Date(new Date(v * 1000).toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+    hh = tw.getHours(); mm = tw.getMinutes();
+  } else {
+    const m = String(v).match(/(\d{1,2}):(\d{2})/);
+    if (!m) return String(v).slice(0, 5);
+    hh = +m[1]; mm = +m[2];
+  }
+  return `${hh < 12 ? '上午' : '下午'}${String(hh % 12 || 12).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 async function idxFetch(path, opts) {
   const signal = AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined;
