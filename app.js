@@ -1118,7 +1118,7 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
       <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
-  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走Deno代理即時，未設/失敗時退後端日更收盤(標「日」)。";
+  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走 Val Town 代理即時，未設/失敗時退後端日更收盤(標「日」)。";
 }
 let idxTimer = null;
 function scheduleIndexRefresh() {
