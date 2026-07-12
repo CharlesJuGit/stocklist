@@ -15,6 +15,7 @@
 - **P2-7 P3①（Fable 驗收指出）**：小台 fallback(日更)時間欄 `"2026-07-09 收"` 被 `idxTime` `slice(0,5)` 截成「2026-」→ 改 `m.date.slice(5)+" 收"`＋render 用 `daily` 旗標繞過 idxTime → 顯示「07-09 收」。僅 Val Town 失敗退保底時可見
 - cache-buster v=20260712e；push fd6e38a
 - （P3② mxf.last 45739(futDataDown收盤) vs mis 45681 差0.13% Fable 判「記錄即可」不改）
+- **P2-9 兩細項（Fable 驗收多空清單指出，push 300645d）**：①`stocks.json` 補 `updated="2026-07-12"`——首頁「推薦清單更新：日期」恢復顯示（picks 不變）②小台 idx 註記文字「Deno代理」→「Val Town 代理」（實際用 Val Town）；cache-buster v=20260712f。`/weekly` SOP 步驟7 已納 updated 必帶。（P1-2 README「六支」殘項查證已於 P1-14 改 top50 時閉合＝現七支）
 
 ---
 
