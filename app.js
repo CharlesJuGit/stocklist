@@ -1314,7 +1314,8 @@ function setStockTab(i) {
 }
 function gotoStockPage(i) {
   const pages = document.getElementById('stock-pages'); if (!pages || !pages.children[i]) return;
-  pages.children[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  // 只捲水平容器（不用 scrollIntoView，避免連垂直位置一起捲＝頁面往下跑）；offsetLeft 差含 gap
+  pages.scrollTo({ left: pages.children[i].offsetLeft - pages.children[0].offsetLeft, behavior: 'smooth' });
   setStockTab(i);
 }
 function initStockPages() {
