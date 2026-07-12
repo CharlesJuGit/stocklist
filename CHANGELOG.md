@@ -23,6 +23,17 @@
 
 **Feat (Opus，同日追加)：** 選擇權 BC/SC/BP/SP 近20天彈窗——`settlement_history` 每日已含四值→純前端 `openOptionModal`，選擇權區加「近20天▸」鈕；cache-buster v=20260713e
 
+**同日 UI 修整批次（Ball 逐項回饋，待 Fable 驗，含 commit hash）：**
+- `4aba58d` 自選頁籤切換只捲**水平**容器（原 scrollIntoView 連垂直捲→頁面往下跑；改 `pages.scrollTo` 維持 title 在頂）
+- `b2b9c14` 自選新增改用 **mis.twse getStockInfo 取中文股名**（Yahoo shortName 台股給英文）＋判 tse/otc
+- `82f555c` 修**自選股重整後消失**：`renderWatchlist` 開頭保證 `STOCKS_BY_ID` 存在（原早於 loadStocks 的 await→讀 undefined 拋錯）；loadStocks 改合併不清空
+- `1213688` BC/SC/BP/SP 數值依 **30000/20000/15000/10000/8000 熱度標色**（≥30k紅/≥20k橙/≥15k黃/≥10k綠/≥8k青/其餘灰），主顯示4格＋20天彈窗
+- `c9bc504`/`682bfd2` 選擇權＋散戶期貨標題**排版統一**（日期右上、近20天連結移到日期下方直排）
+- `42cd208` 結算比近20天**排序反轉**為最新在上（與其他彈窗一致）
+- `3bccc90` 小台時間 CTime(HHMMSS) 格式化為 **HH:MM**（原 slice(0,5) 顯示「04595」錯）＋距年高**刷新鈕加回饋**（更新中…→已更新HH:MM）
+- `13f7bf5` 距年高時間**統一「上午/下午 HH:MM」12小時制**（Yahoo epoch／OTC／小台 全一致）
+- 最終 cache-buster v=20260713i
+
 ---
 
 ## 2026-07-12（P2-10：個股彈窗加強——籌碼白話/價格走勢/基本資料/外部連結）
