@@ -138,6 +138,27 @@
       </div>
     </div>
 
+    <!-- 全球指數距年高 -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-xs text-gray-500">全球指數距年高</div>
+        <button id="idx-refresh" class="text-xs text-blue-400 hover:text-blue-300" title="刷新">↻ 刷新</button>
+      </div>
+      <div class="bg-gray-800 rounded p-2 overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-gray-500 text-xs border-b border-gray-700">
+            <th class="text-left py-1 font-normal">指數</th>
+            <th class="text-right font-normal">現價</th>
+            <th class="text-right font-normal">距年高</th>
+            <th class="text-right font-normal">年高</th>
+            <th class="text-right font-normal">時間</th>
+          </tr></thead>
+          <tbody id="idx-body"><tr><td colspan="5" class="text-gray-500 py-2 text-center text-xs">載入中…</td></tr></tbody>
+        </table>
+        <div id="idx-note" class="text-gray-600 text-[10px] mt-1"></div>
+      </div>
+    </div>
+
     <!-- 參考連結 -->
     <div>
       <div class="text-xs text-gray-500 mb-2">參考連結</div>
@@ -451,7 +472,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260703b"></script>
+  <script src="app.js?v=20260708a"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

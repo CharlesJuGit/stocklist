@@ -854,6 +854,121 @@ FUT_URL = ("https://openapi.taifex.com.tw/v1/"
 OPT_URL = ("https://openapi.taifex.com.tw/v1/"
            "MarketDataOfMajorInstitutionalTradersDetailsOfCallsAndPutsBytheDate")
 
+# ── 全球指數距年高：OTC／小台 年高維護（P2-7，規格 INDEX_YTD_SPEC §5）────────
+# Yahoo 7 標的年高由前端同呼叫取得，不需後端。OTC/小台 Yahoo 無可靠日史 → 後端維護當年最高。
+# OTC＝FinMind TaiwanStockPrice/TPEx 當年 max（自癒）∪ mis 今高 ∪ 前值；小台＝MTX futDataDown 當年 max（tokenless）。跨年自動重置。
+def _finmind_token():
+    import os
+    t = os.environ.get("FINMIND_TOKEN", "")
+    if not t:
+        for p in ("../stockematool/.env", ".env"):
+            try:
+                for ln in open(p, encoding="utf-8"):
+                    if ln.startswith("FINMIND_TOKEN"):
+                        t = ln.split("=", 1)[1].strip()
+            except Exception:
+                pass
+    return t
+
+
+def _otc_year_high_finmind(year):
+    """FinMind TaiwanStockPrice data_id=TPEx（櫃買指數）當年每日最高的 max。token 有則用、無則嘗試免token。"""
+    import ssl as _ssl, urllib.parse as _up
+    q = {"dataset": "TaiwanStockPrice", "data_id": "TPEx", "start_date": f"{year}-01-01"}
+    tok = _finmind_token()
+    if tok:
+        q["token"] = tok
+    try:
+        u = "https://api.finmindtrade.com/api/v4/data?" + _up.urlencode(q)
+        data = json.loads(urllib.request.urlopen(u, timeout=30, context=_ssl._create_unverified_context()).read().decode())["data"]
+        highs = [r["max"] for r in data if r.get("max")]
+        return max(highs) if highs else None
+    except Exception as e:
+        print(f"index_ytd OTC FinMind 失敗: {e}")
+        return None
+
+
+def _mis_otc_today_high():
+    """mis.twse 櫃買指數今日高 h（server-side 可連，補 cron 未跑到的盤中新高）。"""
+    import ssl as _ssl
+    try:
+        u = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=otc_o00.tw&json=1&delay=0"
+        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+        d = json.loads(urllib.request.urlopen(req, timeout=20, context=_ssl._create_unverified_context()).read().decode())
+        h = d.get("msgArray", [{}])[0].get("h")
+        return float(h) if h not in (None, "", "-") else None
+    except Exception as e:
+        print(f"index_ytd OTC mis 失敗: {e}")
+        return None
+
+
+def _mtx_year_high(year):
+    """小型臺指 MTX（futDataDown，commodity_id=MTX）當年每日最高的 max。tokenless。
+    取每日「總量最大的主力合約」的高點（同 fetch_tx_ohlc），避免薄量週/遠月合約異常價污染。"""
+    import ssl as _ssl, time as _t, urllib.parse as _up, collections
+    from datetime import date as _d, timedelta as _td
+    ctx = _ssl._create_unverified_context()
+    vol_by = collections.defaultdict(int)   # (day, contract) -> 總量
+    hi_by = {}                              # (day, contract) -> 最高價
+    cur, start = _d.today(), _d(year, 1, 1)
+    while cur >= start:
+        s = max(start, cur - _td(days=20)).strftime("%Y/%m/%d")
+        e = cur.strftime("%Y/%m/%d")
+        body = _up.urlencode({"down_type": "1", "commodity_id": "MTX",
+                              "queryStartDate": s, "queryEndDate": e}).encode()
+        try:
+            req = urllib.request.Request("https://www.taifex.com.tw/cht/3/futDataDown", data=body,
+                                         headers={"User-Agent": "Mozilla/5.0",
+                                                  "Content-Type": "application/x-www-form-urlencoded"})
+            txt = urllib.request.urlopen(req, timeout=30, context=ctx).read().decode("big5", "replace")
+            for line in txt.splitlines():
+                p = [c.strip() for c in line.split(",")]
+                if len(p) < 10 or p[1] != "MTX":
+                    continue
+                try:
+                    h, v = float(p[4]), int(p[9])
+                except ValueError:
+                    continue
+                dt, cd = p[0], p[2]
+                vol_by[(dt, cd)] += v
+                hi_by[(dt, cd)] = max(hi_by.get((dt, cd), 0), h)
+        except Exception as ex:
+            print(f"index_ytd MTX {s}~{e} 失敗: {ex}")
+        cur -= _td(days=21)
+        _t.sleep(0.3)
+    best = {}   # day -> 主力合約（總量最大）
+    for (dt, cd), v in vol_by.items():
+        if dt not in best or v > vol_by[(dt, best[dt])]:
+            best[dt] = cd
+    day_high = [hi_by[(dt, best[dt])] for dt in best]
+    return max(day_high) if day_high else None
+
+
+def update_index_ytd(existing):
+    """OTC／小台 年高維護。回傳 index_ytd 區塊；抓失敗沿用前值、避免空資料覆蓋。整段包 try 不拖垮 cron。"""
+    from datetime import date as _d
+    try:
+        return _update_index_ytd_inner(existing)
+    except Exception as e:
+        print(f"index_ytd 整段失敗，沿用既有: {e}")
+        return (existing or {}).get("index_ytd", {})
+
+
+def _update_index_ytd_inner(existing):
+    from datetime import date as _d
+    y = _d.today().year
+    iy = (existing or {}).get("index_ytd") or {}
+    otc_prev = iy.get("otc", {}).get("high") if iy.get("otc", {}).get("year") == y else None
+    mxf_prev = iy.get("mxf", {}).get("high") if iy.get("mxf", {}).get("year") == y else None
+    otc_cands = [v for v in (_otc_year_high_finmind(y), _mis_otc_today_high(), otc_prev) if v is not None]
+    mxf_cands = [v for v in (_mtx_year_high(y), mxf_prev) if v is not None]
+    out = {"year": y, "updated": _d.today().strftime("%Y-%m-%d")}
+    out["otc"] = {"high": round(max(otc_cands), 2), "year": y} if otc_cands else iy.get("otc", {})
+    out["mxf"] = {"high": round(max(mxf_cands)), "year": y} if mxf_cands else iy.get("mxf", {})
+    print(f"index_ytd OK  OTC 年高={out['otc'].get('high')}  小台 年高={out['mxf'].get('high')}")
+    return out
+
+
 def main():
     # ── 讀取既有 JSON（後面若抓失敗可 fallback）────────────────────
     existing_json = {}
@@ -1130,6 +1245,7 @@ def main():
         "basis":              basis,
         "update_log":         update_log,
         "earnings":           earnings,
+        "index_ytd":          update_index_ytd(existing_json),
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
