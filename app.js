@@ -507,6 +507,33 @@ function openStrategyModal() {
   });
 }
 
+// 選擇權 BC/SC/BP/SP 近20天（讀 settlement_history，每日已含四值）
+function openOptionModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.settlement_history;
+    if (!hist?.length) return;
+    const c = v => (v == null || v === '' ? '—' : Number(v).toLocaleString());
+    const rows = [...hist].reverse().slice(0, 20).map(r => `
+      <tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-400">${r.date}</td>
+        <td class="text-right py-1 text-gray-200">${c(r.bc)}</td>
+        <td class="text-right py-1 text-gray-200">${c(r.sc)}</td>
+        <td class="text-right py-1 text-gray-200">${c(r.bp)}</td>
+        <td class="text-right py-1 text-gray-200">${c(r.sp)}</td>
+      </tr>`).join('');
+    document.getElementById('option-modal-body').innerHTML = `
+      <table class="w-full text-xs">
+        <thead><tr class="text-gray-500 border-b border-gray-600">
+          <th class="text-left py-1">日期</th>
+          <th class="text-right py-1">BC<span class="text-gray-600">買Call</span></th>
+          <th class="text-right py-1">SC<span class="text-gray-600">賣Call</span></th>
+          <th class="text-right py-1">BP<span class="text-gray-600">買Put</span></th>
+          <th class="text-right py-1">SP<span class="text-gray-600">賣Put</span></th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+    document.getElementById('option-modal').classList.remove('hidden');
+  });
+}
+
 // ── 波動區塊 ──────────────────────────────────────────────────
 
 const CAT_COLOR = { '低': 'text-blue-400', '小': 'text-cyan-400', '中': 'text-yellow-400', '大': 'text-orange-400', '高': 'text-red-400' };

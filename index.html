@@ -63,7 +63,10 @@
     <div>
       <div class="flex justify-between items-center mb-1">
         <div class="text-xs text-gray-500">台指選擇權未平倉（口）</div>
-        <div class="text-xs text-gray-300" id="opt-date"></div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-300" id="opt-date"></span>
+          <button onclick="openOptionModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+        </div>
       </div>
       <div class="grid grid-cols-4 gap-2 text-center text-sm" id="options-row">
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">BC（買Call）</div><div id="opt-bc">--</div></div>
@@ -332,6 +335,18 @@
     </div>
   </div>
 
+  <!-- 選擇權 BC/SC/BP/SP 近20天 -->
+  <div id="option-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">選擇權未平倉 近20天</h2>
+        <button onclick="document.getElementById('option-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="option-modal-body" class="text-xs max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- 台指期正價差彈出視窗 -->
   <div id="basis-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-800 rounded-xl p-5 w-full max-w-lg mx-4">
@@ -509,7 +524,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260713d"></script>
+  <script src="app.js?v=20260713e"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
