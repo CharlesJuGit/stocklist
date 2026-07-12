@@ -50,13 +50,13 @@ function chipVerdict(rows) {
   const f = sum('foreign'), t = sum('trust'), total = f + t + sum('dealer');
   const badge = total > 500 ? { t: '偏多', c: 'text-red-400' }
     : total < -500 ? { t: '偏空', c: 'text-green-400' } : { t: '中性', c: 'text-gray-400' };
-  let streak = 0; const dir = Math.sign(rows[0].foreign);
-  for (const r of rows) { if (dir !== 0 && Math.sign(r.foreign) === dir) streak++; else break; }
+  let streak = 0, streakSum = 0; const dir = Math.sign(rows[0].foreign);
+  for (const r of rows) { if (dir !== 0 && Math.sign(r.foreign) === dir) { streak++; streakSum += r.foreign; } else break; }
   let text;
-  if (f > 0 && t > 0) text = `外資投信同步買超（外 ${fmt(f)}張／投 ${fmt(t)}張），籌碼偏多`;
-  else if (f < 0 && t < 0) text = `外資投信同步賣超，籌碼偏空`;
+  if (f > 0 && t > 0 && (f + t) >= 500) text = `外資投信同步買超（外 ${fmt(f)}張／投 ${fmt(t)}張），籌碼偏多`;
+  else if (f < 0 && t < 0 && (Math.abs(f) + Math.abs(t)) >= 500) text = `外資投信同步賣超，籌碼偏空`;
   else if (Math.abs(f) >= 500 && Math.abs(t) >= 500) text = `外資投信對作（外 ${fmt(f)}／投 ${fmt(t)}），籌碼分歧`;
-  else if (streak >= 3) text = `外資連 ${streak} 日${dir > 0 ? '買超' : '賣超'}累計 ${fmt(f)}張`;
+  else if (streak >= 3) text = `外資連 ${streak} 日${dir > 0 ? '買超' : '賣超'}累計 ${fmt(streakSum)}張`;
   else text = `法人動向不明顯（5日合計 ${fmt(total)}張）`;
   return { text, badge };
 }
@@ -1241,8 +1241,99 @@ function scheduleIndexRefresh() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) loadIndexYtd(); });
 document.getElementById("idx-refresh")?.addEventListener("click", loadIndexYtd);
 
+// ── P2-11 自選股（localStorage 每裝置一份、不上傳；只存清單本身）──────────
+const WATCH_KEY = 'watchlist_v1', WATCH_NOTICE = 'watchlist_notice_v1', WATCH_MAX = 50;
+function getWatch() {
+  try { const a = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => x && x.id) : []; }
+  catch (e) { return []; }   // 壞資料棄用重建
+}
+function setWatch(a) { localStorage.setItem(WATCH_KEY, JSON.stringify(a.slice(0, WATCH_MAX))); }
+function renderWatchlist() {
+  const box = document.getElementById('watch-list'); if (!box) return;
+  const a = getWatch();
+  a.forEach(s => { if (!STOCKS_BY_ID[s.id]) STOCKS_BY_ID[s.id] = s; });  // 讓彈窗 mkt/後綴 fallback 有值
+  if (!a.length) { box.innerHTML = '<div class="text-gray-600 text-sm py-2">尚無自選股，輸入股號按＋新增</div>'; return; }
+  box.innerHTML = a.map(s => `
+    <div class="flex items-center bg-gray-800 hover:bg-gray-700 rounded-lg transition">
+      <button onclick="openModal('${s.id}','${s.name}')" class="flex-1 text-left px-4 py-3">
+        <span class="font-bold text-gray-300">${s.id}</span><span class="ml-2 text-gray-300">${s.name}</span></button>
+      <button onclick="watchlistRemove('${s.id}')" class="px-3 py-3 text-gray-500 hover:text-red-400" title="移除">✕</button>
+    </div>`).join('');
+}
+// 經 Worker 驗證股號存在＋取股名/市場別
+async function _resolveStock(id) {
+  let mkt = 'twse', res;
+  try { res = (await idxFetch(`/yahoo/${id}.TW?range=5d&interval=1d`)).chart.result[0]; }
+  catch (e) { res = (await idxFetch(`/yahoo/${id}.TWO?range=5d&interval=1d`)).chart.result[0]; mkt = 'tpex'; }
+  return { id, name: res.meta.shortName || res.meta.longName || id, mkt };
+}
+async function watchlistAdd() {
+  const inp = document.getElementById('watch-input'); const id = (inp.value || '').trim();
+  if (!id) return;
+  if (!localStorage.getItem(WATCH_NOTICE)) showWatchNotice();   // 首次提示一次
+  const a = getWatch();
+  if (a.some(x => x.id === id)) { alert('已在自選清單'); return; }
+  if (a.length >= WATCH_MAX) { alert(`自選股已達 ${WATCH_MAX} 支上限，請先移除`); return; }
+  if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) { alert('代理未設定，暫無法驗證股號'); return; }
+  try { a.push(await _resolveStock(id)); setWatch(a); renderWatchlist(); inp.value = ''; }
+  catch (e) { alert('查無此股號'); }
+}
+function watchlistRemove(id) { setWatch(getWatch().filter(x => x.id !== id)); renderWatchlist(); }
+function watchlistClear() { if (confirm('確定清空自選股？')) { localStorage.removeItem(WATCH_KEY); renderWatchlist(); } }
+function watchlistExport() {
+  const s = getWatch().map(x => x.id).join(',');
+  if (!s) { alert('自選清單為空'); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject())
+    .then(() => alert('已複製股號到剪貼簿：\n' + s)).catch(() => prompt('複製以下股號：', s));
+}
+async function watchlistImport() {
+  const s = prompt('貼上股號（逗號分隔，如 2330,2483）：'); if (!s) return;
+  const ids = s.split(/[,\s，]+/).map(x => x.trim()).filter(Boolean);
+  let added = 0;
+  for (const id of ids) {
+    const a = getWatch();
+    if (a.length >= WATCH_MAX) { alert(`已達 ${WATCH_MAX} 支上限，其餘略過`); break; }
+    if (a.some(x => x.id === id)) continue;
+    try { a.push(await _resolveStock(id)); setWatch(a); added++; } catch (e) { /* 略過查無 */ }
+  }
+  renderWatchlist(); alert(`匯入完成，新增 ${added} 支`);
+}
+function showWatchNotice() {
+  localStorage.setItem(WATCH_NOTICE, '1');
+  alert('關於自選股的小說明\n\n你的自選清單只存在這台裝置的瀏覽器裡（就像網站記住深色模式偏好那樣）：\n'
+    + '• 不會上傳到任何伺服器，沒有任何人看得到你的清單\n'
+    + '• 佔用空間極小（幾 KB，不到一張照片的百分之一），不影響瀏覽器速度\n'
+    + '• 隨時可刪：每支股票可單獨移除，也可以一鍵清空\n'
+    + '• 提醒：換裝置或清除瀏覽器資料時，清單不會跟著走——需要的話用「匯出」把清單複製保存');
+}
+// 頁籤 ↔ 橫滑同步
+function setStockTab(i) {
+  document.querySelectorAll('#stock-tabs button').forEach((b, j) => {
+    b.className = `flex-1 py-1 rounded text-sm ${j === i ? 'bg-gray-700 font-bold' : 'bg-gray-800'} ${['text-red-400', 'text-green-400', 'text-gray-300'][j]}`;
+  });
+}
+function gotoStockPage(i) {
+  const pages = document.getElementById('stock-pages'); if (!pages || !pages.children[i]) return;
+  pages.children[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  setStockTab(i);
+}
+function initStockPages() {
+  const pages = document.getElementById('stock-pages'); if (!pages) return;
+  let raf = null;
+  pages.addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = null;
+      const i = Math.round(pages.scrollLeft / pages.clientWidth);
+      setStockTab(Math.max(0, Math.min(2, i)));
+    });
+  });
+}
+
 loadStocks();
 loadMarketInfo();
 loadIndexYtd();
+renderWatchlist();
+initStockPages();
 scheduleAutoRefresh();
 scheduleIndexRefresh();
