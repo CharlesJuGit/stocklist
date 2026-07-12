@@ -21,6 +21,8 @@
 - ②規則4累計改「連續日合計」`streakSum`（非5日合計，避免「連3日買超累計負數」矛盾句）
 - cache-buster v=20260713a
 
+**Feat (Opus，同日追加)：** 選擇權 BC/SC/BP/SP 近20天彈窗——`settlement_history` 每日已含四值→純前端 `openOptionModal`，選擇權區加「近20天▸」鈕；cache-buster v=20260713e
+
 ---
 
 ## 2026-07-12（P2-10：個股彈窗加強——籌碼白話/價格走勢/基本資料/外部連結）
