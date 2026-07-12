@@ -419,10 +419,13 @@
   <!-- 詳細面板（彈出） -->
   <div id="modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
-      <div class="flex justify-between items-center mb-4">
+      <div class="flex justify-between items-center mb-2">
         <h2 id="modal-title" class="text-xl font-bold"></h2>
         <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
       </div>
+
+      <!-- ② 價格與走勢（開彈窗抓一次，失敗整塊隱藏） -->
+      <div id="modal-price" class="hidden mb-3"></div>
 
       <!-- 三大法人 tab -->
       <div class="flex gap-2 mb-3">
@@ -435,6 +438,15 @@
       <div id="chip-loading" class="text-gray-400 text-sm">載入中...</div>
       <div id="chip-1d" class="hidden"></div>
       <div id="chip-5d" class="hidden"></div>
+
+      <!-- ① 籌碼白話解讀 -->
+      <div id="chip-verdict" class="hidden mt-2 text-sm"></div>
+
+      <!-- ③ 基本資料 -->
+      <div id="modal-meta" class="hidden mt-3 pt-3 border-t border-gray-700 text-sm space-y-1"></div>
+
+      <!-- ④ 外部連結 -->
+      <div id="modal-links" class="hidden mt-3 flex flex-wrap gap-2"></div>
     </div>
   </div>
 
@@ -472,7 +484,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260712f"></script>
+  <script src="app.js?v=20260712g"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

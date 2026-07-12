@@ -6,6 +6,8 @@ async function loadStocks() {
   const res = await fetch('stocks.json');
   const data = await res.json();
 
+  window.STOCKS_BY_ID = {};
+  [...(data.long || []), ...(data.short || [])].forEach(s => { STOCKS_BY_ID[s.id] = s; });
   renderList('long-list', data.long, 'red');
   renderList('short-list', data.short, 'green');
   if (data.updated) {
@@ -30,7 +32,118 @@ function openModal(id, name) {
   currentStockId = id;
   document.getElementById('modal-title').textContent = `${id} ${name}`;
   document.getElementById('modal').classList.remove('hidden');
-  switchTab('1d');
+  ['modal-price', 'chip-verdict', 'modal-meta', 'modal-links'].forEach(x => {
+    const el = document.getElementById(x); if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+  });
+  switchTab('1d');           // 既有法人表
+  loadModalPrice(id);        // ② 價格/走勢（獨立 try，失敗隱藏）
+  loadChipVerdict(id);       // ① 籌碼白話
+  renderStockMeta(id);       // ③ 基本資料
+  renderStockLinks(id);      // ④ 外部連結
+}
+
+// ── P2-10 個股彈窗加強（隱私：只公開市場資料，無策略字眼）─────────────
+// ① 籌碼白話解讀（純函式，依序判定首中即用；只描述不建議）
+function chipVerdict(rows) {
+  if (!rows || !rows.length) return null;
+  const sum = k => rows.reduce((s, r) => s + r[k], 0);
+  const f = sum('foreign'), t = sum('trust'), total = f + t + sum('dealer');
+  const badge = total > 500 ? { t: '偏多', c: 'text-red-400' }
+    : total < -500 ? { t: '偏空', c: 'text-green-400' } : { t: '中性', c: 'text-gray-400' };
+  let streak = 0; const dir = Math.sign(rows[0].foreign);
+  for (const r of rows) { if (dir !== 0 && Math.sign(r.foreign) === dir) streak++; else break; }
+  let text;
+  if (f > 0 && t > 0) text = `外資投信同步買超（外 ${fmt(f)}張／投 ${fmt(t)}張），籌碼偏多`;
+  else if (f < 0 && t < 0) text = `外資投信同步賣超，籌碼偏空`;
+  else if (Math.abs(f) >= 500 && Math.abs(t) >= 500) text = `外資投信對作（外 ${fmt(f)}／投 ${fmt(t)}），籌碼分歧`;
+  else if (streak >= 3) text = `外資連 ${streak} 日${dir > 0 ? '買超' : '賣超'}累計 ${fmt(f)}張`;
+  else text = `法人動向不明顯（5日合計 ${fmt(total)}張）`;
+  return { text, badge };
+}
+
+async function loadChipVerdict(id) {
+  const box = document.getElementById('chip-verdict');
+  try {
+    const rows = [];
+    for (const date of getRecentTradingDates(7)) {
+      if (rows.length >= 5) break;
+      const data = await fetchT86(date);
+      if (!data) continue;
+      const row = data.find(r => r[0] === id);
+      if (row) rows.push(parseStockRow(row));
+    }
+    const v = chipVerdict(rows);
+    if (!v) return;
+    box.innerHTML = `${v.text}　<span class="${v.badge.c} font-bold">[${v.badge.t}]</span>`;
+    box.classList.remove('hidden');
+  } catch (e) { /* 靜默 */ }
+}
+
+// ② 價格＋20日位階＋迷你走勢（經現有 CF Worker /yahoo，失敗整塊隱藏、不影響法人表）
+function _sparkline(closes, w = 460, h = 40) {
+  const v = closes.filter(x => x != null);
+  if (v.length < 2) return '';
+  const mn = Math.min(...v), mx = Math.max(...v), rng = mx - mn || 1;
+  const pts = v.map((c, i) => `${(w * i / (v.length - 1)).toFixed(1)},${(h - 2 - (c - mn) / rng * (h - 4)).toFixed(1)}`).join(' ');
+  const up = v[v.length - 1] >= v[0];
+  return `<svg viewBox="0 0 ${w} ${h}" height="${h}" class="w-full mt-1" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? '#f87171' : '#4ade80'}" stroke-width="1.5"/></svg>`;
+}
+async function loadModalPrice(id) {
+  const box = document.getElementById('modal-price');
+  if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
+  const m = STOCKS_BY_ID[id] || {};
+  const suf = m.mkt === 'tpex' ? '.TWO' : '.TW';
+  const tryFetch = async s => (await idxFetch(`/yahoo/${id}${s}?range=1mo&interval=1d`)).chart.result[0];
+  try {
+    let res;
+    try { res = await tryFetch(suf); }
+    catch (e) { res = await tryFetch(suf === '.TW' ? '.TWO' : '.TW'); }  // mkt 缺失 fallback
+    const price = res.meta.regularMarketPrice, prev = res.meta.chartPreviousClose;
+    const closes = (res.indicators.quote[0].close || []).filter(x => x != null);
+    if (price == null || !closes.length) return;
+    const chg = prev ? (price - prev) / prev * 100 : null;
+    const l20 = closes.slice(-20), hi = Math.max(...l20), lo = Math.min(...l20);
+    const pos = hi > lo ? (price - lo) / (hi - lo) * 100 : null;
+    const cc = (chg >= 0) ? 'text-red-400' : 'text-green-400';
+    box.innerHTML = `<div class="flex items-center justify-between">
+        <div><span class="text-lg font-bold">${idxNum(price)}</span>${chg == null ? '' : `<span class="${cc} text-sm ml-1">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`}</div>
+        <div class="text-xs text-gray-400">位階 ${pos == null ? '—' : pos.toFixed(0) + '%'}（20日高 ${idxNum(hi)}／低 ${idxNum(lo)}）</div>
+      </div>${_sparkline(closes)}`;
+    box.classList.remove('hidden');
+  } catch (e) { /* 整塊隱藏 */ }
+}
+
+// ③ 基本資料（讀 stocks.json 擴欄；缺欄顯示—；大戶只給水位）
+function renderStockMeta(id) {
+  const box = document.getElementById('modal-meta');
+  const m = STOCKS_BY_ID[id];
+  if (!m) return;
+  const mktName = m.mkt === 'tpex' ? '上櫃' : m.mkt === 'twse' ? '上市' : '';
+  const r = [];
+  if (m.ind) r.push(`<div><span class="text-gray-500">產業：</span>${m.ind}${mktName ? `（${mktName}）` : ''}</div>`);
+  if (m.rev != null) {
+    const yc = (m.rev_yoy >= 0) ? 'text-red-400' : 'text-green-400';
+    r.push(`<div><span class="text-gray-500">月營收：</span>${m.rev_m}　${m.rev} 億${m.rev_yoy != null ? `　<span class="${yc}">YoY ${m.rev_yoy >= 0 ? '+' : ''}${m.rev_yoy}%</span>` : ''}</div>`);
+  }
+  if (m.eps != null) r.push(`<div><span class="text-gray-500">EPS：</span>${m.eps_q}　${m.eps} 元</div>`);
+  if (m.big400 != null) r.push(`<div><span class="text-gray-500">400張大戶：</span>${m.big400}%${m.big400_w ? `（${m.big400_w.slice(5)} 週）` : ''}</div>`);
+  if (!r.length) return;
+  box.innerHTML = r.join('');
+  box.classList.remove('hidden');
+}
+
+// ④ 外部連結（跳站外，無資料抓取）
+function renderStockLinks(id) {
+  const box = document.getElementById('modal-links');
+  const m = STOCKS_BY_ID[id] || {};
+  const suf = m.mkt === 'tpex' ? '.TWO' : '.TW';
+  const links = [
+    ['Yahoo股市', `https://tw.stock.yahoo.com/quote/${id}${suf}`],
+    ['Goodinfo', `https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID=${id}`],
+    ['財報狗', `https://statementdog.com/analysis/${id}`],
+  ];
+  box.innerHTML = links.map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 text-xs underline">${t} ↗</a>`).join('');
+  box.classList.remove('hidden');
 }
 
 function closeModal() {
