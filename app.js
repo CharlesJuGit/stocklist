@@ -507,6 +507,14 @@ function openStrategyModal() {
   });
 }
 
+// 選擇權未平倉數值熱度色階（越大越紅；門檻 30000/20000/15000/10000/8000）
+function optColor(v) {
+  v = Number(v) || 0;
+  return v >= 30000 ? 'text-red-400' : v >= 20000 ? 'text-orange-400' : v >= 15000 ? 'text-yellow-400'
+    : v >= 10000 ? 'text-green-400' : v >= 8000 ? 'text-cyan-400' : 'text-gray-400';
+}
+function setOpt(id, v) { const el = document.getElementById(id); if (el) { el.textContent = (Number(v) || 0).toLocaleString(); el.className = optColor(v); } }
+
 // 選擇權 BC/SC/BP/SP 近20天（讀 settlement_history，每日已含四值）
 function openOptionModal() {
   loadTaifexJson().then(data => {
@@ -516,10 +524,10 @@ function openOptionModal() {
     const rows = [...hist].reverse().slice(0, 20).map(r => `
       <tr class="border-b border-gray-800">
         <td class="py-1 text-gray-400">${r.date}</td>
-        <td class="text-right py-1 text-gray-200">${c(r.bc)}</td>
-        <td class="text-right py-1 text-gray-200">${c(r.sc)}</td>
-        <td class="text-right py-1 text-gray-200">${c(r.bp)}</td>
-        <td class="text-right py-1 text-gray-200">${c(r.sp)}</td>
+        <td class="text-right py-1 ${optColor(r.bc)}">${c(r.bc)}</td>
+        <td class="text-right py-1 ${optColor(r.sc)}">${c(r.sc)}</td>
+        <td class="text-right py-1 ${optColor(r.bp)}">${c(r.bp)}</td>
+        <td class="text-right py-1 ${optColor(r.sp)}">${c(r.sp)}</td>
       </tr>`).join('');
     document.getElementById('option-modal-body').innerHTML = `
       <table class="w-full text-xs">
@@ -824,10 +832,7 @@ async function loadOptions() {
     const callNet = bc - sc;
     const putNet  = bp - sp;
 
-    document.getElementById('opt-bc').textContent = bc.toLocaleString();
-    document.getElementById('opt-sc').textContent = sc.toLocaleString();
-    document.getElementById('opt-bp').textContent = bp.toLocaleString();
-    document.getElementById('opt-sp').textContent = sp.toLocaleString();
+    setOpt('opt-bc', bc); setOpt('opt-sc', sc); setOpt('opt-bp', bp); setOpt('opt-sp', sp);
 
     const setNet = (id, val) => {
       const el = document.getElementById(id);
