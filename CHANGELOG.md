@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-07-12（P2-8 NQ 週末缺口＋P2-7 P3① 保底時間欄，Fable 驗收後小殘項）
+
+**Fix (Opus)：**
+- **P2-8（NQ 週五高低整週末錯）**：`update-nq.yml` cron `30 22 * * 0-4`→`0-5`。根因＝NQ 週五完整時段收在台灣**週六清晨 5:00**，但收尾班只跑週一~五（週六 6:30 沒班）→ 週五 bucket 凍在美股盤初值、整個週末錯（Ball 覆盤時段），週一班重算才自癒。加週五UTC(=週六6:30TWN)收尾班補缺口。效果待本週五驗證（對照 7/10 high 30078/range 403）
+- **P2-7 P3①（Fable 驗收指出）**：小台 fallback(日更)時間欄 `"2026-07-09 收"` 被 `idxTime` `slice(0,5)` 截成「2026-」→ 改 `m.date.slice(5)+" 收"`＋render 用 `daily` 旗標繞過 idxTime → 顯示「07-09 收」。僅 Val Town 失敗退保底時可見
+- cache-buster v=20260712e；push fd6e38a
+- （P3② mxf.last 45739(futDataDown收盤) vs mis 45681 差0.13% Fable 判「記錄即可」不改）
+
+---
+
 ## 2026-07-08（P2-7：全球指數距年高% — Worker 代理＋前後端）
 
 **Request：** 首頁新增 9 標的「距年高%」（韓/日/台加權/NQ期/道瓊/SP500/費半/櫃買OTC/小台），盤中即時＋刷新鈕＋60s自動更新（規格 INDEX_YTD_SPEC.md；Ball 拍板 A方案CF Worker/NQ=F/盤中高/加OTC與小台）
@@ -17,7 +27,12 @@
 - **後端** `fetch_taifex.py`：新增 `index_ytd` 區塊（OTC/小台年高，Yahoo 7標的年高由前端同呼叫取得不需後端）。OTC＝FinMind TaiwanStockPrice/TPEx 當年max ∪ mis今高 ∪ 前值（自癒）；小台＝MTX futDataDown 當年每日主力合約(量最大)最高的max（tokenless，濾薄量週/遠月異常價）；跨年重置；整段 try 不拖垮 cron
   - **seed 值（spec §7 要求記錄）**：OTC 年高 **459.56**（2026-06-22，FinMind TPEx，最新close 421.39與mis分毫一致）／小台年高 **49239**（2026-06-23 近月202607，MTX）。距年高：OTC −8.3%、小台 −7.1%（貼近加權 −5.7%）。已寫入 taifex_data.json
 - **前端** `index.html`+`app.js`：參考連結前新增「全球指數距年高」表（指數/現價/距年高%/年高/時間）；Yahoo 7標的走 `/yahoo` range=ytd（meta現價＋max盤中高）、OTC走`/twse`、小台走`/taifex`（近月符號依settlement切換、日盤-F/夜盤-M）；距年高%色階（台灣紅多：≥−3%紅/−3~−10%黃/<−10%綠）；`Promise.allSettled`容錯、60s自動更新＋visibilitychange暫停＋刷新鈕；cache-buster→`v=20260708a`
-- **⚠ 待 Ball 部署 Worker**：註冊免費 CF 帳號部署 `worker/index-proxy.js` → 把 `*.workers.dev` URL 填進 app.js 的 `INDEX_PROXY` 常數，前端即上線（未填時該區塊顯示「尚未設定 Worker 代理」）。部署後依 §7 交叉核對（^TWII vs mis t00、小台 vs 期交所、一美股）
+- **部署上線（2026-07-12，Ball 部署＋Opus 實測）**：
+  - CF Worker `stockweb-proxy.ch41083s.workers.dev` 轉 Yahoo 7 標的＋OTC（實測 ^TWII 45354 年高48219、OTC 現價/今高皆通）
+  - 🔴 **小台踩坑改架構**：`/taifex` 經 CF Worker 一律 520——根因 **mis.taifex 本身在 Cloudflare 後面**（Server: cloudflare、CF-RAY-TPE），CF Worker 打它＝CF-to-CF 被對方 CF edge 擋，改 header 無效（Fable 分層診斷）。mis.twse 是 nginx 才能用 CF Worker
+  - **小台改走 Val Town 微代理**（`worker/taifex-proxy-valtown.js`，Deno 新版改綁卡故棄用）：Val Town egress 非 CF、免信用卡、`https://taifex-proxy.val.run`，實測小台即時通（45681/CORS ok）。前端 `TAIFEX_PROXY`＝Val Town、**失敗自動退後端日更值**（後端 `index_ytd.mxf.last`＝MTX 最新收盤，標「日」）
+  - 顯示順序：櫃買 OTC 移到台股加權下（Ball 指示）；cache-buster 迭代至 `v=20260712d`
+  - **驗收(§7)待做**：^TWII(Yahoo) vs mis t00、小台 vs 期交所行情頁、一美股 交叉核對（Fable）
 
 ---
 
