@@ -661,7 +661,7 @@ function scheduleAutoRefresh() {
 function openSettlementModal() {
   loadTaifexJson().then(data => {
     const hist = data.settlement_history || [];
-    const recent = hist.slice(-20);
+    const recent = [...hist].slice(-20).reverse();   // 最新在上（與其他近20天彈窗一致）
     const settlementDate = data.settlement_date || '--';
     document.getElementById('settlement-modal-title').textContent =
       `結算比歷史（結算日 ${settlementDate}）`;
