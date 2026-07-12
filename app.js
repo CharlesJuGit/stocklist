@@ -1018,7 +1018,7 @@ function unlockAdmin() {
 const INDEX_PROXY = "https://stockweb-proxy.ch41083s.workers.dev";
 // 小台即時專用第二代理（Deno Deploy，mis.taifex 在 CF 後面故不能用上面的 CF Worker）。
 // ⚠ 部署 worker/taifex-proxy-deno.js 後把 *.deno.dev 網址填這裡；留空則小台自動退回後端日更值。
-const TAIFEX_PROXY = ""; // 例："https://xxxx.deno.dev"（結尾不要斜線）
+const TAIFEX_PROXY = "https://ch41083s--bf5180a87dc811f193c91607ee4eb77e.web.val.run"; // Val Town 微代理
 
 // 顯示順序：櫃買 OTC 緊接台股加權之下（Ball 2026-07-12）
 const IDX_TARGETS = [
