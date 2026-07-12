@@ -902,14 +902,15 @@ def _mis_otc_today_high():
         return None
 
 
-def _mtx_year_high(year):
-    """小型臺指 MTX（futDataDown，commodity_id=MTX）當年每日最高的 max。tokenless。
-    取每日「總量最大的主力合約」的高點（同 fetch_tx_ohlc），避免薄量週/遠月合約異常價污染。"""
+def _mtx_ytd(year):
+    """小型臺指 MTX（futDataDown，commodity_id=MTX）當年資料。tokenless。
+    取每日「總量最大主力合約」的高/收（避免薄量週/遠月異常價）。
+    回傳 {high: 當年最高, last: 最新交易日主力收盤, date: 最新日}——mis.taifex 被 Cloudflare 擋，小台改走後端。"""
     import ssl as _ssl, time as _t, urllib.parse as _up, collections
     from datetime import date as _d, timedelta as _td
     ctx = _ssl._create_unverified_context()
     vol_by = collections.defaultdict(int)   # (day, contract) -> 總量
-    hi_by = {}                              # (day, contract) -> 最高價
+    hi_by, cl_by = {}, {}                    # (day, contract) -> 最高價 / 收盤價
     cur, start = _d.today(), _d(year, 1, 1)
     while cur >= start:
         s = max(start, cur - _td(days=20)).strftime("%Y/%m/%d")
@@ -926,12 +927,13 @@ def _mtx_year_high(year):
                 if len(p) < 10 or p[1] != "MTX":
                     continue
                 try:
-                    h, v = float(p[4]), int(p[9])
+                    h, c, v = float(p[4]), float(p[6]), int(p[9])
                 except ValueError:
                     continue
-                dt, cd = p[0], p[2]
+                dt, cd = p[0].replace("/", "-"), p[2]
                 vol_by[(dt, cd)] += v
                 hi_by[(dt, cd)] = max(hi_by.get((dt, cd), 0), h)
+                cl_by[(dt, cd)] = c   # 最後一筆(夜盤)覆蓋＝該合約當日收盤
         except Exception as ex:
             print(f"index_ytd MTX {s}~{e} 失敗: {ex}")
         cur -= _td(days=21)
@@ -940,8 +942,11 @@ def _mtx_year_high(year):
     for (dt, cd), v in vol_by.items():
         if dt not in best or v > vol_by[(dt, best[dt])]:
             best[dt] = cd
-    day_high = [hi_by[(dt, best[dt])] for dt in best]
-    return max(day_high) if day_high else None
+    if not best:
+        return None
+    high = max(hi_by[(dt, best[dt])] for dt in best)
+    last_day = max(best)
+    return {"high": round(high), "last": round(cl_by[(last_day, best[last_day])]), "date": last_day}
 
 
 def update_index_ytd(existing):
@@ -961,11 +966,16 @@ def _update_index_ytd_inner(existing):
     otc_prev = iy.get("otc", {}).get("high") if iy.get("otc", {}).get("year") == y else None
     mxf_prev = iy.get("mxf", {}).get("high") if iy.get("mxf", {}).get("year") == y else None
     otc_cands = [v for v in (_otc_year_high_finmind(y), _mis_otc_today_high(), otc_prev) if v is not None]
-    mxf_cands = [v for v in (_mtx_year_high(y), mxf_prev) if v is not None]
     out = {"year": y, "updated": _d.today().strftime("%Y-%m-%d")}
     out["otc"] = {"high": round(max(otc_cands), 2), "year": y} if otc_cands else iy.get("otc", {})
-    out["mxf"] = {"high": round(max(mxf_cands)), "year": y} if mxf_cands else iy.get("mxf", {})
-    print(f"index_ytd OK  OTC 年高={out['otc'].get('high')}  小台 年高={out['mxf'].get('high')}")
+    # 小台：mis.taifex 被 Cloudflare 擋 → 走後端 MTX 日資料（high 年高＋last 最新收盤＋date）
+    mtx = _mtx_ytd(y)
+    if mtx:
+        high = max([mtx["high"]] + ([mxf_prev] if mxf_prev else []))   # 年高 running max
+        out["mxf"] = {"high": high, "last": mtx["last"], "date": mtx["date"], "year": y}
+    else:
+        out["mxf"] = iy.get("mxf", {})
+    print(f"index_ytd OK  OTC 年高={out['otc'].get('high')}  小台 年高={out['mxf'].get('high')} 最新={out['mxf'].get('last')}")
     return out
 
 

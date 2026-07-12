@@ -1017,14 +1017,17 @@ function unlockAdmin() {
 // ⚠ Worker 部署後把網址填進 INDEX_PROXY（見 repo 內 worker/index-proxy.js 的部署指引）
 const INDEX_PROXY = "https://stockweb-proxy.ch41083s.workers.dev";
 
-const IDX_YAHOO = [
-  { name: "韓國 KOSPI", sym: "^KS11" },
-  { name: "日經 225",   sym: "^N225" },
-  { name: "台股加權",   sym: "^TWII" },
-  { name: "那斯達克期", sym: "NQ=F" },
-  { name: "道瓊",       sym: "^DJI" },
-  { name: "S&P 500",    sym: "^GSPC" },
-  { name: "費城半導體", sym: "^SOX" },
+// 顯示順序：櫃買 OTC 緊接台股加權之下（Ball 2026-07-12）
+const IDX_TARGETS = [
+  { name: "韓國 KOSPI", t: "y", sym: "^KS11" },
+  { name: "日經 225",   t: "y", sym: "^N225" },
+  { name: "台股加權",   t: "y", sym: "^TWII" },
+  { name: "櫃買 OTC",   t: "otc" },
+  { name: "那斯達克期", t: "y", sym: "NQ=F" },
+  { name: "道瓊",       t: "y", sym: "^DJI" },
+  { name: "S&P 500",    t: "y", sym: "^GSPC" },
+  { name: "費城半導體", t: "y", sym: "^SOX" },
+  { name: "台指期 小台", t: "mxf" },
 ];
 
 function idxColor(pct) {   // 台灣慣例紅多：貼近年高=紅、深回檔=綠
@@ -1058,24 +1061,11 @@ async function idxOtc(iy) {
   const price = parseFloat(a.z), todayHigh = parseFloat(a.h);
   return { name: "櫃買 OTC", price, yearHigh: Math.max(iy?.otc?.high || 0, todayHigh || 0, price), time: a.t };
 }
-function mxfSymbol(settlementStr) {
-  const now = new Date();
-  const tw = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
-  let y = tw.getFullYear(), m = tw.getMonth() + 1;
-  if (settlementStr && now > new Date(settlementStr + "T13:30:00+08:00")) { m++; if (m > 12) { m = 1; y++; } }
-  const hm = tw.getHours() * 100 + tw.getMinutes();
-  const night = !(hm >= 845 && hm < 1345);   // 日盤 08:45–13:45 用 -F，否則夜盤 -M
-  return { sym: `MXF${"ABCDEFGHIJKL"[m - 1]}${String(y).slice(-1)}${night ? "-M" : "-F"}`, night };
-}
-async function idxMxf(iy, settlementStr) {
-  const { sym, night } = mxfSymbol(settlementStr);
-  const j = await idxFetch(`/taifex`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ SymbolID: [sym] }) });
-  let d = null;
-  const scan = o => { if (!o || d) return; if (Array.isArray(o)) o.forEach(scan); else if (typeof o === "object") { if (o.CLastPrice != null) d = o; else Object.values(o).forEach(scan); } };
-  scan(j);
-  if (!d) throw new Error("no taifex data");
-  const price = parseFloat(d.CLastPrice), todayHigh = parseFloat(d.CHighPrice);
-  return { name: "台指期 小台" + (night ? "（夜盤）" : ""), price, yearHigh: Math.max(iy?.mxf?.high || 0, todayHigh || 0, price), time: (d.CTime || "").slice(0, 5) };
+// 小台：mis.taifex 即時源被 Cloudflare 擋 → 改讀後端 index_ytd.mxf（MTX 日資料：high 年高＋last 最新收盤＋date）
+function idxMxf(iy) {
+  const m = iy && iy.mxf;
+  if (!m || m.last == null || m.high == null) throw new Error("no mxf backend data");
+  return { name: "台指期 小台", price: m.last, yearHigh: m.high, time: (m.date || "") + " 收", daily: true };
 }
 async function loadIndexYtd() {
   const body = document.getElementById("idx-body"), note = document.getElementById("idx-note");
@@ -1084,21 +1074,23 @@ async function loadIndexYtd() {
     body.innerHTML = `<tr><td colspan="5" class="text-gray-500 py-2 text-center text-xs">尚未設定 Worker 代理（見 worker/index-proxy.js 部署指引）</td></tr>`;
     return;
   }
-  let iy = null, settlement = null;
-  try { const t = await fetch("taifex_data.json?_=" + Date.now()).then(r => r.json()); iy = t.index_ytd; settlement = t.settlement_date; } catch (e) {}
-  const names = [...IDX_YAHOO.map(t => t.name), "櫃買 OTC", "台指期 小台"];
-  const results = await Promise.allSettled([...IDX_YAHOO.map(idxYahoo), idxOtc(iy), idxMxf(iy, settlement)]);
+  let iy = null;
+  try { const t = await fetch("taifex_data.json?_=" + Date.now()).then(r => r.json()); iy = t.index_ytd; } catch (e) {}
+  const tasks = IDX_TARGETS.map(t =>
+    t.t === "y" ? idxYahoo(t) : t.t === "otc" ? idxOtc(iy) : Promise.resolve().then(() => idxMxf(iy)));
+  const results = await Promise.allSettled(tasks);
   body.innerHTML = results.map((r, i) => {
-    if (r.status !== "fulfilled") return `<tr class="border-b border-gray-800"><td class="py-1 text-gray-300">${names[i]}</td><td colspan="4" class="text-right text-gray-600 text-xs">—</td></tr>`;
+    const nm = IDX_TARGETS[i].name;
+    if (r.status !== "fulfilled") return `<tr class="border-b border-gray-800"><td class="py-1 text-gray-300">${nm}</td><td colspan="4" class="text-right text-gray-600 text-xs">—</td></tr>`;
     const d = r.value, pct = d.yearHigh > 0 ? (d.price - d.yearHigh) / d.yearHigh * 100 : null;
     return `<tr class="border-b border-gray-800">
-      <td class="py-1 text-gray-300">${d.name}</td>
+      <td class="py-1 text-gray-300">${nm}${d.daily ? '<span class="text-gray-600 text-[10px]">日</span>' : ''}</td>
       <td class="text-right text-gray-200">${idxNum(d.price)}</td>
       <td class="text-right font-bold ${idxColor(pct)}">${pct == null ? "—" : (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
       <td class="text-right text-gray-600 text-xs">${idxTime(d.time)}</td></tr>`;
   }).join("");
-  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC/小台=後端維護。";
+  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台(標「日」)=後端日更收盤(mis即時源被CORS阻擋)。";
 }
 let idxTimer = null;
 function scheduleIndexRefresh() {
