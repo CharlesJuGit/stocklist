@@ -6,7 +6,7 @@ async function loadStocks() {
   const res = await fetch('stocks.json');
   const data = await res.json();
 
-  window.STOCKS_BY_ID = {};
+  window.STOCKS_BY_ID = window.STOCKS_BY_ID || {};   // 合併不清空（refreshAll 時保留自選股的 mkt 註冊）
   [...(data.long || []), ...(data.short || [])].forEach(s => { STOCKS_BY_ID[s.id] = s; });
   renderList('long-list', data.long, 'red');
   renderList('short-list', data.short, 'green');
@@ -1250,6 +1250,7 @@ function getWatch() {
 function setWatch(a) { localStorage.setItem(WATCH_KEY, JSON.stringify(a.slice(0, WATCH_MAX))); }
 function renderWatchlist() {
   const box = document.getElementById('watch-list'); if (!box) return;
+  window.STOCKS_BY_ID = window.STOCKS_BY_ID || {};   // 初始化時可能早於 loadStocks 的 await，先保證存在
   const a = getWatch();
   a.forEach(s => { if (!STOCKS_BY_ID[s.id]) STOCKS_BY_ID[s.id] = s; });  // 讓彈窗 mkt/後綴 fallback 有值
   if (!a.length) { box.innerHTML = '<div class="text-gray-600 text-sm py-2">尚無自選股，輸入股號按＋新增</div>'; return; }
