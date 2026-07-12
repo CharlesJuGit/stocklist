@@ -1260,12 +1260,17 @@ function renderWatchlist() {
       <button onclick="watchlistRemove('${s.id}')" class="px-3 py-3 text-gray-500 hover:text-red-400" title="移除">✕</button>
     </div>`).join('');
 }
-// 經 Worker 驗證股號存在＋取股名/市場別
+// 經 Worker 驗證股號存在＋取「中文」股名/市場別
+// 用 mis.twse getStockInfo（回中文簡稱 n；Yahoo 的 shortName 台股常是英文）；先試上市 tse 再上櫃 otc
 async function _resolveStock(id) {
-  let mkt = 'twse', res;
-  try { res = (await idxFetch(`/yahoo/${id}.TW?range=5d&interval=1d`)).chart.result[0]; }
-  catch (e) { res = (await idxFetch(`/yahoo/${id}.TWO?range=5d&interval=1d`)).chart.result[0]; mkt = 'tpex'; }
-  return { id, name: res.meta.shortName || res.meta.longName || id, mkt };
+  for (const [ch, mkt] of [['tse', 'twse'], ['otc', 'tpex']]) {
+    try {
+      const j = await idxFetch(`/twse?ex_ch=${ch}_${id}.tw&json=1&delay=0`);
+      const a = j.msgArray && j.msgArray[0];
+      if (a && a.n) return { id, name: a.n, mkt };
+    } catch (e) { /* 試下一個市場 */ }
+  }
+  throw new Error('查無此股號');
 }
 async function watchlistAdd() {
   const inp = document.getElementById('watch-input'); const id = (inp.value || '').trim();
