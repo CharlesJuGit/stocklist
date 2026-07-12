@@ -8,6 +8,20 @@
 
 ---
 
+## 2026-07-12（P2-10：個股彈窗加強——籌碼白話/價格走勢/基本資料/外部連結）
+
+**Request：** 個股彈窗只有 T86 法人表，加四項說明（規格 STOCK_MODAL_SPEC.md，Ball 核准四方向）。🔴 隱私：彈窗只用公開市場資料、無策略字眼、大戶只給最新週水位
+
+**Feat (Opus)：**
+- **①籌碼白話** `chipVerdict(rows)` 純函式：5日T86→一句描述+徽章（同買/同賣/對作/連3日/不明顯，只描述不建議）
+- **②價格走勢**：經現有 CF Worker `/yahoo range=1mo`——現價/漲跌%/20日位階/inline sparkline；mkt→`.TW`/`.TWO`（缺 mkt 自動試另一）；獨立 try 失敗整塊隱藏、不影響法人表
+- **③基本資料**：`enrich_stocks.py`（轉檔器本機跑）補 stocks.json 公開擴欄——FinMind(產業/市場)、TWSE t187ap05_L+TPEx(月營收 千元→億/YoY)、t187ap14_L(季EPS)、TDCC(400張大戶最新週**水位**)；openapi flaky 加重試；覆蓋 mkt94/ind94/rev79/eps57/big400 91（缺者顯示—）
+- **④外部連結**：Yahoo股市/Goodinfo/財報狗（用 mkt 組後綴、`rel=noopener`）
+- **隱私**：stocks.json 欄位僅公開資料、**大戶只 big400 水位（無 pp/變化量/排名）**、彈窗段無 EMA/金叉/角度/票/間距/加速；cache-buster v=20260712g
+- ⚠ **biz(簡介)欄暫缺**：規格假設 t187ap03_L 有「主要經營業務」欄，實測該表與 FinMind **皆無**（spec gap）→ v1 依「缺欄省略」略過，待 Ball/Fable 定案來源
+
+---
+
 ## 2026-07-12（P2-8 NQ 週末缺口＋P2-7 P3① 保底時間欄，Fable 驗收後小殘項）
 
 **Fix (Opus)：**
