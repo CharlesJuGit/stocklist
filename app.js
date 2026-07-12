@@ -1016,6 +1016,9 @@ function unlockAdmin() {
 // ── 全球指數距年高（P2-7）──────────────────────────────────────
 // ⚠ Worker 部署後把網址填進 INDEX_PROXY（見 repo 內 worker/index-proxy.js 的部署指引）
 const INDEX_PROXY = "https://stockweb-proxy.ch41083s.workers.dev";
+// 小台即時專用第二代理（Deno Deploy，mis.taifex 在 CF 後面故不能用上面的 CF Worker）。
+// ⚠ 部署 worker/taifex-proxy-deno.js 後把 *.deno.dev 網址填這裡；留空則小台自動退回後端日更值。
+const TAIFEX_PROXY = ""; // 例："https://xxxx.deno.dev"（結尾不要斜線）
 
 // 顯示順序：櫃買 OTC 緊接台股加權之下（Ball 2026-07-12）
 const IDX_TARGETS = [
@@ -1061,10 +1064,35 @@ async function idxOtc(iy) {
   const price = parseFloat(a.z), todayHigh = parseFloat(a.h);
   return { name: "櫃買 OTC", price, yearHigh: Math.max(iy?.otc?.high || 0, todayHigh || 0, price), time: a.t };
 }
-// 小台：mis.taifex 即時源被 Cloudflare 擋 → 改讀後端 index_ytd.mxf（MTX 日資料：high 年高＋last 最新收盤＋date）
-function idxMxf(iy) {
+// 小台近月符號：MXF+月碼(A=1月…L=12月)+年尾碼+盤別(-F日盤/-M夜盤)；過結算日跳下月
+function mxfSymbol(settlementStr) {
+  const now = new Date();
+  const tw = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  let y = tw.getFullYear(), m = tw.getMonth() + 1;
+  if (settlementStr && now > new Date(settlementStr + "T13:30:00+08:00")) { m++; if (m > 12) { m = 1; y++; } }
+  const hm = tw.getHours() * 100 + tw.getMinutes();
+  const night = !(hm >= 845 && hm < 1345);   // 日盤 08:45–13:45 用 -F，否則夜盤 -M
+  return { sym: `MXF${"ABCDEFGHIJKL"[m - 1]}${String(y).slice(-1)}${night ? "-M" : "-F"}`, night };
+}
+// 小台：先試 Deno 即時代理（mis.taifex 在 CF 後面、主 Worker 打不到）；失敗或未設定則退後端日更值
+async function idxMxf(iy, settlementStr) {
+  if (TAIFEX_PROXY) {
+    try {
+      const { sym, night } = mxfSymbol(settlementStr);
+      const signal = AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined;
+      const j = await fetch(TAIFEX_PROXY + "/taifex", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ SymbolID: [sym] }), signal }).then(r => r.json());
+      let d = null;
+      const scan = o => { if (!o || d) return; if (Array.isArray(o)) o.forEach(scan); else if (typeof o === "object") { if (o.CLastPrice != null) d = o; else Object.values(o).forEach(scan); } };
+      scan(j);
+      if (d && d.CLastPrice != null && parseFloat(d.CLastPrice) > 0) {
+        const price = parseFloat(d.CLastPrice), todayHigh = parseFloat(d.CHighPrice);
+        return { name: "台指期 小台" + (night ? "（夜盤）" : ""), price, yearHigh: Math.max(iy?.mxf?.high || 0, todayHigh || 0, price), time: (d.CTime || "").slice(0, 5) };
+      }
+    } catch (e) { /* 退 fallback */ }
+  }
+  // fallback：後端 index_ytd.mxf 日更值（MTX 最新收盤）
   const m = iy && iy.mxf;
-  if (!m || m.last == null || m.high == null) throw new Error("no mxf backend data");
+  if (!m || m.last == null || m.high == null) throw new Error("no mxf");
   return { name: "台指期 小台", price: m.last, yearHigh: m.high, time: (m.date || "") + " 收", daily: true };
 }
 async function loadIndexYtd() {
@@ -1074,10 +1102,10 @@ async function loadIndexYtd() {
     body.innerHTML = `<tr><td colspan="5" class="text-gray-500 py-2 text-center text-xs">尚未設定 Worker 代理（見 worker/index-proxy.js 部署指引）</td></tr>`;
     return;
   }
-  let iy = null;
-  try { const t = await fetch("taifex_data.json?_=" + Date.now()).then(r => r.json()); iy = t.index_ytd; } catch (e) {}
+  let iy = null, settlement = null;
+  try { const t = await fetch("taifex_data.json?_=" + Date.now()).then(r => r.json()); iy = t.index_ytd; settlement = t.settlement_date; } catch (e) {}
   const tasks = IDX_TARGETS.map(t =>
-    t.t === "y" ? idxYahoo(t) : t.t === "otc" ? idxOtc(iy) : Promise.resolve().then(() => idxMxf(iy)));
+    t.t === "y" ? idxYahoo(t) : t.t === "otc" ? idxOtc(iy) : idxMxf(iy, settlement));
   const results = await Promise.allSettled(tasks);
   body.innerHTML = results.map((r, i) => {
     const nm = IDX_TARGETS[i].name;
@@ -1090,7 +1118,7 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
       <td class="text-right text-gray-600 text-xs">${idxTime(d.time)}</td></tr>`;
   }).join("");
-  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台(標「日」)=後端日更收盤(mis即時源被CORS阻擋)。";
+  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走Deno代理即時，未設/失敗時退後端日更收盤(標「日」)。";
 }
 let idxTimer = null;
 function scheduleIndexRefresh() {
