@@ -20,9 +20,9 @@ function renderList(containerId, stocks, color) {
   const container = document.getElementById(containerId);
   container.innerHTML = stocks.map(s => `
     <button onclick="openModal('${s.id}', '${s.name}')"
-      class="w-full text-left bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition">
-      <span class="font-bold text-${color}-400">${s.id}</span>
-      <span class="ml-2 text-${color}-400">${s.name}</span>
+      class="w-full text-left bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition flex items-center justify-between gap-2">
+      <span><span class="font-bold text-${color}-400">${s.id}</span><span class="ml-2 text-${color}-400">${s.name}</span></span>
+      <span data-chg="${s.id}" class="text-xs text-gray-500 whitespace-nowrap">${_chgCell(s.id)}</span>
     </button>
   `).join('');
 }
@@ -88,6 +88,32 @@ function _sparkline(closes, w = 460, h = 40) {
   const up = v[v.length - 1] >= v[0];
   return `<svg viewBox="0 0 ${w} ${h}" height="${h}" class="w-full mt-1" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? '#f87171' : '#4ade80'}" stroke-width="1.5"/></svg>`;
 }
+// ── P2-14/P2-15 漲跌幅共用計算（彈窗與清單只寫一份，避免定義分岔）──────────
+// 台灣日期字串 YYYY-MM-DD（epoch 秒）
+function _twDate(sec) { return new Date(sec * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }); }
+// 輸入 Yahoo chart result[0]，輸出 {price, chgDay, chgWeek}（算不出的欄為 null）
+function calcChanges(res) {
+  const price = res && res.meta ? res.meta.regularMarketPrice : null;
+  const closeArr = (res && res.indicators && res.indicators.quote[0].close) || [];
+  const tsArr = (res && res.timestamp) || [];
+  const pts = [];   // timestamp 與 close 成對過濾（同索引），否則日期對位錯亂；順帶濾零價
+  for (let i = 0; i < closeArr.length; i++) {
+    if (closeArr[i] != null && closeArr[i] > 0 && tsArr[i] != null) pts.push({ t: tsArr[i], c: closeArr[i] });
+  }
+  if (price == null || pts.length < 2) return { price, chgDay: null, chgWeek: null };
+  // 本日：前一日收盤＝倒數第二筆有效 close（禁用 meta.chartPreviousClose＝範圍起點前收盤，非昨收）
+  const prevClose = pts[pts.length - 2].c;
+  const chgDay = prevClose ? (price - prevClose) / prevClose * 100 : null;
+  // 本週：基準＝台灣本週一 00:00 之前最後一筆有效收盤（＝上週五收盤，自動涵蓋週五假日/連假）
+  const nowTw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+  const mon = new Date(nowTw); mon.setDate(nowTw.getDate() - ((nowTw.getDay() + 6) % 7));
+  const monStr = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+  let weekBase = null;
+  for (const p of pts) { if (_twDate(p.t) < monStr) weekBase = p.c; }
+  const chgWeek = weekBase ? (price - weekBase) / weekBase * 100 : null;
+  return { price, chgDay, chgWeek };
+}
+
 async function loadModalPrice(id) {
   const box = document.getElementById('modal-price');
   if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
@@ -98,19 +124,57 @@ async function loadModalPrice(id) {
     let res;
     try { res = await tryFetch(suf); }
     catch (e) { res = await tryFetch(suf === '.TW' ? '.TWO' : '.TW'); }  // mkt 缺失 fallback
-    const price = res.meta.regularMarketPrice, prev = res.meta.chartPreviousClose;
-    const closes = (res.indicators.quote[0].close || []).filter(x => x != null);
+    const { price, chgDay, chgWeek } = calcChanges(res);
+    priceCache[id] = { price, chgDay, chgWeek };   // 彈窗抓到順便餵清單快取（同股不重打）
+    const closes = (res.indicators.quote[0].close || []).filter(x => x != null && x > 0);
     if (price == null || !closes.length) return;
-    const chg = prev ? (price - prev) / prev * 100 : null;
     const l20 = closes.slice(-20), hi = Math.max(...l20), lo = Math.min(...l20);
     const pos = hi > lo ? (price - lo) / (hi - lo) * 100 : null;
-    const cc = (chg >= 0) ? 'text-red-400' : 'text-green-400';
+    const dc = chgDay == null ? '' : `<span class="${chgDay >= 0 ? 'text-red-400' : 'text-green-400'} text-sm ml-1">${chgDay >= 0 ? '+' : ''}${chgDay.toFixed(2)}%</span>`;
+    const wc = chgWeek == null ? '' : `<span class="${chgWeek >= 0 ? 'text-red-400' : 'text-green-400'} text-xs ml-2">本週 ${chgWeek >= 0 ? '+' : ''}${chgWeek.toFixed(2)}%</span>`;
     box.innerHTML = `<div class="flex items-center justify-between">
-        <div><span class="text-lg font-bold">${idxNum(price)}</span>${chg == null ? '' : `<span class="${cc} text-sm ml-1">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`}</div>
+        <div><span class="text-lg font-bold">${idxNum(price)}</span>${dc}${wc}</div>
         <div class="text-xs text-gray-400">位階 ${pos == null ? '—' : pos.toFixed(0) + '%'}（20日高 ${idxNum(hi)}／低 ${idxNum(lo)}）</div>
       </div>${_sparkline(closes)}`;
     box.classList.remove('hidden');
   } catch (e) { /* 整塊隱藏 */ }
+}
+
+// ── P2-14 §3 清單漸進式漲跌幅（多頭/空頭/自選三表通用，批次節流）───────────
+const priceCache = {};   // id → {price, chgDay, chgWeek}，session 內共用、同股只抓一次
+const LIST_PRICE_BATCH = 6, LIST_PRICE_GAP_MS = 300;   // 每批 6 支、批次間隔 300ms（可調）
+function _chgHtml(c) {
+  if (!c) return '<span class="text-gray-600">—</span>';
+  const seg = (label, v) => v == null ? '' :
+    `<span class="${v > 0 ? 'text-red-400' : v < 0 ? 'text-green-400' : 'text-gray-400'}">${label} ${v >= 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+  const parts = [seg('本日', c.chgDay), seg('本週', c.chgWeek)].filter(Boolean);
+  return parts.length ? parts.join('　') : '<span class="text-gray-600">—</span>';
+}
+function _chgCell(id) { return priceCache[id] ? _chgHtml(priceCache[id]) : '···'; }   // 初次/重繪：有快取先填，否則佔位
+async function _fetchChanges(id, mkt) {
+  if (priceCache[id]) return priceCache[id];
+  const suf = mkt === 'tpex' ? '.TWO' : '.TW';
+  const tryFetch = async s => (await idxFetch(`/yahoo/${id}${s}?range=1mo&interval=1d`)).chart.result[0];
+  let res;
+  try { res = await tryFetch(suf); }
+  catch (e) { res = await tryFetch(suf === '.TW' ? '.TWO' : '.TW'); }
+  return (priceCache[id] = calcChanges(res));
+}
+function _updateChgCells(id, html) {
+  document.querySelectorAll(`[data-chg="${id}"]`).forEach(el => { el.innerHTML = html; });
+}
+// 掃三份清單可見的 data-chg 股號（去重），分批補上漲跌幅；快取命中不重打、首屏不受影響
+async function loadListChanges() {
+  if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
+  const ids = [...new Set([...document.querySelectorAll('[data-chg]')].map(el => el.getAttribute('data-chg')))];
+  for (let i = 0; i < ids.length; i += LIST_PRICE_BATCH) {
+    const batch = ids.slice(i, i + LIST_PRICE_BATCH);
+    await Promise.all(batch.map(async id => {
+      try { _updateChgCells(id, _chgHtml(await _fetchChanges(id, (STOCKS_BY_ID[id] || {}).mkt))); }
+      catch (e) { _updateChgCells(id, _chgHtml(null)); }   // 失敗顯示 —，不擋該列點擊
+    }));
+    if (i + LIST_PRICE_BATCH < ids.length) await new Promise(r => setTimeout(r, LIST_PRICE_GAP_MS));
+  }
 }
 
 // ③ 基本資料（讀 stocks.json 擴欄；缺欄顯示—；大戶只給水位）
@@ -1307,8 +1371,9 @@ function renderWatchlist() {
   if (!a.length) { box.innerHTML = '<div class="text-gray-600 text-sm py-2">尚無自選股，輸入股號按＋新增</div>'; return; }
   box.innerHTML = a.map(s => `
     <div class="flex items-center bg-gray-800 hover:bg-gray-700 rounded-lg transition">
-      <button onclick="openModal('${s.id}','${s.name}')" class="flex-1 text-left px-4 py-3">
-        <span class="font-bold text-gray-300">${s.id}</span><span class="ml-2 text-gray-300">${s.name}</span></button>
+      <button onclick="openModal('${s.id}','${s.name}')" class="flex-1 text-left px-4 py-3 flex items-center justify-between gap-2">
+        <span><span class="font-bold text-gray-300">${s.id}</span><span class="ml-2 text-gray-300">${s.name}</span></span>
+        <span data-chg="${s.id}" class="text-xs text-gray-500 whitespace-nowrap">${_chgCell(s.id)}</span></button>
       <button onclick="watchlistRemove('${s.id}')" class="px-3 py-3 text-gray-500 hover:text-red-400" title="移除">✕</button>
     </div>`).join('');
 }
@@ -1332,7 +1397,7 @@ async function watchlistAdd() {
   if (a.some(x => x.id === id)) { alert('已在自選清單'); return; }
   if (a.length >= WATCH_MAX) { alert(`自選股已達 ${WATCH_MAX} 支上限，請先移除`); return; }
   if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) { alert('代理未設定，暫無法驗證股號'); return; }
-  try { a.push(await _resolveStock(id)); setWatch(a); renderWatchlist(); inp.value = ''; }
+  try { a.push(await _resolveStock(id)); setWatch(a); renderWatchlist(); loadListChanges(); inp.value = ''; }
   catch (e) { alert('查無此股號'); }
 }
 function watchlistRemove(id) { setWatch(getWatch().filter(x => x.id !== id)); renderWatchlist(); }
@@ -1353,7 +1418,7 @@ async function watchlistImport() {
     if (a.some(x => x.id === id)) continue;
     try { a.push(await _resolveStock(id)); setWatch(a); added++; } catch (e) { /* 略過查無 */ }
   }
-  renderWatchlist(); alert(`匯入完成，新增 ${added} 支`);
+  renderWatchlist(); loadListChanges(); alert(`匯入完成，新增 ${added} 支`);
 }
 function showWatchNotice() {
   localStorage.setItem(WATCH_NOTICE, '1');
@@ -1388,7 +1453,7 @@ function initStockPages() {
   });
 }
 
-loadStocks();
+loadStocks().then(loadListChanges);   // 清單渲染後再漸進補漲跌幅（自選列同批掃入）
 loadMarketInfo();
 loadIndexYtd();
 renderWatchlist();
