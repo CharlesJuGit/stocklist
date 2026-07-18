@@ -550,24 +550,58 @@ function openRetailModal() {
   });
 }
 
-const STRATEGY_COLOR = { '雙買': 'text-yellow-300', '雙賣': 'text-purple-400', '看多': 'text-red-400', '看空': 'text-green-400', '中性': 'text-gray-400' };
+const STRATEGY_COLOR = { '雙買': 'text-yellow-300', '雙賣': 'text-purple-400', '看多': 'text-red-400', '看空': 'text-green-400', '偏多': 'text-red-300', '偏空': 'text-green-300', '中性': 'text-gray-400' };
+
+// 外資選擇權策略分類（改動須同步後端 fetch_taifex.py classify_opt_strategy）：
+// 方向成立需同時 |淨部位| ≥ 1000 口 且 ≥ 該邊總 OI 的 10%（相對門檻，OI 大時 1000 口只是雜訊）；
+// 單邊明確、另一邊中性 → 偏多/偏空（買Call或賣Put=偏多；賣Call或買Put=偏空），不再併入中性
+function optBias(net, total) {
+  const thr = Math.max(1000, total * 0.10);
+  return net >= thr ? 'long' : net <= -thr ? 'short' : 'neutral';
+}
+function classifyStrategy(bc, sc, bp, sp) {
+  const c = optBias(bc - sc, bc + sc);
+  const p = optBias(bp - sp, bp + sp);
+  if (c === 'long'  && p === 'long')  return { label: '雙買', full: '雙買（Long Strangle）',  desc: '預期大波動，方向未定',        color: 'text-yellow-400' };
+  if (c === 'short' && p === 'short') return { label: '雙賣', full: '雙賣（Short Strangle）', desc: '預期盤整、小波動',            color: 'text-blue-400' };
+  if (c === 'long'  && p === 'short') return { label: '看多', full: '看多（Bullish）',        desc: '買 Call 賣 Put，偏多',        color: 'text-red-400' };
+  if (c === 'short' && p === 'long')  return { label: '看空', full: '看空/避險（Bearish）',   desc: '賣 Call 買 Put，偏空或避險',  color: 'text-green-400' };
+  if (c === 'long'  || p === 'short') return { label: '偏多', full: '偏多（單邊）',           desc: c === 'long' ? '單邊買 Call，溫和偏多' : '單邊賣 Put，溫和偏多', color: 'text-red-300' };
+  if (c === 'short' || p === 'long')  return { label: '偏空', full: '偏空（單邊）',           desc: c === 'short' ? '單邊賣 Call，溫和偏空' : '單邊買 Put，溫和偏空', color: 'text-green-300' };
+  return { label: '中性', full: '中性／觀望', desc: '淨部位接近中立', color: 'text-gray-400' };
+}
 
 function openStrategyModal() {
   loadTaifexJson().then(data => {
     const hist = data?.settlement_history;
     if (!hist?.length) return;
+    const fmt = v => (v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toLocaleString());
+    const netColor = v => (v == null ? 'text-gray-400' : v > 0 ? 'text-red-400' : v < 0 ? 'text-green-400' : 'text-gray-400');
     const rows = [...hist].reverse().slice(0, 20).map(r => {
-      const s = r.opt_strategy ?? '--';
-      const color = STRATEGY_COLOR[s] || 'text-gray-400';
-      return `<div class="flex justify-between py-1 border-b border-gray-700">
-        <span class="text-gray-400">${r.date}</span>
-        <span class="font-bold ${color}">${s}</span>
-      </div>`;
+      // 有原始 bc/sc/bp/sp 就即時用新邏輯回算（歷史存的 opt_strategy 是舊門檻），沒有才用存值
+      const hasRaw = r.bc != null && r.sc != null && r.bp != null && r.sp != null;
+      const st = hasRaw ? classifyStrategy(r.bc, r.sc, r.bp, r.sp) : null;
+      const label = st ? st.label : (r.opt_strategy ?? '--');
+      const color = st ? st.color : (STRATEGY_COLOR[label] || 'text-gray-400');
+      const callNet = hasRaw ? r.bc - r.sc : null;
+      const putNet  = hasRaw ? r.bp - r.sp : null;
+      return `<tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-400">${r.date}</td>
+        <td class="text-right py-1 ${netColor(callNet)}">${fmt(callNet)}</td>
+        <td class="text-right py-1 ${netColor(putNet)}">${fmt(putNet)}</td>
+        <td class="text-right py-1 font-bold ${color}">${label}</td>
+      </tr>`;
     }).join('');
-    document.getElementById('strategy-modal-body').innerHTML =
-      `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
-        <span>日期</span><span>外資策略</span>
-      </div>` + rows;
+    document.getElementById('strategy-modal-body').innerHTML = `
+      <table class="w-full text-xs">
+        <thead><tr class="text-gray-500 border-b border-gray-600">
+          <th class="text-left py-1 font-normal">日期</th>
+          <th class="text-right font-normal">Call淨</th>
+          <th class="text-right font-normal">Put淨</th>
+          <th class="text-right font-normal">策略</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
     document.getElementById('strategy-modal').classList.remove('hidden');
   });
 }
@@ -907,37 +941,25 @@ async function loadOptions() {
     setNet('opt-call-net', callNet);
     setNet('opt-put-net',  putNet);
 
-    // 策略判斷
-    const THRESHOLD = 1000; // 淨部位絕對值低於此視為中性
-    const callBias = callNet > THRESHOLD ? 'long' : callNet < -THRESHOLD ? 'short' : 'neutral';
-    const putBias  = putNet  > THRESHOLD ? 'long' : putNet  < -THRESHOLD ? 'short' : 'neutral';
-
-    let strategy, strategyDesc, strategyColor;
-    if (callBias === 'long' && putBias === 'long') {
-      strategy = '雙買（Long Strangle）';
-      strategyDesc = '預期大波動，方向未定';
-      strategyColor = 'text-yellow-400';
-    } else if (callBias === 'short' && putBias === 'short') {
-      strategy = '雙賣（Short Strangle）';
-      strategyDesc = '預期盤整、小波動';
-      strategyColor = 'text-blue-400';
-    } else if (callBias === 'long' && putBias === 'short') {
-      strategy = '看多（Bullish）';
-      strategyDesc = '買 Call 賣 Put，偏多';
-      strategyColor = 'text-red-400';
-    } else if (callBias === 'short' && putBias === 'long') {
-      strategy = '看空/避險（Bearish）';
-      strategyDesc = '賣 Call 買 Put，偏空或避險';
-      strategyColor = 'text-green-400';
-    } else {
-      strategy = '中性／觀望';
-      strategyDesc = '淨部位接近中立';
-      strategyColor = 'text-gray-400';
-    }
-
+    // 策略判斷（相對門檻＋單邊分類，與後端/彈窗共用 classifyStrategy）
+    const st = classifyStrategy(bc, sc, bp, sp);
     const el = document.getElementById('opt-strategy');
-    el.textContent = `${strategy}　${strategyDesc}`;
-    el.className = `text-sm font-bold ${strategyColor}`;
+    el.textContent = `${st.full}　${st.desc}`;
+    el.className = `text-sm font-bold ${st.color}`;
+
+    // 日增減 Δ：與前一交易日留倉比較（settlement_history 每日已含 bc/sc/bp/sp）
+    const todayIso = rawDate.length === 8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : '';
+    const prior = [...(data.settlement_history || [])].reverse()
+      .find(r => r.date < todayIso && r.bc != null && r.sc != null && r.bp != null && r.sp != null);
+    const setDelta = (id, v) => {
+      const dEl = document.getElementById(id);
+      if (!dEl) return;
+      if (v == null) { dEl.textContent = ''; return; }
+      dEl.textContent = `Δ ${v >= 0 ? '+' : ''}${v.toLocaleString()}`;
+      dEl.className = 'text-xs ' + (v > 0 ? 'text-red-300' : v < 0 ? 'text-green-300' : 'text-gray-500');
+    };
+    setDelta('opt-call-delta', prior ? callNet - (prior.bc - prior.sc) : null);
+    setDelta('opt-put-delta',  prior ? putNet  - (prior.bp - prior.sp) : null);
 
     // P/C Ratio（以數值比較，避免字串/數字混用）
     const callTotal = bc + sc;
@@ -964,7 +986,79 @@ async function loadOptions() {
   }
 }
 
-// 籌碼綜合評估
+// 籌碼綜合評分：單日資料 → {score, signals, futNet}
+// entry 欄位：foreign/trust(億元，可缺)、txF/mtxF(口)、bc/sc/bp/sp(口)、ratio/tdays
+// 主畫面（當日即時）與近20天彈窗（settlement_history 逐日）共用，避免兩套邏輯漂移
+function scoreEntry(e) {
+  const signals = [];
+  let score = 0; // 正=多 負=空
+
+  // 1. 外資現貨買賣超（高權重）
+  const foreign = e.foreign ?? null;
+  if (foreign !== null) {
+    const s = foreign >= 30 ? 2 : foreign >= 5 ? 1 : foreign <= -30 ? -2 : foreign <= -5 ? -1 : 0;
+    score += s * 2;
+    const label = foreign >= 0 ? `+${foreign}億` : `${foreign}億`;
+    signals.push(`外資現貨 ${label} → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+  }
+
+  // 2. 外資期貨淨部位（高權重）
+  const futNet = (e.txF ?? 0) + (e.mtxF ?? 0) / 4;
+  {
+    const s = futNet >= 2000 ? 2 : futNet >= 500 ? 1 : futNet <= -2000 ? -2 : futNet <= -500 ? -1 : 0;
+    score += s * 2;
+    signals.push(`外資期貨 ${Math.round(futNet) >= 0 ? '+' : ''}${Math.round(futNet).toLocaleString()}口 → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+  }
+
+  // 3. 結算比（高權重，正值代表空方壓力大）
+  if (e.ratio != null) {
+    const ratio = e.ratio ?? 0;
+    const tdays = e.tdays ?? 20;
+    const s = ratio >= 5000 ? -2 : ratio >= 2000 ? -1 : ratio <= 500 ? 1 : 0;
+    score += s * 2;
+    signals.push(`結算比 ${ratio.toLocaleString()}（${tdays}日）→ ${s < 0 ? '空壓大' : s > 0 ? '壓力低' : '中性'}`);
+  }
+
+  // 4. P/C Ratio（中權重）
+  const bc = e.bc ?? 0, sc = e.sc ?? 0, bp = e.bp ?? 0, sp = e.sp ?? 0;
+  if (bc + sc > 0) {
+    const pcr = (bp + sp) / (bc + sc);
+    // 門檻與顯示用（loadOptions）一致：>1.2 偏空、<0.8 偏多，避免「顯示偏空恐慌卻不計分」
+    const s = pcr > 1.2 ? -1 : pcr < 0.8 ? 1 : 0;
+    score += s;
+    signals.push(`P/C Ratio ${pcr.toFixed(2)} → ${s < 0 ? '偏空恐慌' : s > 0 ? '偏多追漲' : '中性'}`);
+  }
+
+  // 5. 外資選擇權方向（中權重）：與策略分類同一套判斷（看多/偏多=+1、看空/偏空=−1）
+  if (bc + sc + bp + sp > 0) {
+    const st = classifyStrategy(bc, sc, bp, sp);
+    const s = (st.label === '看多' || st.label === '偏多') ? 1
+            : (st.label === '看空' || st.label === '偏空') ? -1 : 0;
+    score += s;
+    const callNet = bc - sc, putNet = bp - sp;
+    signals.push(`選擇權 ${st.label} Call${callNet >= 0 ? '+' : ''}${callNet.toLocaleString()} Put${putNet >= 0 ? '+' : ''}${putNet.toLocaleString()}`);
+  }
+
+  // 6. 投信買賣超（低權重）
+  const trust = e.trust ?? null;
+  if (trust !== null) {
+    const s = trust >= 5 ? 1 : trust <= -5 ? -1 : 0;
+    score += s;
+    signals.push(`投信 ${trust >= 0 ? '+' : ''}${trust}億 → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+  }
+
+  return { score, signals, futNet };
+}
+
+function rateScore(score) {
+  if (score >= 5)  return { label: '▲ 強烈偏多',  color: 'text-red-400' };
+  if (score >= 2)  return { label: '▲ 偏多',       color: 'text-red-300' };
+  if (score <= -5) return { label: '▼ 強烈偏空',  color: 'text-green-400' };
+  if (score <= -2) return { label: '▼ 偏空',       color: 'text-green-300' };
+  return { label: '◆ 中性／分歧', color: 'text-yellow-400' };
+}
+
+// 籌碼綜合評估（主畫面：當日即時資料）
 async function loadSignalSummary() {
   try {
     const data = await loadTaifexJson();
@@ -974,79 +1068,18 @@ async function loadSignalSummary() {
     const hist = data.settlement_history || [];
     const latest = hist.length ? hist[hist.length - 1] : null;
 
-    const signals = [];
-    let score = 0; // 正=多 負=空
-
-    // 1. 外資現貨買賣超（高權重）
-    const foreign = inst.foreign ?? null;
-    if (foreign !== null) {
-      const s = foreign >= 30 ? 2 : foreign >= 5 ? 1 : foreign <= -30 ? -2 : foreign <= -5 ? -1 : 0;
-      score += s * 2;
-      const label = foreign >= 0 ? `+${foreign}億` : `${foreign}億`;
-      signals.push(`外資現貨 ${label} → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
-    }
-
-    // 2. 外資期貨淨部位（高權重）
-    const txF  = f.txF  ?? 0;
-    const mtxF = f.mtxF ?? 0;
-    const futNet = txF + mtxF / 4;
-    {
-      const s = futNet >= 2000 ? 2 : futNet >= 500 ? 1 : futNet <= -2000 ? -2 : futNet <= -500 ? -1 : 0;
-      score += s * 2;
-      signals.push(`外資期貨 ${Math.round(futNet) >= 0 ? '+' : ''}${Math.round(futNet).toLocaleString()}口 → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
-    }
-
-    // 3. 結算比（高權重，正值代表空方壓力大）
-    if (latest) {
-      const ratio = latest.ratio ?? 0;
-      const tdays = latest.tdays ?? 20;
-      const s = ratio >= 5000 ? -2 : ratio >= 2000 ? -1 : ratio <= 500 ? 1 : 0;
-      score += s * 2;
-      signals.push(`結算比 ${ratio.toLocaleString()}（${tdays}日）→ ${s < 0 ? '空壓大' : s > 0 ? '壓力低' : '中性'}`);
-    }
-
-    // 4. P/C Ratio（中權重）
-    const bc = o.bc ?? 0, sc = o.sc ?? 0, bp = o.bp ?? 0, sp = o.sp ?? 0;
-    if (bc + sc > 0) {
-      const pcr = (bp + sp) / (bc + sc);
-      // 門檻與顯示用（loadOptions）一致：>1.2 偏空、<0.8 偏多，避免「顯示偏空恐慌卻不計分」
-      const s = pcr > 1.2 ? -1 : pcr < 0.8 ? 1 : 0;
-      score += s;
-      signals.push(`P/C Ratio ${pcr.toFixed(2)} → ${s < 0 ? '偏空恐慌' : s > 0 ? '偏多追漲' : '中性'}`);
-    }
-
-    // 5. 外資選擇權方向（中權重）
-    const callNet = bc - sc, putNet = bp - sp;
-    if (Math.abs(callNet) > 1000 || Math.abs(putNet) > 1000) {
-      const callBull = callNet > 1000, putBull = putNet > 1000;
-      const s = (callBull && !putBull) ? 1 : (!callBull && putBull) ? -1 : 0;
-      score += s;
-      signals.push(`選擇權方向 Call${callNet >= 0 ? '+' : ''}${callNet.toLocaleString()} Put${putNet >= 0 ? '+' : ''}${putNet.toLocaleString()} → ${s > 0 ? '看多' : s < 0 ? '看空' : '雙買/雙賣'}`);
-    }
-
-    // 6. 投信買賣超（低權重）
-    const trust = inst.trust ?? null;
-    if (trust !== null) {
-      const s = trust >= 5 ? 1 : trust <= -5 ? -1 : 0;
-      score += s;
-      signals.push(`投信 ${trust >= 0 ? '+' : ''}${trust}億 → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
-    }
-
-    // 綜合判斷
-    let summary, summaryColor;
-    if (score >= 5) {
-      summary = '▲ 強烈偏多';  summaryColor = 'text-red-400';
-    } else if (score >= 2) {
-      summary = '▲ 偏多';       summaryColor = 'text-red-300';
-    } else if (score <= -5) {
-      summary = '▼ 強烈偏空';  summaryColor = 'text-green-400';
-    } else if (score <= -2) {
-      summary = '▼ 偏空';       summaryColor = 'text-green-300';
-    } else {
-      summary = '◆ 中性／分歧'; summaryColor = 'text-yellow-400';
-    }
+    const { score, signals, futNet } = scoreEntry({
+      foreign: inst.foreign ?? null,
+      trust:   inst.trust ?? null,
+      txF: f.txF, mtxF: f.mtxF,
+      bc: o.bc, sc: o.sc, bp: o.bp, sp: o.sp,
+      ratio: latest ? (latest.ratio ?? 0) : null,
+      tdays: latest ? latest.tdays : null,
+    });
+    const { label: summary, color: summaryColor } = rateScore(score);
 
     // 一致性警示
+    const foreign = inst.foreign ?? null;
     const consistency = (futNet < -500 && foreign !== null && foreign > 30)
       ? '⚠ 現貨多/期貨空：訊號分歧，注意避險'
       : (futNet > 500 && foreign !== null && foreign < -30)
@@ -1061,6 +1094,31 @@ async function loadSignalSummary() {
   } catch (e) {
     console.error('loadSignalSummary:', e);
   }
+}
+
+// 籌碼綜合評估 近20天（settlement_history 逐日回算；缺外資現貨/投信的日子標 *）
+function openSignalModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.settlement_history;
+    if (!hist?.length) return;
+    let hasPartial = false;
+    const rows = [...hist].reverse().slice(0, 20).map(r => {
+      const { score } = scoreEntry(r);
+      const partial = r.foreign == null;
+      if (partial) hasPartial = true;
+      const { label, color } = rateScore(score);
+      return `<div class="flex justify-between py-1 border-b border-gray-700">
+        <span class="text-gray-400">${r.date}${partial ? '<span class="text-yellow-500">*</span>' : ''}</span>
+        <span class="font-bold ${color}">${score > 0 ? '+' : ''}${score}分　${label}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('signal-modal-body').innerHTML =
+      `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
+        <span>日期</span><span>分數／評語</span>
+      </div>` + rows +
+      (hasPartial ? '<div class="text-xs text-gray-500 mt-2">* 該日缺外資現貨/投信資料，分數未含這兩項</div>' : '');
+    document.getElementById('signal-modal').classList.remove('hidden');
+  });
 }
 
 async function loadEarnings() {

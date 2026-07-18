@@ -75,8 +75,8 @@
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">SP（賣Put）</div><div id="opt-sp">--</div></div>
       </div>
       <div class="grid grid-cols-2 gap-2 text-center text-sm mt-2">
-        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Call 淨部位（BC－SC）</div><div id="opt-call-net">--</div></div>
-        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Put 淨部位（BP－SP）</div><div id="opt-put-net">--</div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Call 淨部位（BC－SC）</div><div id="opt-call-net">--</div><div id="opt-call-delta" class="text-xs"></div></div>
+        <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">Put 淨部位（BP－SP）</div><div id="opt-put-net">--</div><div id="opt-put-delta" class="text-xs"></div></div>
       </div>
       <div class="bg-gray-800 rounded p-2 mt-2 flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -135,7 +135,10 @@
 
       <!-- 綜合評估 -->
       <div class="bg-gray-800 rounded p-3 mt-3">
-        <div class="text-xs text-gray-500 mb-2">籌碼綜合評估</div>
+        <div class="flex justify-between items-center mb-2">
+          <div class="text-xs text-gray-500">籌碼綜合評估</div>
+          <button onclick="openSignalModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+        </div>
         <div id="signal-summary" class="text-sm font-bold text-gray-400 mb-1">--</div>
         <div id="signal-detail" class="text-xs text-gray-500 space-y-0.5"></div>
       </div>
@@ -335,6 +338,18 @@
     </div>
   </div>
 
+  <!-- 籌碼綜合評估 近20天 -->
+  <div id="signal-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">籌碼綜合評估 近20天</h2>
+        <button onclick="document.getElementById('signal-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="signal-modal-body" class="text-sm space-y-1 max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- 選擇權 BC/SC/BP/SP 近20天 -->
   <div id="option-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
@@ -524,7 +539,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260718a"></script>
+  <script src="app.js?v=20260718b"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

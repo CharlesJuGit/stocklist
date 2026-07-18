@@ -235,6 +235,95 @@ def parse_options(text):
     return {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
 
 
+# ── 外資選擇權策略分類（改動須同步前端 app.js classifyStrategy）──
+
+def classify_opt_strategy(bc, sc, bp, sp):
+    """方向成立需同時：|淨部位| ≥ 1000 口 且 ≥ 該邊總 OI 的 10%（2026-07-18 改相對門檻，
+    取代固定 1000 口——OI 大時 1000 口是雜訊、OI 小時明確方向會被漏判）。
+    單邊明確、另一邊中性 → 偏多/偏空（買Call或賣Put=偏多；賣Call或買Put=偏空），不再併入中性。"""
+    def bias(net, total):
+        thr = max(1000, total * 0.10)
+        return "long" if net >= thr else ("short" if net <= -thr else "neutral")
+    c = bias(bc - sc, bc + sc)
+    p = bias(bp - sp, bp + sp)
+    if c == "long" and p == "long":   return "雙買"
+    if c == "short" and p == "short": return "雙賣"
+    if c == "long" and p == "short":  return "看多"
+    if c == "short" and p == "long":  return "看空"
+    if c == "long" or p == "short":   return "偏多"
+    if c == "short" or p == "long":   return "偏空"
+    return "中性"
+
+
+# ── 三大法人買賣超單日（TWSE BFI82U）───────────────────────────
+
+def fetch_bfi82u_day(dt_str, retries=3):
+    """抓單日三大法人買賣超（億元）。dt_str=YYYYMMDD。
+    標準口徑：自營=自行買賣+避險、外資=外資及陸資+外資自營商（對齊 TWSE 合計）。
+    非交易日/尚無資料回 None。"""
+    import ssl as _ssl, time as _time
+    ctx = _ssl._create_unverified_context()   # 與 market_volume 一致，避免部分環境 TWSE 憑證問題
+    url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
+           f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
+    j = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
+                j = json.loads(r.read())
+            break
+        except Exception as e:
+            print(f"BFI82U {dt_str} 第{attempt+1}次失敗: {e}")
+            _time.sleep(3)
+    if j is None:
+        return None
+    rows = j.get("data", [])
+    if not rows:
+        return None   # 非交易日/尚無資料（非錯誤）
+
+    # 依列首精準取值（startswith 避免「外資及陸資(不含外資自營商)」被子字串誤配）
+    def comp(prefix):
+        for row in rows:
+            if row[0].strip().startswith(prefix):
+                try:
+                    return float(row[3].replace(",", "")) / 1e8
+                except (ValueError, IndexError):
+                    return None
+        return None
+
+    def total_of(*prefixes):
+        vals = [comp(p) for p in prefixes]
+        if all(v is None for v in vals):
+            return None
+        return round(sum(v or 0 for v in vals), 1)
+
+    dealer  = total_of("自營商(自行買賣)", "自營商(避險)")
+    trust   = total_of("投信")
+    foreign = total_of("外資及陸資", "外資自營商")
+    if foreign is None and trust is None:
+        return None
+    total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
+    return {"date": dt_str, "foreign": foreign, "trust": trust,
+            "dealer": dealer, "total": total}
+
+
+def backfill_inst_history(history, max_days=20):
+    """settlement_history 近 max_days 筆補上外資現貨/投信（億元），供近20天綜合評分回算。
+    已有 foreign 欄位者跳過 → 首次執行一次性補齊，之後每日近乎 no-op。"""
+    import time as _time
+    filled = 0
+    for rec in history[-max_days:]:
+        if rec.get("foreign") is not None:
+            continue
+        inst = fetch_bfi82u_day(rec["date"].replace("-", ""), retries=2)
+        if inst:
+            rec["foreign"] = inst["foreign"]
+            rec["trust"]   = inst["trust"]
+            filled += 1
+        _time.sleep(2)
+    return filled
+
+
 # ── 上市+上櫃 成交量（億元） ─────────────────────────────────
 
 def fetch_market_volume(n_days=45):
@@ -1022,60 +1111,19 @@ def main():
 
     # ── 三大法人（TWSE，存入 JSON 供前端讀取，繞過 CORS）──────────
     def fetch_institute():
-        import ssl as _ssl, time as _time
+        # 單日抓取/解析已抽出為 fetch_bfi82u_day（含單日重試 3 次，三次皆敗才退往前一天，
+        # 避免一次網路抖動就沉默退回昨日資料）；此處只負責往前找最近交易日
         from datetime import date as _d, timedelta as _td
-        ctx = _ssl._create_unverified_context()   # 與 market_volume 一致，避免部分環境 TWSE 憑證問題
         today = _d.today()
         for i in range(10):
             d = today - _td(days=i)
             if d.weekday() >= 5:
                 continue
-            dt_str = d.strftime("%Y%m%d")
-            url = (f"https://www.twse.com.tw/rwd/zh/fund/BFI82U"
-                   f"?dayDate={dt_str}&weekDate=&monthDate=&type=day&response=json")
-            # 單日 transient 失敗重試 3 次（比照 fetch_market_volume），三次皆敗才退往前一天，
-            # 避免一次網路抖動就沉默退回昨日資料
-            j = None
-            for attempt in range(3):
-                try:
-                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(req, timeout=10, context=ctx) as r:
-                        j = json.loads(r.read())
-                    break
-                except Exception as e:
-                    print(f"institute {dt_str} 第{attempt+1}次失敗: {e}")
-                    _time.sleep(3)
-            if j is None:
-                continue  # 三次皆 transient 失敗 → 換前一天（最後手段）
-            rows = j.get("data", [])
-            if not rows:
-                continue  # 非交易日/尚無資料（非錯誤，不需重試）→ 換前一天
-            # 依列首精準取值（startswith 避免「外資及陸資(不含外資自營商)」被子字串誤配）
-            def comp(prefix):
-                for row in rows:
-                    if row[0].strip().startswith(prefix):
-                        try:
-                            return float(row[3].replace(",", "")) / 1e8
-                        except (ValueError, IndexError):
-                            return None
-                return None
-
-            def total_of(*prefixes):
-                vals = [comp(p) for p in prefixes]
-                if all(v is None for v in vals):
-                    return None
-                return round(sum(v or 0 for v in vals), 1)
-
-            # 標準三大法人：自營商=自行買賣+避險、外資=外資及陸資+外資自營商、投信（對齊 TWSE 合計）
-            dealer  = total_of("自營商(自行買賣)", "自營商(避險)")
-            trust   = total_of("投信")
-            foreign = total_of("外資及陸資", "外資自營商")
-            if foreign is None and trust is None:
-                continue
-            total = round((foreign or 0) + (trust or 0) + (dealer or 0), 1)
-            print(f"institute OK  date={dt_str}  foreign={foreign}  trust={trust}  dealer={dealer}  total={total}")
-            return {"date": dt_str, "foreign": foreign, "trust": trust,
-                    "dealer": dealer, "total": total}
+            inst = fetch_bfi82u_day(d.strftime("%Y%m%d"))
+            if inst:
+                print(f"institute OK  date={inst['date']}  foreign={inst['foreign']}  "
+                      f"trust={inst['trust']}  dealer={inst['dealer']}  total={inst['total']}")
+                return inst
         return {}
 
     institute = {}
@@ -1160,15 +1208,8 @@ def main():
         tmx_retail = -(tmxF + tmxT + tmxD) / 5
         retail_total = round(mtx_retail + tmx_retail)
 
-        # 外資選擇權策略
-        THRESHOLD = 1000
-        call_bias = "long" if bc > sc + THRESHOLD else ("short" if sc > bc + THRESHOLD else "neutral")
-        put_bias  = "long" if bp > sp + THRESHOLD else ("short" if sp > bp + THRESHOLD else "neutral")
-        if call_bias == "long"  and put_bias == "long":  opt_strategy = "雙買"
-        elif call_bias == "short" and put_bias == "short": opt_strategy = "雙賣"
-        elif call_bias == "long"  and put_bias == "short": opt_strategy = "看多"
-        elif call_bias == "short" and put_bias == "long":  opt_strategy = "看空"
-        else: opt_strategy = "中性"
+        # 外資選擇權策略（2026-07-18 改相對門檻＋單邊分類，見 classify_opt_strategy）
+        opt_strategy = classify_opt_strategy(bc, sc, bp, sp)
 
         today_entry = {
             "date":         today_iso,
@@ -1186,8 +1227,21 @@ def main():
             "retail_total": retail_total,
             "opt_strategy": opt_strategy,
         }
+        # 外資現貨/投信（億元）：只在三大法人日期跟上期貨日期時寫入
+        # （P2-16：BFI82U 發布較晚，inst 可能落後一天；落後就留空，之後由 backfill 補）
+        if institute and institute.get("date") == date:
+            today_entry["foreign"] = institute.get("foreign")
+            today_entry["trust"]   = institute.get("trust")
         existing_history = build_settlement_history(existing_history, today_entry)
         print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
+
+    # 近20天缺外資現貨/投信者補齊（首次一次性回補，之後每日近乎 no-op）
+    try:
+        n_filled = backfill_inst_history(existing_history)
+        if n_filled:
+            print(f"inst backfill: 補 {n_filled} 天")
+    except Exception as e:
+        print(f"inst backfill FAIL: {e}")
 
     # 更新紀錄：每次執行 append 一筆（含觸發方式與各資料抓到的日期），供前端「更新紀錄」顯示
     # 用於觀察定期/手動觸發後是否正確更新到當日，保留最近 12 筆
