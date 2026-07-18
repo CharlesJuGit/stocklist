@@ -1103,13 +1103,17 @@ async function triggerFetch() {
   btn.textContent = '檢查中...';
   btn.disabled = true;
 
-  // 比對 JSON 最後更新時間，30分鐘內視為已是最新（避免重複觸發）
+  // 比對 JSON 最後更新時間，30分鐘內視為已是最新（避免重複觸發）。
+  // P2-16（2026-07-17 教訓）：只看檔案時間會誤擋——排程班剛寫過檔但三大法人尚未發布時
+  // （inst.date 落後頂層 date），手動救援被「已是最新」拒觸發。故加條件：內容也要跟上才算最新。
   try {
     const localData = await loadTaifexJson().catch(() => null);
     const updatedAt = localData?.updated_at;
     if (updatedAt) {
       const diffMin = (Date.now() - new Date(updatedAt).getTime()) / 60000;
-      if (diffMin < 30) {
+      const instDate = localData?.institute?.date;
+      const instFresh = !instDate || !localData?.date || instDate === localData.date;
+      if (diffMin < 30 && instFresh) {
         btn.textContent = '已是最新';
         setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 2000);
         return;
