@@ -47,19 +47,18 @@
 
     <!-- 三大法人 -->
     <div>
-      <div class="flex justify-between items-center mb-1">
+      <div class="flex justify-between items-start mb-1">
         <div class="text-xs text-gray-500">三大法人買賣超（億元）</div>
-        <div class="text-xs text-gray-300" id="inst-date"></div>
+        <div class="flex flex-col items-end">
+          <span class="text-xs text-gray-300" id="inst-date"></span>
+          <button onclick="openInstModal()" class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+        </div>
       </div>
       <div class="grid grid-cols-4 gap-2 text-center text-sm" id="institute-row">
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">外資</div><div id="inst-foreign">--</div></div>
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">投信</div><div id="inst-trust">--</div></div>
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">自營商</div><div id="inst-dealer">--</div></div>
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計</div><div id="inst-total">--</div></div>
-      </div>
-      <div class="text-center mt-1">
-        <button onclick="openInstModal()"
-          class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
       </div>
     </div>
 
