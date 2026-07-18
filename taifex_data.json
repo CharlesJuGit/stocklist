@@ -396,7 +396,8 @@
       "retail_total": 8136,
       "opt_strategy": "看空",
       "foreign": 211.5,
-      "trust": -53.6
+      "trust": -53.6,
+      "dealer": 154.9
     },
     {
       "date": "2026-06-22",
@@ -414,7 +415,8 @@
       "retail_total": 3309,
       "opt_strategy": "中性",
       "foreign": 684.6,
-      "trust": -105.2
+      "trust": -105.2,
+      "dealer": 121.0
     },
     {
       "date": "2026-06-23",
@@ -432,7 +434,8 @@
       "retail_total": 17549,
       "opt_strategy": "雙買",
       "foreign": -385.9,
-      "trust": 72.4
+      "trust": 72.4,
+      "dealer": -169.8
     },
     {
       "date": "2026-06-24",
@@ -450,7 +453,8 @@
       "retail_total": 17916,
       "opt_strategy": "中性",
       "foreign": -1774.0,
-      "trust": 33.0
+      "trust": 33.0,
+      "dealer": -364.9
     },
     {
       "date": "2026-06-25",
@@ -468,7 +472,8 @@
       "retail_total": 15808,
       "opt_strategy": "中性",
       "foreign": -405.1,
-      "trust": 174.2
+      "trust": 174.2,
+      "dealer": -70.0
     },
     {
       "date": "2026-06-26",
@@ -486,7 +491,8 @@
       "retail_total": 19510,
       "opt_strategy": "看空",
       "foreign": -1431.9,
-      "trust": 101.0
+      "trust": 101.0,
+      "dealer": -707.3
     },
     {
       "date": "2026-06-29",
@@ -504,7 +510,8 @@
       "retail_total": 9355,
       "opt_strategy": "中性",
       "foreign": -43.4,
-      "trust": 145.2
+      "trust": 145.2,
+      "dealer": -45.9
     },
     {
       "date": "2026-06-30",
@@ -522,7 +529,8 @@
       "retail_total": 8693,
       "opt_strategy": "雙買",
       "foreign": -5.1,
-      "trust": 3.7
+      "trust": 3.7,
+      "dealer": 145.9
     },
     {
       "date": "2026-07-01",
@@ -540,7 +548,8 @@
       "retail_total": 9563,
       "opt_strategy": "中性",
       "foreign": 323.8,
-      "trust": 156.0
+      "trust": 156.0,
+      "dealer": 59.4
     },
     {
       "date": "2026-07-02",
@@ -558,7 +567,8 @@
       "retail_total": 16562,
       "opt_strategy": "中性",
       "foreign": -890.5,
-      "trust": 99.6
+      "trust": 99.6,
+      "dealer": -43.3
     },
     {
       "date": "2026-07-03",
@@ -576,7 +586,8 @@
       "retail_total": 11503,
       "opt_strategy": "中性",
       "foreign": -777.8,
-      "trust": 75.0
+      "trust": 75.0,
+      "dealer": -32.6
     },
     {
       "date": "2026-07-06",
@@ -594,7 +605,8 @@
       "retail_total": 11731,
       "opt_strategy": "中性",
       "foreign": -255.0,
-      "trust": 71.6
+      "trust": 71.6,
+      "dealer": -97.2
     },
     {
       "date": "2026-07-07",
@@ -612,7 +624,8 @@
       "retail_total": 17647,
       "opt_strategy": "中性",
       "foreign": -547.3,
-      "trust": 96.8
+      "trust": 96.8,
+      "dealer": -487.3
     },
     {
       "date": "2026-07-08",
@@ -630,7 +643,8 @@
       "retail_total": 19227,
       "opt_strategy": "中性",
       "foreign": -379.5,
-      "trust": 126.8
+      "trust": 126.8,
+      "dealer": -169.4
     },
     {
       "date": "2026-07-09",
@@ -648,7 +662,8 @@
       "retail_total": 12587,
       "opt_strategy": "中性",
       "foreign": -472.5,
-      "trust": 199.0
+      "trust": 199.0,
+      "dealer": -76.7
     },
     {
       "date": "2026-07-13",
@@ -666,7 +681,8 @@
       "retail_total": 8401,
       "opt_strategy": "雙買",
       "foreign": -195.6,
-      "trust": 125.8
+      "trust": 125.8,
+      "dealer": -111.0
     },
     {
       "date": "2026-07-14",
@@ -684,7 +700,8 @@
       "retail_total": 16730,
       "opt_strategy": "雙買",
       "foreign": -518.9,
-      "trust": 110.0
+      "trust": 110.0,
+      "dealer": -382.9
     },
     {
       "date": "2026-07-15",
@@ -702,7 +719,8 @@
       "retail_total": 12126,
       "opt_strategy": "看空",
       "foreign": -14.2,
-      "trust": 125.4
+      "trust": 125.4,
+      "dealer": 101.3
     },
     {
       "date": "2026-07-16",
@@ -720,7 +738,8 @@
       "retail_total": 19900,
       "opt_strategy": "看空",
       "foreign": -483.3,
-      "trust": 86.5
+      "trust": 86.5,
+      "dealer": -33.6
     },
     {
       "date": "2026-07-17",
@@ -738,7 +757,8 @@
       "retail_total": 27650,
       "opt_strategy": "看空",
       "foreign": -1883.1,
-      "trust": 73.5
+      "trust": 73.5,
+      "dealer": -821.8
     }
   ],
   "volatility": {

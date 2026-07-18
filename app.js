@@ -912,6 +912,44 @@ async function loadInstitutes() {
   });
 }
 
+// 三大法人 近20天（P2-18）：資料源＝settlement_history 的 foreign/trust/dealer
+// （後端 backfill_inst_history 由 TWSE BFI82U 逐日補；口徑同首頁＝自營含避險、外資含外資自營商）
+// dealer 為 P2-18 新增欄位，後端首次回補前舊列會是 null → 顯示「--」而非 0，不假裝有資料
+function openInstModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.settlement_history;
+    if (!hist?.length) return;
+    const num = v => (typeof v === 'number');
+    const cell = v => {
+      if (!num(v)) return `<span class="text-gray-500">--</span>`;
+      const color = v >= 0 ? 'text-red-400' : 'text-green-400';
+      return `<span class="${color}">${(v >= 0 ? '+' : '') + v.toFixed(1)}</span>`;
+    };
+    const rows = [...hist].reverse().slice(0, 20).map(r => {
+      const vals = [r.foreign, r.trust, r.dealer];
+      const total = vals.every(num) ? vals.reduce((a, b) => a + b, 0) : null;
+      return `<tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-400">${r.date}</td>
+        <td class="py-1 text-right">${cell(r.foreign)}</td>
+        <td class="py-1 text-right">${cell(r.trust)}</td>
+        <td class="py-1 text-right">${cell(r.dealer)}</td>
+        <td class="py-1 text-right font-bold">${cell(total)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('inst-modal-body').innerHTML =
+      `<table class="w-full">
+        <thead><tr class="text-gray-500 border-b border-gray-600">
+          <th class="py-1 text-left font-normal">日期</th>
+          <th class="py-1 text-right font-normal">外資</th>
+          <th class="py-1 text-right font-normal">投信</th>
+          <th class="py-1 text-right font-normal">自營商</th>
+          <th class="py-1 text-right font-normal">合計</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+       <div class="text-gray-500 mt-2">紅＝買超、綠＝賣超；「--」＝該日資料尚未回補。</div>`;
+    document.getElementById('inst-modal').classList.remove('hidden');
+  });
+}
+
 // 台指選擇權（讀 taifex_data.json）
 async function loadOptions() {
   try {

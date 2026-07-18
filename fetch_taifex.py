@@ -308,17 +308,20 @@ def fetch_bfi82u_day(dt_str, retries=3):
 
 
 def backfill_inst_history(history, max_days=20):
-    """settlement_history 近 max_days 筆補上外資現貨/投信（億元），供近20天綜合評分回算。
-    已有 foreign 欄位者跳過 → 首次執行一次性補齊，之後每日近乎 no-op。"""
+    """settlement_history 近 max_days 筆補上三大法人現貨買賣超（億元），供近20天綜合評分回算
+    與前端「三大法人 近20天」彈窗（P2-18）。
+    三欄（foreign/trust/dealer）皆已有者跳過 → 首次執行一次性補齊，之後每日近乎 no-op。
+    dealer 為 P2-18 新增，既有列只有 foreign/trust → 上線後首次執行會為那些列各打一次 BFI82U 補上。"""
     import time as _time
     filled = 0
     for rec in history[-max_days:]:
-        if rec.get("foreign") is not None:
+        if all(rec.get(k) is not None for k in ("foreign", "trust", "dealer")):
             continue
         inst = fetch_bfi82u_day(rec["date"].replace("-", ""), retries=2)
         if inst:
             rec["foreign"] = inst["foreign"]
             rec["trust"]   = inst["trust"]
+            rec["dealer"]  = inst["dealer"]
             filled += 1
         _time.sleep(2)
     return filled
@@ -1227,11 +1230,12 @@ def main():
             "retail_total": retail_total,
             "opt_strategy": opt_strategy,
         }
-        # 外資現貨/投信（億元）：只在三大法人日期跟上期貨日期時寫入
+        # 三大法人現貨買賣超（億元）：只在三大法人日期跟上期貨日期時寫入
         # （P2-16：BFI82U 發布較晚，inst 可能落後一天；落後就留空，之後由 backfill 補）
         if institute and institute.get("date") == date:
             today_entry["foreign"] = institute.get("foreign")
             today_entry["trust"]   = institute.get("trust")
+            today_entry["dealer"]  = institute.get("dealer")   # P2-18：近20天彈窗需要自營商
         existing_history = build_settlement_history(existing_history, today_entry)
         print(f"settlement_history updated: {len(existing_history)} 筆, latest={today_iso}, ratio={sr['ratio']}")
 

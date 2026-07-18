@@ -57,6 +57,10 @@
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">自營商</div><div id="inst-dealer">--</div></div>
         <div class="bg-gray-800 rounded p-2"><div class="text-gray-400 text-xs">合計</div><div id="inst-total">--</div></div>
       </div>
+      <div class="text-center mt-1">
+        <button onclick="openInstModal()"
+          class="text-xs text-blue-400 hover:text-blue-300 underline">近20天 ▸</button>
+      </div>
     </div>
 
     <!-- 選擇權 -->
@@ -314,6 +318,18 @@
     <div id="earnings-box" class="text-xs text-gray-400">載入中...</div>
   </div>
 
+  <!-- 三大法人歷史彈出視窗（P2-18） -->
+  <div id="inst-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">三大法人買賣超 近20天（億元）</h2>
+        <button onclick="document.getElementById('inst-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="inst-modal-body" class="text-xs max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- 散戶期貨歷史彈出視窗 -->
   <div id="retail-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
@@ -539,7 +555,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260718b"></script>
+  <script src="app.js?v=20260719a"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
