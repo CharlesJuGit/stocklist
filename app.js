@@ -39,6 +39,7 @@ function openModal(id, name) {
   loadModalPrice(id);        // ② 價格/走勢（獨立 try，失敗隱藏）
   loadChipVerdict(id);       // ① 籌碼白話
   renderStockMeta(id);       // ③ 基本資料
+  loadDividendInfo(id);      // ③b 殖利率/除息日（P2-20，lazy 抓、獨立失敗不影響其他區塊）
   renderStockLinks(id);      // ④ 外部連結
 }
 
@@ -100,7 +101,7 @@ function calcChanges(res) {
   for (let i = 0; i < closeArr.length; i++) {
     if (closeArr[i] != null && closeArr[i] > 0 && tsArr[i] != null) pts.push({ t: tsArr[i], c: closeArr[i] });
   }
-  if (price == null || pts.length < 2) return { price, chgDay: null, chgWeek: null };
+  if (price == null || pts.length < 2) return { price, chgDay: null, chgWeek: null, chgMonth: null, pts: [] };
   // 本日：前一日收盤＝倒數第二筆有效 close（禁用 meta.chartPreviousClose＝範圍起點前收盤，非昨收）
   const prevClose = pts[pts.length - 2].c;
   const chgDay = prevClose ? (price - prevClose) / prevClose * 100 : null;
@@ -111,7 +112,13 @@ function calcChanges(res) {
   let weekBase = null;
   for (const p of pts) { if (_twDate(p.t) < monStr) weekBase = p.c; }
   const chgWeek = weekBase ? (price - weekBase) / weekBase * 100 : null;
-  return { price, chgDay, chgWeek };
+  // 本月（P2-20 §1）：基準＝台灣本月 1 日 00:00 之前最後一筆有效收盤（＝上月最後交易日收盤，
+  // 同「上週五收盤」句式，自動涵蓋月底假日/連假）。需 range=3mo 才抓得到上月底（月初時 1mo 抓不滿）。
+  const firstStr = `${nowTw.getFullYear()}-${String(nowTw.getMonth() + 1).padStart(2, '0')}-01`;
+  let monthBase = null;
+  for (const p of pts) { if (_twDate(p.t) < firstStr) monthBase = p.c; }
+  const chgMonth = monthBase ? (price - monthBase) / monthBase * 100 : null;
+  return { price, chgDay, chgWeek, chgMonth, pts };
 }
 
 async function loadModalPrice(id) {
@@ -119,23 +126,29 @@ async function loadModalPrice(id) {
   if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
   const m = STOCKS_BY_ID[id] || {};
   const suf = m.mkt === 'tpex' ? '.TWO' : '.TW';
-  const tryFetch = async s => (await idxFetch(`/yahoo/${id}${s}?range=1mo&interval=1d`)).chart.result[0];
+  // P2-20 §1：range 1mo→3mo（月初時 1mo 抓不滿上月底＝算不出本月%）
+  const tryFetch = async s => (await idxFetch(`/yahoo/${id}${s}?range=3mo&interval=1d`)).chart.result[0];
   try {
     let res;
     try { res = await tryFetch(suf); }
     catch (e) { res = await tryFetch(suf === '.TW' ? '.TWO' : '.TW'); }  // mkt 缺失 fallback
-    const { price, chgDay, chgWeek } = calcChanges(res);
-    priceCache[id] = { price, chgDay, chgWeek };   // 彈窗抓到順便餵清單快取（同股不重打）
+    const { price, chgDay, chgWeek, chgMonth, pts } = calcChanges(res);
+    priceCache[id] = { price, chgDay, chgWeek, chgMonth };   // 彈窗抓到順便餵清單快取（同股不重打）
     const closes = (res.indicators.quote[0].close || []).filter(x => x != null && x > 0);
     if (price == null || !closes.length) return;
     const l20 = closes.slice(-20), hi = Math.max(...l20), lo = Math.min(...l20);
     const pos = hi > lo ? (price - lo) / (hi - lo) * 100 : null;
     const dc = chgDay == null ? '' : `<span class="${chgDay >= 0 ? 'text-red-400' : 'text-green-400'} text-sm ml-1">${chgDay >= 0 ? '+' : ''}${chgDay.toFixed(2)}%</span>`;
     const wc = chgWeek == null ? '' : `<span class="${chgWeek >= 0 ? 'text-red-400' : 'text-green-400'} text-xs ml-2">本週 ${chgWeek >= 0 ? '+' : ''}${chgWeek.toFixed(2)}%</span>`;
+    const mc = chgMonth == null ? '' : `<span class="${chgMonth >= 0 ? 'text-red-400' : 'text-green-400'} text-xs ml-2">本月 ${chgMonth >= 0 ? '+' : ''}${chgMonth.toFixed(2)}%</span>`;
+    // sparkline 口徑不變（P2-20 §1 紅線）：range 改 3mo 後只取「近 31 天」序列尾段，
+    // 重現改版前 range=1mo 的視覺範圍；位階仍取 closes.slice(-20)＝與改版前同一組數（天然零回歸）
+    const cutTs = Math.floor(Date.now() / 1000) - 31 * 86400;
+    const sparkCloses = pts.filter(p => p.t >= cutTs).map(p => p.c);
     box.innerHTML = `<div class="flex items-center justify-between">
-        <div><span class="text-lg font-bold">${idxNum(price)}</span>${dc}${wc}</div>
+        <div><span class="text-lg font-bold">${idxNum(price)}</span>${dc}${wc}${mc}</div>
         <div class="text-xs text-gray-400">位階 ${pos == null ? '—' : pos.toFixed(0) + '%'}（20日高 ${idxNum(hi)}／低 ${idxNum(lo)}）</div>
-      </div>${_sparkline(closes)}`;
+      </div>${_sparkline(sparkCloses.length ? sparkCloses : closes)}`;
     box.classList.remove('hidden');
   } catch (e) { /* 整塊隱藏 */ }
 }
@@ -194,6 +207,69 @@ function renderStockMeta(id) {
   if (!r.length) return;
   box.innerHTML = r.join('');
   box.classList.remove('hidden');
+}
+
+// ── P2-20 §2 殖利率／除息日（官方 openapi 經 CF Worker；四表皆無 CORS，直打必失敗）──
+// 四表都是「日更全表」：session 內抓一次全表→依股號 lookup，**上市/上櫃/自選股全蓋**，
+// 不依賴 stocks.json（自選股不在清單裡也查得到）。
+let _divCache = null, _divPromise = null;
+async function loadDivTables() {
+  if (_divCache) return _divCache;
+  if (_divPromise) return _divPromise;
+  _divPromise = (async () => {
+    // 🔴 分流（2026-07-19 兩次實測）：**TPEx 擋 Cloudflare 出口 IP**（經 CF Worker 一律 302 導 /errors，
+    // 帶完整瀏覽器標頭仍被擋）→ TPEx 兩表走 Val Town（非 CF egress）；TWSE 兩表經 CF Worker 正常，維持不動。
+    const getCF = async k => { try { return await idxFetch(`/div/${k}`); } catch (e) { return []; } };
+    const getVT = async k => {
+      try {
+        if (typeof TAIFEX_PROXY === 'undefined' || !TAIFEX_PROXY) return [];
+        const r = await fetch(`${TAIFEX_PROXY}/div/${k}`);
+        return r.ok ? await r.json() : [];
+      } catch (e) { return []; }
+    };
+    const [ty, py, te, pe] = await Promise.all(
+      [getCF('twse-yield'), getVT('tpex-yield'), getCF('twse-exdiv'), getVT('tpex-exdiv')]);
+    const yield_ = {}, exdiv = {};
+    // 上市殖利率：Code / DividendYield（%）
+    for (const r of ty || []) if (r.Code) yield_[r.Code] = { y: parseFloat(r.DividendYield) };
+    // 上櫃殖利率：SecuritiesCompanyCode / YieldRatio（%）＋ DividendPerShare（元）
+    for (const r of py || []) if (r.SecuritiesCompanyCode)
+      yield_[r.SecuritiesCompanyCode] = { y: parseFloat(r.YieldRatio), dps: parseFloat(r.DividendPerShare) };
+    // 除權息預告（民國日期）：上市 Date/Exdividend（息|權）、上櫃 ExRrightsExDividendDate/ExRrightsExDividend（除息|除權）
+    for (const r of te || []) if (r.Code) exdiv[r.Code] = { d: _rocToAd(r.Date), kind: r.Exdividend };
+    for (const r of pe || []) if (r.SecuritiesCompanyCode)
+      exdiv[r.SecuritiesCompanyCode] = { d: _rocToAd(r.ExRrightsExDividendDate), kind: r.ExRrightsExDividend };
+    return (_divCache = { yield_, exdiv });
+  })();
+  return _divPromise;
+}
+// 把殖利率/除息日補進基本資料區（獨立於 stocks.json → 自選股也蓋得到）
+async function loadDividendInfo(id) {
+  const box = document.getElementById('modal-meta');
+  if (!box || typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
+  try {
+    const { yield_, exdiv } = await loadDivTables();
+    // 競態守衛：連點兩支股票時，前一支的非同步結果不得 append 進後一支的彈窗
+    // （openModal 開啟時已清空 modal-meta，故只需擋「回來時已換股」這種情況）
+    if (currentStockId !== id) return;
+    // Worker 尚未部署 /div 路由（或四表全掛）→ 整區不渲染，而不是每支股票都顯示兩個「—」（那看起來像壞掉）
+    if (!Object.keys(yield_).length && !Object.keys(exdiv).length) return;
+    const y = yield_[id], e = exdiv[id];
+    const yTxt = (y && isFinite(y.y)) ? `${y.y.toFixed(2)}%${(isFinite(y.dps) && y.dps > 0) ? `（股利 ${y.dps} 元）` : ''}` : '—';
+    const eTxt = (e && e.d) ? `${String(e.kind || '').includes('權') && !String(e.kind || '').includes('息') ? '除權' : '除息'} ${e.d}` : '—';
+    const rows =
+      `<div><span class="text-gray-500">殖利率：</span>${yTxt}</div>` +
+      `<div title="僅顯示已公告且尚未除權息之股票，多數股票平常為 —"><span class="text-gray-500">除息日：</span>${eTxt}</div>`;
+    box.insertAdjacentHTML('beforeend', rows);
+    box.classList.remove('hidden');
+  } catch (err) { /* 靜默：不影響彈窗其他區塊 */ }
+}
+
+// 民國 1150731 → 2026-07-31（前 3 碼為民國年）
+function _rocToAd(s) {
+  const t = String(s || '').trim();
+  if (!/^\d{7}$/.test(t)) return null;
+  return `${Number(t.slice(0, 3)) + 1911}-${t.slice(3, 5)}-${t.slice(5, 7)}`;
 }
 
 // ④ 外部連結（跳站外，無資料抓取）
@@ -1166,11 +1242,20 @@ async function loadEarnings() {
     const box = document.getElementById('earnings-box');
     if (!list.length) { box.textContent = '暫無資料'; return; }
     const NAME = {NVDA:'輝達',AAPL:'蘋果',MSFT:'微軟',GOOGL:'Google',AMZN:'亞馬遜',META:'Meta',TSLA:'特斯拉',TSM:'台積電'};
-    box.innerHTML = list.map(r => `
-      <div class="flex justify-between py-1 border-b border-gray-800">
-        <span class="text-gray-300">${r.sym} ${NAME[r.sym]||''}</span>
-        <span class="text-yellow-300">${r.next || '--'}</span>
-      </div>`).join('');
+    // P2-20 §3：法說日已過 → 整列灰顯＋標「已公布」。
+    // 背景：AlphaVantage 法說後要數天~一週才滾到下一季（如 TSM 7/16 已結束仍顯示舊日期），
+    // 灰顯只解決「看起來像未來事件」的誤導，不改後端資料。
+    // ⚠ 不可用 toISOString()——它會轉回 UTC，台灣 08:00 前會算成前一天（與 calcChanges 同一寫法手組）
+    const _tw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    const todayTw = `${_tw.getFullYear()}-${String(_tw.getMonth() + 1).padStart(2, '0')}-${String(_tw.getDate()).padStart(2, '0')}`;
+    box.innerHTML = list.map(r => {
+      const past = r.next && r.next < todayTw;
+      return `
+      <div class="flex justify-between py-1 border-b border-gray-800${past ? ' text-gray-500' : ''}">
+        <span class="${past ? 'text-gray-500' : 'text-gray-300'}">${r.sym} ${NAME[r.sym]||''}</span>
+        <span class="${past ? 'text-gray-500' : 'text-yellow-300'}">${r.next || '--'}${past ? ' <span class="text-xs">已公布</span>' : ''}</span>
+      </div>`;
+    }).join('');
   } catch (e) { console.error('loadEarnings:', e); }
 }
 

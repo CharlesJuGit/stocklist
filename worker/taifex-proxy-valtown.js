@@ -2,7 +2,12 @@
  * taifex-proxy-valtown.js — Val Town HTTP val：小台即時報價代理（stockweb P2-7 ②，Deno 改綁卡的替代）
  *
  * Val Town 免費、免信用卡、瀏覽器內直接寫，egress 非 Cloudflare → 可繞過 mis.taifex 的 CF-to-CF 封鎖。
- * 只代理 mis.taifex 一個上游（白名單寫死）、無 secret。任何路徑都代理（前端打 /taifex 亦可）。
+ * 代理白名單寫死、無 secret：
+ *   ①（原）任何路徑 → mis.taifex 小台即時報價（前端打 /taifex）
+ *   ②（2026-07-19 P2-20 新增）/div/tpex-yield、/div/tpex-exdiv → TPEx openapi 殖利率／除權息預告
+ *      為何不放 CF Worker：**TPEx 會擋 Cloudflare 出口 IP**——經 CF Worker 一律 302 導 /errors，
+ *      帶完整瀏覽器標頭（UA/Referer/Accept-Language）仍被擋 ⇒ 證明擋的是 IP 不是 UA（2026-07-19 兩次實測）。
+ *      TWSE 兩表（openapi.twse）經 CF Worker 正常，故維持在 CF，不搬過來。
  *
  * === Ball 部署指引（免費、~3 分鐘、免綁卡）===
  *   1. 開 https://www.val.town → Sign up（可用 GitHub / Google，免信用卡）
@@ -21,6 +26,35 @@ export default async function (req) {
     "Access-Control-Allow-Headers": "Content-Type",
   };
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  // ── P2-20：TPEx 兩張日更全表（CF Worker 被 TPEx 擋 IP，故走這裡）──────────
+  const TPEX = {
+    "tpex-yield": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", // 889 筆
+    "tpex-exdiv": "https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost",            // 259 筆
+  };
+  const path = new URL(req.url).pathname;
+  if (path.startsWith("/div/")) {
+    const up = TPEX[path.slice("/div/".length)];
+    if (!up) return new Response("unknown div table", { status: 400, headers: CORS });
+    try {
+      const r = await fetch(up, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "zh-TW,zh;q=0.9",
+          "Referer": "https://www.tpex.org.tw/",
+        },
+      });
+      const t = await r.text();
+      return new Response(t, {
+        status: r.status,
+        // 日更全表 → 快取 1 小時（與 CF Worker 的 /div 一致）
+        headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: String(e) }), { status: 502, headers: CORS });
+    }
+  }
 
   try {
     // 前端 POST 帶 {"SymbolID":["MXFG6-F"]}；GET 給預設近月日盤方便瀏覽器測試
