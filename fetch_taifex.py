@@ -968,6 +968,9 @@ def _otc_year_high_finmind(year):
     import ssl as _ssl, urllib.parse as _up
     q = {"dataset": "TaiwanStockPrice", "data_id": "TPEx", "start_date": f"{year}-01-01"}
     tok = _finmind_token()
+    # 只印來源不印內容（比照 [earnings]）：Actions 上匿名請求常被 FinMind 以 IP 額度擋成 400，
+    # 有 token 可降低 fallback 觸發頻率；未設時明講，免得日後又要靠猜。
+    print(f"index_ytd OTC FinMind: {'使用 FINMIND_TOKEN' if tok else '⚠ 無 token（Actions 上易被擋 400，建議設 GitHub secret FINMIND_TOKEN）'}")
     if tok:
         q["token"] = tok
     try:
@@ -978,6 +981,43 @@ def _otc_year_high_finmind(year):
     except Exception as e:
         print(f"index_ytd OTC FinMind 失敗: {e}")
         return None
+
+
+def _otc_year_high_yahoo(year):
+    """第二層 fallback（P2-23，Fable 2026-07-19 裁決）：Yahoo `^TWOII` 當年日 K 的 max(high)。
+
+    為何需要：FinMind 在 **GitHub Actions 環境**會回 400（匿名額度按 IP 計、Actions 共享 IP 被打爆），
+    導致「每日重算當年最高」的自癒能力失效，退化成只靠 mis 今高∪前值累積——一旦存進錯的高點會一直錯下去。
+
+    🔴 **兩條實作紅線（Fable 實測、Opus 獨立複驗）**：
+      ① **嚴禁讀 `meta.regularMarketPrice`**——該欄對 ^TWOII 是壞的（實測 269.45，真值 378.44）；
+         只能用 `indicators.quote[0].high` 日 K 序列。
+      ② 日 K 會有 **None bar**（實測 2026-07-10 一筆）→ 必須濾掉再取 max。
+    口徑與其他 7 個 Yahoo 標的一致（盤中高），與 FinMind 同源可比：實測當年最高 459.56（2026-06-22），
+    與 FinMind 分毫不差。
+    """
+    import ssl as _ssl
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    try:
+        u = "https://query1.finance.yahoo.com/v8/finance/chart/%5ETWOII?range=1y&interval=1d"
+        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+        d = json.loads(urllib.request.urlopen(req, timeout=25, context=_ssl._create_unverified_context()).read().decode())
+        r = d["chart"]["result"][0]
+        ts = r["timestamp"]
+        highs = r["indicators"]["quote"][0]["high"]          # ⚠ 只用日 K，不碰 meta（紅線①）
+        vals = []
+        for t, h in zip(ts, highs):
+            if h is None:                                     # 紅線②：濾 None bar
+                continue
+            tw_date = _dt.fromtimestamp(t, _tz.utc) + _td(hours=8)
+            if tw_date.year == year:
+                vals.append(float(h))
+        if vals:
+            print(f"index_ytd OTC Yahoo ^TWOII fallback: 當年最高 {max(vals):.2f}（{len(vals)} 個交易日）")
+            return max(vals)
+    except Exception as e:
+        print(f"index_ytd OTC Yahoo 失敗: {e}")
+    return None
 
 
 def _mis_otc_today_high():
@@ -1057,7 +1097,14 @@ def _update_index_ytd_inner(existing):
     iy = (existing or {}).get("index_ytd") or {}
     otc_prev = iy.get("otc", {}).get("high") if iy.get("otc", {}).get("year") == y else None
     mxf_prev = iy.get("mxf", {}).get("high") if iy.get("mxf", {}).get("year") == y else None
-    otc_cands = [v for v in (_otc_year_high_finmind(y), _mis_otc_today_high(), otc_prev) if v is not None]
+    # OTC 年高三層（P2-23，Ball 裁示＋Fable 定案）：
+    #   ①FinMind 主源（有自癒：每日由全年日 K 重算）
+    #   ②失敗 → Yahoo ^TWOII 當年日 K max(high)（同口徑、同樣有自癒；Actions 上 FinMind 常 400）
+    #   ③再失敗 → 既有 mis 今高 ∪ 前值累積（無自癒，只保底）
+    _auth = _otc_year_high_finmind(y)
+    if _auth is None:
+        _auth = _otc_year_high_yahoo(y)          # 第二層：仍具自癒能力
+    otc_cands = [v for v in (_auth, _mis_otc_today_high(), otc_prev) if v is not None]
     out = {"year": y, "updated": _d.today().strftime("%Y-%m-%d")}
     out["otc"] = {"high": round(max(otc_cands), 2), "year": y} if otc_cands else iy.get("otc", {})
     # 小台：mis.taifex 被 Cloudflare 擋 → 走後端 MTX 日資料（high 年高＋last 最新收盤＋date）
