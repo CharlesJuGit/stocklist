@@ -36,10 +36,10 @@ function openModal(id, name) {
     const el = document.getElementById(x); if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
   });
   switchTab('1d');           // 既有法人表
-  loadModalPrice(id);        // ② 價格/走勢（獨立 try，失敗隱藏）
+  const pricePromise = loadModalPrice(id);   // ② 價格/走勢（獨立 try，失敗隱藏）
   loadChipVerdict(id);       // ① 籌碼白話
   renderStockMeta(id);       // ③ 基本資料
-  loadDividendInfo(id);      // ③b 殖利率/除息日（P2-20，lazy 抓、獨立失敗不影響其他區塊）
+  loadDividendInfo(id, pricePromise);  // ③b 殖利率/除息日（P2-20；等價格到齊才能反推上市股利金額）
   renderStockLinks(id);      // ④ 外部連結
 }
 
@@ -244,18 +244,33 @@ async function loadDivTables() {
   return _divPromise;
 }
 // 把殖利率/除息日補進基本資料區（獨立於 stocks.json → 自選股也蓋得到）
-async function loadDividendInfo(id) {
+async function loadDividendInfo(id, pricePromise) {
   const box = document.getElementById('modal-meta');
   if (!box || typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
   try {
-    const { yield_, exdiv } = await loadDivTables();
+    const [{ yield_, exdiv }] = await Promise.all([
+      loadDivTables(),
+      Promise.resolve(pricePromise).catch(() => null),   // 價格失敗不擋殖利率顯示
+    ]);
     // 競態守衛：連點兩支股票時，前一支的非同步結果不得 append 進後一支的彈窗
     // （openModal 開啟時已清空 modal-meta，故只需擋「回來時已換股」這種情況）
     if (currentStockId !== id) return;
     // Worker 尚未部署 /div 路由（或四表全掛）→ 整區不渲染，而不是每支股票都顯示兩個「—」（那看起來像壞掉）
     if (!Object.keys(yield_).length && !Object.keys(exdiv).length) return;
     const y = yield_[id], e = exdiv[id];
-    const yTxt = (y && isFinite(y.y)) ? `${y.y.toFixed(2)}%${(isFinite(y.dps) && y.dps > 0) ? `（股利 ${y.dps} 元）` : ''}` : '—';
+    // 股利金額：上櫃有官方 DividendPerShare 直接用；上市（BWIBBU 無金額欄）以「現價 × 殖利率」反推、標「約」。
+    // 口徑：TWSE/TPEx 的殖利率皆為「近四季(年度)現金股利 ÷ 收盤價」——2330 實證 近四季 22.00 元 ÷ 2290 = 0.96% ✅；
+    // 反推公式對 5 支上櫃股（同時有官方金額）驗證誤差 ±0.16% 內。⚠ 盤中現價與官方計算基準日收盤不同會有小差，故標「約」。
+    let dpsTxt = '';
+    if (y && isFinite(y.y) && y.y > 0) {
+      if (isFinite(y.dps) && y.dps > 0) {
+        dpsTxt = `（年配息 ${(+y.dps).toFixed(2)} 元）`;
+      } else {
+        const px = (priceCache[id] || {}).price;
+        if (px > 0) dpsTxt = `（年配息約 ${(px * y.y / 100).toFixed(2)} 元）`;
+      }
+    }
+    const yTxt = (y && isFinite(y.y)) ? `${y.y.toFixed(2)}%${dpsTxt}` : '—';
     const eTxt = (e && e.d) ? `${String(e.kind || '').includes('權') && !String(e.kind || '').includes('息') ? '除權' : '除息'} ${e.d}` : '—';
     const rows =
       `<div><span class="text-gray-500">殖利率：</span>${yTxt}</div>` +
