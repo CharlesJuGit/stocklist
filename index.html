@@ -487,9 +487,10 @@
   </div>
 
   <!-- 詳細面板（彈出） -->
+  <!-- P2-17 帶修：面板限高 90vh＋內部捲動（20/60/120 日內容超過螢幕高時，原本置中無捲動→手機整頁卡死、X 搆不到）；標題列 sticky 讓 X 永遠可點 -->
   <div id="modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
-    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
-      <div class="flex justify-between items-center mb-2">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto overscroll-contain">
+      <div class="flex justify-between items-center mb-2 sticky top-0 bg-gray-900 z-10">
         <h2 id="modal-title" class="text-xl font-bold"></h2>
         <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
       </div>
