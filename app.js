@@ -227,8 +227,9 @@ async function loadDivTables() {
         return r.ok ? await r.json() : [];
       } catch (e) { return []; }
     };
-    const [ty, py, te, pe] = await Promise.all(
-      [getCF('twse-yield'), getVT('tpex-yield'), getCF('twse-exdiv'), getVT('tpex-exdiv')]);
+    const [ty, py, te, pe, dp] = await Promise.all(
+      [getCF('twse-yield'), getVT('tpex-yield'), getCF('twse-exdiv'), getVT('tpex-exdiv'),
+       getCF('twse-divpay')]);   // 上市股利分派（官方金額＋期別）；Worker 未部署此路由時回 [] → 只是不顯示季配
     const yield_ = {}, exdiv = {};
     // 上市殖利率：Code / DividendYield（%）
     for (const r of ty || []) if (r.Code) yield_[r.Code] = { y: parseFloat(r.DividendYield) };
@@ -239,7 +240,23 @@ async function loadDivTables() {
     for (const r of te || []) if (r.Code) exdiv[r.Code] = { d: _rocToAd(r.Date), kind: r.Exdividend };
     for (const r of pe || []) if (r.SecuritiesCompanyCode)
       exdiv[r.SecuritiesCompanyCode] = { d: _rocToAd(r.ExRrightsExDividendDate), kind: r.ExRrightsExDividend };
-    return (_divCache = { yield_, exdiv });
+    // 上市股利分派：同一家可能有多筆（不同股利年度/期別，實測最多 2 筆）→ 取最新一筆
+    // （依 股利年度 + 董事會分派日 排序）。期別「年度」＝官方年配息；其餘（第N季/上下半年）＝該期金額。
+    const pay = {};
+    for (const r of dp || []) {
+      const sid = r['公司代號'];
+      // ⚠ 現金股利有三個來源欄，必須相加：盈餘分配＋法定盈餘公積＋資本公積。
+      // 實證：台泥 1101 盈餘分配 0 元、**資本公積 0.80 元**——只讀第一欄會顯示「年 0.00 元（3.40%）」自相矛盾。
+      const num = k => { const v = parseFloat(r[k]); return isFinite(v) ? v : 0; };
+      const cash = num('股東配發-盈餘分配之現金股利(元/股)')
+                 + num('股東配發-法定盈餘公積發放之現金(元/股)')
+                 + num('股東配發-資本公積發放之現金(元/股)');
+      if (!sid || !(cash > 0)) continue;
+      const period = (r['股利所屬年(季)度'] || '').trim();
+      const rank = `${r['股利年度'] || ''}-${r['董事會（擬議）股利分派日'] || ''}`;
+      if (!pay[sid] || rank > pay[sid].rank) pay[sid] = { cash, period, rank, year: r['股利年度'] };
+    }
+    return (_divCache = { yield_, exdiv, pay });
   })();
   return _divPromise;
 }
@@ -248,7 +265,7 @@ async function loadDividendInfo(id, pricePromise) {
   const box = document.getElementById('modal-meta');
   if (!box || typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) return;
   try {
-    const [{ yield_, exdiv }] = await Promise.all([
+    const [{ yield_, exdiv, pay }] = await Promise.all([
       loadDivTables(),
       Promise.resolve(pricePromise).catch(() => null),   // 價格失敗不擋殖利率顯示
     ]);
@@ -261,16 +278,24 @@ async function loadDividendInfo(id, pricePromise) {
     // 股利金額：上櫃有官方 DividendPerShare 直接用；上市（BWIBBU 無金額欄）以「現價 × 殖利率」反推、標「約」。
     // 口徑：TWSE/TPEx 的殖利率皆為「近四季(年度)現金股利 ÷ 收盤價」——2330 實證 近四季 22.00 元 ÷ 2290 = 0.96% ✅；
     // 反推公式對 5 支上櫃股（同時有官方金額）驗證誤差 ±0.16% 內。⚠ 盤中現價與官方計算基準日收盤不同會有小差，故標「約」。
+    // 顯示格式（Ball 2026-07-19 指定）：「季 X 元　年 Y 元（Z%）」
+    //  年：上櫃＝官方 DividendPerShare；上市年度配息股＝官方 t187ap45_L；上市季配股＝現價×殖利率反推（標「約」）
+    //  季：只有上市分期配息股有（t187ap45_L 期別為「第N季/上下半年」）；上櫃對應表已停更 5 年故無
+    const p = (pay || {})[id];
+    const isPeriodic = p && p.period && p.period !== '年度';
     let dpsTxt = '';
     if (y && isFinite(y.y) && y.y > 0) {
-      if (isFinite(y.dps) && y.dps > 0) {
-        dpsTxt = `（年配息 ${(+y.dps).toFixed(2)} 元）`;
-      } else {
-        const px = (priceCache[id] || {}).price;
-        if (px > 0) dpsTxt = `（年配息約 ${(px * y.y / 100).toFixed(2)} 元）`;
-      }
+      const px = (priceCache[id] || {}).price;
+      let annual = null, approx = false;
+      if (isFinite(y.dps) && y.dps > 0) annual = +y.dps;                       // 上櫃官方
+      else if (p && !isPeriodic) annual = p.cash;                              // 上市年度配息官方
+      else if (px > 0) { annual = px * y.y / 100; approx = true; }             // 上市季配→反推
+      const parts = [];
+      if (isPeriodic) parts.push(`${p.period} ${p.cash.toFixed(2)} 元`);
+      if (annual != null) parts.push(`年 ${approx ? '約 ' : ''}${annual.toFixed(2)} 元`);
+      if (parts.length) dpsTxt = `　${parts.join('　')}`;
     }
-    const yTxt = (y && isFinite(y.y)) ? `${y.y.toFixed(2)}%${dpsTxt}` : '—';
+    const yTxt = (y && isFinite(y.y)) ? `${dpsTxt ? dpsTxt.trim() + `（${y.y.toFixed(2)}%）` : y.y.toFixed(2) + '%'}` : '—';
     const eTxt = (e && e.d) ? `${String(e.kind || '').includes('權') && !String(e.kind || '').includes('息') ? '除權' : '除息'} ${e.d}` : '—';
     const rows =
       `<div><span class="text-gray-500">殖利率：</span>${yTxt}</div>` +

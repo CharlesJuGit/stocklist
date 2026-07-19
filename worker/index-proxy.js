@@ -35,6 +35,9 @@ const DIV_UPSTREAM = {
   "twse-yield":  "https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL",           // 1,079 筆 Code/DividendYield
   "tpex-yield":  "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", // 889 筆 SecuritiesCompanyCode/YieldRatio/DividendPerShare
   "twse-exdiv":  "https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL",           // 224 筆 Code/Date(民國)/Exdividend
+  // 上市股利分派（1,137 筆／1,107 家）：期別「年度」1005 家＝官方年配息；「第1季/第4季/下半年」132 筆＝分期配息金額。
+  // ⚠ 上櫃對應表 mopsfin_t187ap39_O **已停更 5 年**（全表出表日 1100804、資料到股利年度 107）→ 不採用，上櫃只顯示年配息。
+  "twse-divpay": "https://openapi.twse.com.tw/v1/opendata/t187ap45_L",
   "tpex-exdiv":  "https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost",            // 259 筆 SecuritiesCompanyCode/ExRrightsExDividendDate(民國)/ExRrightsExDividend
 };
 
