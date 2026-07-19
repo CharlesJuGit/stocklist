@@ -545,21 +545,24 @@ function buildChipFmMulti(rows, nDays) {
   const more = a.days.length > SHOW
     ? `<p class="text-xs text-gray-500 mt-2">合計為近 ${a.days.length} 個交易日；明細只列最近 ${SHOW} 日</p>`
     : `<p class="text-xs text-gray-500 mt-2">近 ${a.days.length} 個交易日</p>`;
+  // 合計列放最上面（Ball 2026-07-19 指定）：長天期看的就是總量，不該捲過 20 列明細才看到
   return `
     <table class="w-full text-xs">
-      <thead><tr class="text-gray-400 border-b border-gray-700">
-        <th class="text-left py-1">日期</th><th class="text-right py-1">外資</th>
-        <th class="text-right py-1">投信</th><th class="text-right py-1">自營</th>
-        <th class="text-right py-1">合計</th>
-      </tr></thead>
+      <thead>
+        <tr class="text-gray-400 border-b border-gray-700">
+          <th class="text-left py-1">日期</th><th class="text-right py-1">外資</th>
+          <th class="text-right py-1">投信</th><th class="text-right py-1">自營</th>
+          <th class="text-right py-1">合計</th>
+        </tr>
+        <tr class="border-b-2 border-gray-600 font-bold bg-gray-800/60">
+          <td class="py-1 text-gray-200">${nDays}日合計</td>
+          <td class="text-right py-1 ${col(t.foreign)}">${fmt(t.foreign)}</td>
+          <td class="text-right py-1 ${col(t.trust)}">${fmt(t.trust)}</td>
+          <td class="text-right py-1 ${col(t.dealer)}">${fmt(t.dealer)}</td>
+          <td class="text-right py-1 ${col(tt)}">${fmt(tt)}</td>
+        </tr>
+      </thead>
       <tbody>${dataRows}</tbody>
-      <tfoot><tr class="border-t border-gray-600 font-bold text-xs">
-        <td class="py-1 text-gray-300">${nDays}日合計</td>
-        <td class="text-right py-1 ${col(t.foreign)}">${fmt(t.foreign)}</td>
-        <td class="text-right py-1 ${col(t.trust)}">${fmt(t.trust)}</td>
-        <td class="text-right py-1 ${col(t.dealer)}">${fmt(t.dealer)}</td>
-        <td class="text-right py-1 ${col(tt)}">${fmt(tt)}</td>
-      </tr></tfoot>
     </table>${more}`;
 }
 
