@@ -296,10 +296,20 @@ async function loadDividendInfo(id, pricePromise) {
       if (parts.length) dpsTxt = `　${parts.join('　')}`;
     }
     const yTxt = (y && isFinite(y.y)) ? `${dpsTxt ? dpsTxt.trim() + `（${y.y.toFixed(2)}%）` : y.y.toFixed(2) + '%'}` : '—';
-    const eTxt = (e && e.d) ? `${String(e.kind || '').includes('權') && !String(e.kind || '').includes('息') ? '除權' : '除息'} ${e.d}` : '—';
+    // 除權息預告表含**已過期**日期（實測 483 筆中 214 筆已過、最舊 2026-07-08）→ 已過的標「已除息/已除權」並灰顯，
+    // 否則看起來像即將發生的事（與 §3 法說灰顯同一個誤導問題，同樣處理）
+    const _tw2 = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    const today2 = `${_tw2.getFullYear()}-${String(_tw2.getMonth() + 1).padStart(2, '0')}-${String(_tw2.getDate()).padStart(2, '0')}`;
+    let eTxt = '—';
+    if (e && e.d) {
+      const kind = String(e.kind || '').includes('權') && !String(e.kind || '').includes('息') ? '除權' : '除息';
+      eTxt = e.d < today2
+        ? `<span class="text-gray-500">${kind} ${e.d}（已${kind}）</span>`
+        : `${kind} ${e.d}`;
+    }
     const rows =
       `<div><span class="text-gray-500">殖利率：</span>${yTxt}</div>` +
-      `<div title="僅顯示已公告且尚未除權息之股票，多數股票平常為 —"><span class="text-gray-500">除息日：</span>${eTxt}</div>`;
+      `<div title="資料＝證交所/櫃買「除權息預告表」，只涵蓋已公告的近期除權息（實測 483 支、窗口約 7 週）。不在此窗口的股票顯示 —，屬正常。"><span class="text-gray-500">除息日：</span>${eTxt}</div>`;
     box.insertAdjacentHTML('beforeend', rows);
     box.classList.remove('hidden');
   } catch (err) { /* 靜默：不影響彈窗其他區塊 */ }
