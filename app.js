@@ -157,7 +157,11 @@ async function loadModalPrice(id) {
         <div class="text-xs text-gray-400">位階 ${pos == null ? '—' : pos.toFixed(0) + '%'}（20日高 ${idxNum(hi)}／低 ${idxNum(lo)}）</div>
       </div>${_sparkline(sparkCloses.length ? sparkCloses : closes)}`;
     box.classList.remove('hidden');
-  } catch (e) { /* 整塊隱藏 */ }
+  } catch (e) {
+    // 抓不到報價（.TW/.TWO 皆 404）→ 顯示標註而非整塊隱藏，否則使用者點進來看不到任何說明
+    box.innerHTML = `<div class="text-xs text-amber-500" title="Yahoo 查無此標的報價——可能為暫停交易、處置或已下市，請自行查證">⚠ 查無報價資料（可能暫停交易或已下市）</div>`;
+    box.classList.remove('hidden');
+  }
 }
 
 // ── P2-14 §3 清單漸進式漲跌幅（多頭/空頭/自選三表通用，批次節流）───────────
@@ -171,6 +175,9 @@ function _chgHtml(c) {
   return parts.length ? parts.join('　') : '<span class="text-gray-600">—</span>';
 }
 function _chgCell(id) { return priceCache[id] ? _chgHtml(priceCache[id]) : '···'; }   // 初次/重繪：有快取先填，否則佔位
+// 抓不到報價（.TW/.TWO 皆 404）→ 標註而非靜靜顯示「—」（Ball 2026-07-19 選 b 案：先觀察不排除）。
+// ⚠ 措辭刻意不寫「下市」：暫停交易與下市在資料上長得一樣，寫死會誤導（黑名單復牌同一類坑）。
+const NOQUOTE_HTML = '<span class="text-amber-500" title="Yahoo 查無此標的報價——可能為暫停交易、處置或已下市，請自行查證">⚠ 資料異常</span>';
 async function _fetchChanges(id, mkt) {
   if (priceCache[id]) return priceCache[id];
   const suf = mkt === 'tpex' ? '.TWO' : '.TW';
@@ -191,7 +198,7 @@ async function loadListChanges() {
     const batch = ids.slice(i, i + LIST_PRICE_BATCH);
     await Promise.all(batch.map(async id => {
       try { _updateChgCells(id, _chgHtml(await _fetchChanges(id, (STOCKS_BY_ID[id] || {}).mkt))); }
-      catch (e) { _updateChgCells(id, _chgHtml(null)); }   // 失敗顯示 —，不擋該列點擊
+      catch (e) { _updateChgCells(id, NOQUOTE_HTML); }   // 抓不到報價→標註資料異常，不擋該列點擊
     }));
     if (i + LIST_PRICE_BATCH < ids.length) await new Promise(r => setTimeout(r, LIST_PRICE_GAP_MS));
   }
