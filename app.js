@@ -65,13 +65,20 @@ function chipVerdict(rows) {
 async function loadChipVerdict(id) {
   const box = document.getElementById('chip-verdict');
   try {
-    const rows = [];
-    for (const date of getRecentTradingDates(7)) {
-      if (rows.length >= 5) break;
-      const data = await fetchT86(date);
-      if (!data) continue;
-      const row = data.find(r => r[0] === id);
-      if (row) rows.push(parseStockRow(row));
+    // P2-17：判定基準維持「近 5 日」不變（P2-10/P2-12 語意紅線），只換資料來源——
+    // FinMind 可用就用它（規格 §3：T86 純備援不平行打，省一輪請求）；否則走原 T86 路徑。
+    let rows = [];
+    const fm = await ensureFinmindChip(id);
+    if (fm) {
+      rows = fmAggregate(fm, 5).perDay.map(r => ({ foreign: r.foreign, trust: r.trust, dealer: r.dealer }));
+    } else {
+      for (const date of getRecentTradingDates(7)) {
+        if (rows.length >= 5) break;
+        const data = await fetchT86(date);
+        if (!data) continue;
+        const row = data.find(r => r[0] === id);
+        if (row) rows.push(parseStockRow(row));
+      }
     }
     const v = chipVerdict(rows);
     if (!v) return;
@@ -341,22 +348,105 @@ function closeModal() {
 }
 
 // 切換 tab
+// ── P2-17 個股籌碼多天期（1/5/20/60/120 日）──────────────────────────────
+// 主源＝FinMind TaiwanStockInstitutionalInvestorsBuySell（一次請求含全天期，**上櫃亦有資料**）；
+// 備援＝現行 T86 路徑（原封保留）。FinMind 失效時：當日/5日 走 T86、20/60/120 灰化、頂部黃底警示列。
+// 前置驗證（2026-07-19 實測）：匿名無 token 可抓 ✅／`Server: uvicorn` 非 CF ✅／**CORS `ACAO: *` → 前端直打免代理** ✅
+const CHIP_TABS = ['1d', '5d', '20d', '60d', '120d'];
+const CHIP_LONG = ['20d', '60d', '120d'];        // FinMind 失效時灰化這三個
+const FM_TIMEOUT = 6000;                          // 規格 §3：逾時 6 秒即視為失效
+const fmChipCache = {};                           // stockId → rows | null（null＝已知失效，不重打）
+const fmChipInflight = {};                        // stockId → Promise（去重：switchTab 與 loadChipVerdict 會同時要）
+var __forceChipFallback = false;                  // 失效演練開關（Console 可改，見 ensureFinmindChip）
+
 async function switchTab(tab) {
-  document.getElementById('tab-1d').className = tab === '1d'
-    ? 'px-3 py-1 rounded text-sm bg-blue-600 text-white'
-    : 'px-3 py-1 rounded text-sm bg-gray-700 text-white';
-  document.getElementById('tab-5d').className = tab === '5d'
-    ? 'px-3 py-1 rounded text-sm bg-blue-600 text-white'
-    : 'px-3 py-1 rounded text-sm bg-gray-700 text-white';
-
-  document.getElementById('chip-1d').classList.add('hidden');
-  document.getElementById('chip-5d').classList.add('hidden');
+  const src = await ensureFinmindChip(currentStockId);   // 先確定資料源（決定灰化與警示）
+  const dead = !src && CHIP_LONG.includes(tab);
+  for (const t of CHIP_TABS) {
+    const btn = document.getElementById(`tab-${t}`);
+    if (!btn) continue;
+    const disabled = !src && CHIP_LONG.includes(t);
+    btn.disabled = disabled;
+    btn.className = 'px-3 py-1 rounded text-sm ' +
+      (disabled ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                : t === tab ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white');
+    document.getElementById(`chip-${t}`)?.classList.add('hidden');
+  }
+  if (dead) {   // 灰化的 tab 不載入（點不動，但防呆）
+    document.getElementById('chip-loading').classList.add('hidden');
+    return;
+  }
   document.getElementById('chip-loading').classList.remove('hidden');
-
   await loadChipData(currentStockId, tab);
-
   document.getElementById('chip-loading').classList.add('hidden');
   document.getElementById(`chip-${tab}`).classList.remove('hidden');
+}
+
+// 取 FinMind 個股法人資料（每股一次請求 ~7 個月）；失敗/逾時/空資料/格式異常 → 回 null 觸發備援
+async function ensureFinmindChip(stockId) {
+  if (!stockId) return null;
+  if (stockId in fmChipCache) { renderChipWarn(!!fmChipCache[stockId]); return fmChipCache[stockId]; }
+  if (fmChipInflight[stockId]) return fmChipInflight[stockId];   // 同股同時只打一次
+  fmChipInflight[stockId] = (async () => {
+  let rows = null;
+  try {
+    // 失效演練用開關（規格 §6 錨3）：Console 打 `__forceChipFallback = true` 後重開彈窗，
+    // 即可驗證「T86 接手當日/5日＋20/60/120 灰化＋黃底警示列」；改回 false 恢復。
+    if (typeof __forceChipFallback !== 'undefined' && __forceChipFallback) throw new Error('forced fallback (test)');
+    const start = new Date(Date.now() - 210 * 86400000).toISOString().slice(0, 10);  // 120 交易日＋餘裕
+    const url = 'https://api.finmindtrade.com/api/v4/data'
+      + `?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${encodeURIComponent(stockId)}&start_date=${start}`;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), FM_TIMEOUT);
+    const r = await fetch(url, { signal: ctl.signal });    // ⚠ 不帶自訂標頭＝simple request，不觸發 preflight
+    clearTimeout(timer);
+    const j = await r.json();
+    if (j && j.msg === 'success' && Array.isArray(j.data) && j.data.length) rows = j.data;
+  } catch (e) { rows = null; }
+  fmChipCache[stockId] = rows;
+  renderChipWarn(!!rows);
+  return rows;
+  })().finally(() => { delete fmChipInflight[stockId]; });
+  return fmChipInflight[stockId];
+}
+
+function renderChipWarn(ok) {
+  const box = document.getElementById('chip-warn');
+  if (!box) return;
+  if (ok) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.innerHTML = '⚠ 長天期資料源（FinMind）暫時失效，目前僅顯示 當日／近5日（TWSE 備援）';
+  box.classList.remove('hidden');
+}
+
+// 依 FinMind 原始列聚合 N 個「有資料的交易日」
+// 口徑對齊 T86 標準（P2-12 紅線）：外資＝Foreign_Investor＋Foreign_Dealer_Self、投信＝Investment_Trust、
+// 自營商＝Dealer_self＋Dealer_Hedging；淨額＝buy−sell（股）；股→張沿用「先加總再除」。
+const FM_FOREIGN = ['Foreign_Investor', 'Foreign_Dealer_Self'];
+const FM_TRUST = ['Investment_Trust'];
+const FM_DEALER = ['Dealer_self', 'Dealer_Hedging'];
+function fmAggregate(rows, nDays) {
+  const dates = [...new Set(rows.map(r => r.date))].sort();
+  const use = new Set(dates.slice(-nDays));
+  const perDay = {};
+  for (const r of rows) {
+    if (!use.has(r.date)) continue;
+    const d = (perDay[r.date] ||= { foreign: 0, trust: 0, dealer: 0 });
+    const net = (r.buy || 0) - (r.sell || 0);
+    if (FM_FOREIGN.includes(r.name)) d.foreign += net;
+    else if (FM_TRUST.includes(r.name)) d.trust += net;
+    else if (FM_DEALER.includes(r.name)) d.dealer += net;
+  }
+  const lot = s => Math.round(s / 1000);
+  const days = Object.keys(perDay).sort();
+  return {
+    days,
+    perDay: days.map(d => ({ date: d, foreign: lot(perDay[d].foreign), trust: lot(perDay[d].trust), dealer: lot(perDay[d].dealer) })),
+    total: {
+      foreign: lot(days.reduce((s, d) => s + perDay[d].foreign, 0)),
+      trust:   lot(days.reduce((s, d) => s + perDay[d].trust, 0)),
+      dealer:  lot(days.reduce((s, d) => s + perDay[d].dealer, 0)),
+    },
+  };
 }
 
 // 從 TWSE T86 抓單日個股三大法人，回傳 {date, foreign, trust, dealer} 或 null
@@ -385,22 +475,90 @@ function parseStockRow(row) {
 
 // 抓三大法人資料
 async function loadChipData(stockId, tab) {
-  const cacheKey = `${stockId}-${tab}`;
+  const fm = fmChipCache[stockId];
+  // 快取鍵含資料源標記（規格 §4）：避免失效期間的 T86 畫面在恢復後被沿用
+  const cacheKey = `${stockId}-${tab}-${fm ? 'finmind' : 't86'}`;
   if (chipCache[cacheKey]) {
     document.getElementById(`chip-${tab}`).innerHTML = chipCache[cacheKey];
     return;
   }
 
   try {
-    const dates = getRecentTradingDates(7); // 多抓幾天以防假日
-    const html = tab === '1d'
-      ? await buildChip1d(stockId, dates)
-      : await buildChip5d(stockId, dates);
+    let html;
+    if (fm) {
+      html = tab === '1d' ? buildChipFm1d(fm) : buildChipFmMulti(fm, parseInt(tab));
+    } else {
+      const dates = getRecentTradingDates(7); // 多抓幾天以防假日
+      html = tab === '1d' ? await buildChip1d(stockId, dates) : await buildChip5d(stockId, dates);
+    }
     chipCache[cacheKey] = html;
     document.getElementById(`chip-${tab}`).innerHTML = html;
   } catch (e) {
     document.getElementById(`chip-${tab}`).innerHTML = '<p class="text-red-400 text-sm">資料載入失敗</p>';
   }
+}
+
+// FinMind 當日（版面與 T86 版一致）
+function buildChipFm1d(rows) {
+  const a = fmAggregate(rows, 1);
+  if (!a.days.length) return '<p class="text-gray-400 text-sm">查無資料</p>';
+  const { foreign, trust, dealer } = a.total;
+  const total = foreign + trust + dealer;
+  return `
+    <table class="w-full text-sm">
+      <thead><tr class="text-gray-400 border-b border-gray-700">
+        <th class="text-left py-1">法人</th><th class="text-right py-1">買賣超（張）</th>
+      </tr></thead>
+      <tbody>
+        ${chipRow('外資', foreign)}
+        ${chipRow('投信', trust)}
+        ${chipRow('自營商', dealer)}
+        <tr class="border-t border-gray-700 font-bold">
+          <td class="py-1">主力合計</td>
+          <td class="text-right py-1 ${total >= 0 ? 'text-red-400' : 'text-green-400'}">${fmt(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="text-xs text-gray-500 mt-2">資料日期：${a.days[a.days.length - 1]}</p>`;
+}
+
+// FinMind 多天期（5/20/60/120）：合計列＋逐日明細（長天期只列最近 20 日，避免爆版）
+function buildChipFmMulti(rows, nDays) {
+  const a = fmAggregate(rows, nDays);
+  if (!a.days.length) return '<p class="text-gray-400 text-sm">查無資料</p>';
+  const t = a.total, tt = t.foreign + t.trust + t.dealer;
+  const col = v => v >= 0 ? 'text-red-400' : 'text-green-400';
+  const SHOW = 20;
+  const shown = a.perDay.slice(-SHOW).reverse();   // 最新在上
+  const dataRows = shown.map(r => {
+    const tot = r.foreign + r.trust + r.dealer;
+    return `<tr class="border-b border-gray-800 text-xs">
+      <td class="py-1 text-gray-400">${r.date.slice(5)}</td>
+      <td class="text-right py-1 ${col(r.foreign)}">${fmt(r.foreign)}</td>
+      <td class="text-right py-1 ${col(r.trust)}">${fmt(r.trust)}</td>
+      <td class="text-right py-1 ${col(r.dealer)}">${fmt(r.dealer)}</td>
+      <td class="text-right py-1 font-bold ${col(tot)}">${fmt(tot)}</td>
+    </tr>`;
+  }).join('');
+  const more = a.days.length > SHOW
+    ? `<p class="text-xs text-gray-500 mt-2">合計為近 ${a.days.length} 個交易日；明細只列最近 ${SHOW} 日</p>`
+    : `<p class="text-xs text-gray-500 mt-2">近 ${a.days.length} 個交易日</p>`;
+  return `
+    <table class="w-full text-xs">
+      <thead><tr class="text-gray-400 border-b border-gray-700">
+        <th class="text-left py-1">日期</th><th class="text-right py-1">外資</th>
+        <th class="text-right py-1">投信</th><th class="text-right py-1">自營</th>
+        <th class="text-right py-1">合計</th>
+      </tr></thead>
+      <tbody>${dataRows}</tbody>
+      <tfoot><tr class="border-t border-gray-600 font-bold text-xs">
+        <td class="py-1 text-gray-300">${nDays}日合計</td>
+        <td class="text-right py-1 ${col(t.foreign)}">${fmt(t.foreign)}</td>
+        <td class="text-right py-1 ${col(t.trust)}">${fmt(t.trust)}</td>
+        <td class="text-right py-1 ${col(t.dealer)}">${fmt(t.dealer)}</td>
+        <td class="text-right py-1 ${col(tt)}">${fmt(tt)}</td>
+      </tr></tfoot>
+    </table>${more}`;
 }
 
 // 當日

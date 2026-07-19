@@ -497,17 +497,27 @@
       <!-- ② 價格與走勢（開彈窗抓一次，失敗整塊隱藏） -->
       <div id="modal-price" class="hidden mb-3"></div>
 
-      <!-- 三大法人 tab -->
-      <div class="flex gap-2 mb-3">
+      <!-- 三大法人 tab（P2-17：當日/5/20/60/120 日） -->
+      <div id="chip-warn" class="hidden mb-2 rounded bg-yellow-900/60 border border-yellow-600 px-3 py-2 text-xs text-yellow-200"></div>
+      <div class="flex gap-2 mb-3 flex-wrap">
         <button onclick="switchTab('1d')" id="tab-1d"
           class="px-3 py-1 rounded text-sm bg-blue-600 text-white">當日</button>
         <button onclick="switchTab('5d')" id="tab-5d"
           class="px-3 py-1 rounded text-sm bg-gray-700 text-white">近5日</button>
+        <button onclick="switchTab('20d')" id="tab-20d"
+          class="px-3 py-1 rounded text-sm bg-gray-700 text-white">20日</button>
+        <button onclick="switchTab('60d')" id="tab-60d"
+          class="px-3 py-1 rounded text-sm bg-gray-700 text-white">60日</button>
+        <button onclick="switchTab('120d')" id="tab-120d"
+          class="px-3 py-1 rounded text-sm bg-gray-700 text-white">120日</button>
       </div>
 
       <div id="chip-loading" class="text-gray-400 text-sm">載入中...</div>
       <div id="chip-1d" class="hidden"></div>
       <div id="chip-5d" class="hidden"></div>
+      <div id="chip-20d" class="hidden"></div>
+      <div id="chip-60d" class="hidden"></div>
+      <div id="chip-120d" class="hidden"></div>
 
       <!-- ① 籌碼白話解讀 -->
       <div id="chip-verdict" class="hidden mt-2 text-sm"></div>
@@ -554,7 +564,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260719e"></script>
+  <script src="app.js?v=20260719f"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
