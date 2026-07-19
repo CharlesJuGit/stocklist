@@ -1526,7 +1526,10 @@ async function triggerFetch() {
   // PAT 存 localStorage：個人儀表板、手機常用，記住免重輸（靜態網頁無使用者輸入，XSS 風險低）
   let pat = localStorage.getItem('gh_pat') || '';
   if (!pat) {
-    pat = prompt('請輸入 GitHub Personal Access Token（需要 workflow 權限）：');
+    // ⚠ 權限說明（2026-07-19 實測踩過）：dispatch 需要的是「Actions 寫入」，不是 workflow scope——
+    // fine-grained：Only select repositories 勾 stocklist ＋ Repository permissions 的 Actions = Read and write
+    // classic：需 repo（或 public_repo）scope；只勾 workflow 會 403
+    pat = prompt('請輸入 GitHub Personal Access Token\n\nfine-grained：需勾 stocklist ＋ Actions = Read and write\nclassic：需 public_repo（或 repo）scope');
     if (!pat) { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; return; }
     pat = pat.trim();
     localStorage.setItem('gh_pat', pat);
@@ -1556,6 +1559,13 @@ async function triggerFetch() {
       alert('Token 無效或已過期，已清除，請重試。');
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 2000);
     } else {
+      // 403/404 都是權限問題，但成因不同（GitHub 對「有登入無權限」回 404 以免洩漏 repo 存在）
+      if (res.status === 403 || res.status === 404) {
+        alert(res.status === 403
+          ? 'Token 權限不足（403）\n\nclassic token 只勾 workflow 是不夠的——\n觸發 workflow 需要 repo（或 public_repo）scope。\n請重建 token 並勾選 public_repo。'
+          : 'Token 看不到這個 repo（404）\n\nfine-grained token 常見原因：\n① Repository access 沒勾 stocklist\n② Repository permissions 的 Actions 不是 Read and write\n\n改好後要重新 Generate 一次（權限異動不影響舊 token 值時亦可直接編輯儲存）。');
+        localStorage.removeItem('gh_pat');   // 清掉讓下次可重輸
+      }
       btn.textContent = `失敗 (${res.status})`;
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 3000);
     }
