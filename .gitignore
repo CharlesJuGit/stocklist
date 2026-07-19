@@ -3,3 +3,7 @@ merged_to_json.py
 
 __pycache__/
 *.pyc
+
+# P2-21 隱私：規格文件與本機操作台只留本機（未 push 的 *_SPEC.md 為策略/規格細節）
+*_SPEC.md
+ops.html
