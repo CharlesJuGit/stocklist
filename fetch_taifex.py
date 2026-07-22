@@ -65,6 +65,18 @@ def scrape_taifex_web():
         raw = re.findall(r'class="(?:blue|red)">\s*([-\d,]+)\s*</span>', html)
         return [int(n.replace(",", "")) for n in raw]
 
+    def _nums_with_amt(html):
+        """選擇權頁：口數(blue/red span)＋緊接其後的契約金額(該頁「契約金額」欄非 span，
+        是純數字 <TD>，緊跟在口數 <TD> 之後；首列偶見多包一層空 <div> 的排版差異，容許之）。
+        （P2-26 Part A，2026-07-22 實測驗證：回傳序列與 _nums_all 的口數逐位相同，
+        且對應金額與 TAIFEX callsAndPutsDateDown 下載端點同日同列逐位相同。）
+        回傳 [(口數, 契約金額), ...]，與 _nums_all() 同順序、同索引意義（如 idx34＝PUT外資賣方）。"""
+        pairs = re.findall(
+            r'class="(?:blue|red)">\s*([-\d,]+)\s*</span>\s*</TD>\s*'
+            r'<TD[^>]*>\s*(?:<div[^>]*>\s*</div>\s*)*(?:<div[^>]*>\s*)?([-\d,]+)\s*(?:</div>)?\s*</TD>',
+            html, re.IGNORECASE)
+        return [(int(a.replace(",", "")), int(b.replace(",", ""))) for a, b in pairs]
+
     def _date(html):
         m = re.search(r"(\d{4}/\d{2}/\d{2})", html)
         return m.group(1).replace("/", "") if m else None
@@ -125,18 +137,29 @@ def scrape_taifex_web():
         # PUT 外資（row 2）：6欄從 index 30 開始，未平倉買=idx 33, 未平倉賣=idx 34
         bp = opt_nums[33] if len(opt_nums) > 33 else 0
         sp = opt_nums[34] if len(opt_nums) > 34 else 0
+        # P2-26 Part A：SP（賣Put）契約金額，供 SP 訊號（P1-25）判斷用。單位千元（同 TAIFEX 慣例）。
+        # 缺值防呆：解析失敗或索引不足 → None（settlement_history 該日 sp_amt: null，不強湊）。
+        try:
+            opt_pairs = _nums_with_amt(html_opt)
+            sp_amt = opt_pairs[34][1] if len(opt_pairs) > 34 and opt_pairs[34][0] == sp else None
+            if sp_amt is None:
+                print(f"scrape TXO sp_amt 解析不一致（配對口數={opt_pairs[34][0] if len(opt_pairs)>34 else 'N/A'} vs sp={sp}），標 null")
+        except Exception as e_amt:
+            print(f"scrape TXO sp_amt fail: {e_amt}")
+            sp_amt = None
     except Exception as e:
         print(f"scrape TXO fail: {e}")
         bc = sc = bp = sp = 0
+        sp_amt = None
 
     futures = {
         "txF": txF, "txT": txT, "txD": txD,
         "mtxF": mtxF, "mtxT": mtxT, "mtxD": mtxD,
         "tmxF": tmxF, "tmxT": tmxT, "tmxD": tmxD,
     }
-    options = {"bc": bc, "sc": sc, "bp": bp, "sp": sp}
+    options = {"bc": bc, "sc": sc, "bp": bp, "sp": sp, "sp_amt": sp_amt}
     print(f"scrape_taifex_web OK: date={date} txF={txF} "
-          f"mtx(D/T/F)={mtxD}/{mtxT}/{mtxF} tmx(D/T/F)={tmxD}/{tmxT}/{tmxF} bc={bc} bp={bp}")
+          f"mtx(D/T/F)={mtxD}/{mtxT}/{mtxF} tmx(D/T/F)={tmxD}/{tmxT}/{tmxF} bc={bc} bp={bp} sp_amt={sp_amt}")
     return date, futures, options
 
 
@@ -791,6 +814,22 @@ def get_settlement_date(ref_date=None):
     return settlement
 
 
+def recent_settlement_dates(n_months=4):
+    """近 n_months 個月的結算日清單（含本月），供前端 SP 訊號判斷用（P2-26 Part B）。
+    重用既有 get_settlement_date（單一真相來源，不另寫一份）——傳入「該月第一天」當 ref_date，
+    因結算日必在該月中旬後，day=1 必然 <= 結算日，不會觸發其「已過結算日則取下月」的位移邏輯。"""
+    from datetime import date as _date
+    today = _date.today()
+    out = []
+    y, m = today.year, today.month
+    for _ in range(n_months):
+        out.append(get_settlement_date(_date(y, m, 1)).strftime("%Y-%m-%d"))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    return sorted(out)
+
+
 def count_trading_days(from_date, to_date):
     """計算 from_date 到 to_date（含兩端）之間的交易日數（排除週末與國定假日）。"""
     from datetime import timedelta as _td
@@ -1251,6 +1290,7 @@ def main():
         sp   = options.get("sp", 0)
         bc   = options.get("bc", 0)
         sc   = options.get("sc", 0)
+        sp_amt = options.get("sp_amt")   # P2-26 Part A：可能為 None（解析失敗/非 scrape_taifex_web 路徑），不強湊
         sr   = calc_settlement_ratio(txF, mtxF, bp, sp, settlement_date, from_date=taifex_date)
 
         # 散戶淨部位
@@ -1267,6 +1307,7 @@ def main():
             "mtxF":         mtxF,
             "bp":           bp,
             "sp":           sp,
+            "sp_amt":       sp_amt,   # P2-26 Part A：SP契約金額（千元），供 SP 訊號判斷；缺值為 None
             "bc":           bc,
             "sc":           sc,
             "fut_net":      sr["fut_net"],
@@ -1354,6 +1395,7 @@ def main():
         "options":            options,
         "institute":          institute,
         "settlement_date":    settlement_date.strftime("%Y-%m-%d"),
+        "recent_settlement_dates": recent_settlement_dates(),   # P2-26 Part B：SP訊號結算日防呆用
         "settlement_history": existing_history,
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
