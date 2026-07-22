@@ -1423,6 +1423,19 @@ async function loadOptions() {
 // 籌碼綜合評分：單日資料 → {score, signals, futNet}
 // entry 欄位：foreign/trust(億元，可缺)、txF/mtxF(口)、bc/sc/bp/sp(口)、ratio/tdays
 // 主畫面（當日即時）與近20天彈窗（settlement_history 逐日）共用，避免兩套邏輯漂移
+// P2-25：外資期貨淨部位評分改「近N日滾動百分位」，取代絕對口數門檻（±2000/±500）。
+// 起因：外資淨OI有結構性單向漂移（年度中位 2022 +760／2024 −27,112／2025 −31,474／2026 −40,428），
+// 固定門檻在 2024 年起幾乎恆判 −2 分（×2 權重＝恆扣 4 分）、已無鑑別力兩年多，持續把綜合評分往空方拉。
+// 改法語意變更：從「絕對站多/站空」→「相對近期部位偏多/偏空」，regime-adaptive、隨結構水位自動重新置中。
+const FUT_PCT_WIN = 40;   // 窗口天數（settlement_history 現滾動可得 ~44-60 天）
+function futNetPercentile(current, windowVals) {
+  // p = 窗內 <= current 的比例（windowVals 含 current 本身）；樣本 <20 天不計分（回 null）
+  const n = windowVals.length;
+  if (n < 20) return null;
+  const rank = windowVals.filter(v => v <= current).length;
+  return rank / n * 100;
+}
+
 function scoreEntry(e) {
   const signals = [];
   let score = 0; // 正=多 負=空
@@ -1436,12 +1449,17 @@ function scoreEntry(e) {
     signals.push(`外資現貨 ${label} → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
   }
 
-  // 2. 外資期貨淨部位（高權重）
+  // 2. 外資期貨淨部位（高權重）— P2-25 改制，見上方 futNetPercentile 說明
   const futNet = (e.txF ?? 0) + (e.mtxF ?? 0) / 4;
   {
-    const s = futNet >= 2000 ? 2 : futNet >= 500 ? 1 : futNet <= -2000 ? -2 : futNet <= -500 ? -1 : 0;
+    const win = e.futWindow || [];
+    const p = futNetPercentile(futNet, win);
+    const s = p == null ? 0 : (p <= 10 ? -2 : p <= 30 ? -1 : p >= 90 ? 2 : p >= 70 ? 1 : 0);
     score += s * 2;
-    signals.push(`外資期貨 ${Math.round(futNet) >= 0 ? '+' : ''}${Math.round(futNet).toLocaleString()}口 → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+    const label = `${Math.round(futNet) >= 0 ? '+' : ''}${Math.round(futNet).toLocaleString()}口`;
+    signals.push(p == null
+      ? `外資期貨 ${label}（近期樣本<20日，不計分）`
+      : `外資期貨 ${label}（近${win.length}日 p${p.toFixed(0)}%） → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
   }
 
   // 3. 結算比（高權重，正值代表空方壓力大）
@@ -1501,6 +1519,9 @@ async function loadSignalSummary() {
     const inst = data.institute || {};
     const hist = data.settlement_history || [];
     const latest = hist.length ? hist[hist.length - 1] : null;
+    // P2-25：今日 futures.txF/mtxF 與 settlement_history 最新一筆同日同值（已核對）
+    // → 近 N 日窗口可直接取 hist 尾段，不需另外拼接今日值
+    const futWindow = hist.slice(-FUT_PCT_WIN).map(r => (r.txF ?? 0) + (r.mtxF ?? 0) / 4);
 
     const { score, signals, futNet } = scoreEntry({
       foreign: inst.foreign ?? null,
@@ -1509,6 +1530,7 @@ async function loadSignalSummary() {
       bc: o.bc, sc: o.sc, bp: o.bp, sp: o.sp,
       ratio: latest ? (latest.ratio ?? 0) : null,
       tdays: latest ? latest.tdays : null,
+      futWindow,
     });
     const { label: summary, color: summaryColor } = rateScore(score);
 
@@ -1536,8 +1558,12 @@ function openSignalModal() {
     const hist = data?.settlement_history;
     if (!hist?.length) return;
     let hasPartial = false;
-    const rows = [...hist].reverse().slice(0, 20).map(r => {
-      const { score } = scoreEntry(r);
+    // P2-25：逐日回算改「walk-forward」——第 i 天的百分位窗口只用第 i 天(含)以前的資料，
+    // 不可用未來資料算過去分數（否則會有 lookahead bias：用未來才知道的資料計算過去分數）。hist 為升冪（舊→新）。
+    const rows = hist.map((r, i) => {
+      const win = hist.slice(Math.max(0, i - FUT_PCT_WIN + 1), i + 1)
+        .map(x => (x.txF ?? 0) + (x.mtxF ?? 0) / 4);
+      const { score } = scoreEntry({ ...r, futWindow: win });
       const partial = r.foreign == null;
       if (partial) hasPartial = true;
       const { label, color } = rateScore(score);
@@ -1545,7 +1571,7 @@ function openSignalModal() {
         <span class="text-gray-400">${r.date}${partial ? '<span class="text-yellow-500">*</span>' : ''}</span>
         <span class="font-bold ${color}">${score > 0 ? '+' : ''}${score}分　${label}</span>
       </div>`;
-    }).join('');
+    }).reverse().slice(0, 20).join('');
     document.getElementById('signal-modal-body').innerHTML =
       `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
         <span>日期</span><span>分數／評語</span>
