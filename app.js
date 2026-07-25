@@ -17,6 +17,28 @@ async function loadStocks() {
     document.getElementById('stocks-updated').textContent =
       `推薦清單更新：${data.updated}`;
   }
+  renderRegimeBanner(data.regime);
+}
+
+// P2-27：市況燈號（只顯示顏色/名稱/emoji；不含行動建議或內部數字——
+// 那些是本機端另一套系統的內部細節，Ball 2026-07-25 裁示不上傳）。
+// 顏色沿用同一份既有報告畫面的配色，與 Ball 已熟悉的畫面一致。
+const REGIME_COLORS = {
+  green:  { bg: '#ecfdf5', border: '#16a34a', text: '#166534' },
+  yellow: { bg: '#fffbeb', border: '#d97706', text: '#92400e' },
+  red:    { bg: '#fef2f2', border: '#dc2626', text: '#991b1b' },
+  gray:   { bg: '#f4f4f5', border: '#9ca3af', text: '#4b5563' },
+};
+function renderRegimeBanner(regime) {
+  const box = document.getElementById('regime-banner');
+  if (!box) return;
+  if (!regime || !regime.light) { box.classList.add('hidden'); return; }
+  const c = REGIME_COLORS[regime.light] || REGIME_COLORS.gray;
+  box.style.background = c.bg;
+  box.style.borderColor = c.border;
+  box.style.color = c.text;
+  box.textContent = `市況燈號：${regime.emoji || ''} ${regime.name || ''}`;
+  box.classList.remove('hidden');
 }
 
 // ── P2-24 前三週多頭留存（依規格只做多方清單，空方不留存）──────────

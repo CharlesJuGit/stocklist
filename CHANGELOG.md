@@ -8,6 +8,20 @@
 
 ---
 
+## 2026-07-25（P2-27：市況燈號上傳公開頁，選股區上方）
+
+**Request：** Ball——把目前只在本機端報告可見的市況燈號帶到公開頁，位置在選股清單上方；只上傳燈號本身（顏色/名稱/emoji），不含行動建議文字或內部判定數字。
+
+**Feat (Sonnet)：**
+- 新增 `sync_regime.py`：重用本機端既有、已驗證的燈號判定函式（唯一真相來源，不在 stockweb 側另寫一份判定邏輯），只讀其 `{light, name, emoji}` 三個顯示欄位寫入 `stocks.json` 頂層 `regime` 鍵，**不帶行動建議文字**（該文字含內部代號，不適合公開）。用法：`/weekly` 產生 `stocks.json` 後於 stockweb 目錄執行。
+- `index.html` 新增燈號 banner 容器（`#regime-banner`），插在「推薦清單更新」時間列與多空清單頁籤之間。
+- `app.js` 新增 `renderRegimeBanner()`，於 `loadStocks()` 內以 `data.regime` 驅動：依 `light`（green/yellow/red/gray）套用底色/邊框/文字色（沿用既有報告畫面同一組配色），顯示 `emoji + name`；`regime` 缺值（舊快取或尚未同步）時 banner 保持隱藏，不報錯。
+- 燈號共 **4 態**非 3 態：🟢積極做多／🟡減碼警戒／🔴防禦窗口／⚪資料不足（<5週歷史時的保底態，目前 15 週歷史下不會觸發，但前端仍完整處理）。
+- **驗證**：`sync_regime.py` 實跑本週（2026-07-25）資料，輸出 `🔴 防禦窗口（red）`，與 `/weekly` 本週報告的燈號結果一致；`stocks.json` 內 `regime` 欄逐鍵核對僅含 `{light,name,emoji}` 三鍵，無多餘欄位。
+- 隱私掃描：`sync_regime.py` 初版註解一度直寫內部代號（S4/G2/G4/MDD）與「策略」字樣，已改為中性措辭（不點名內部系統/模組/代號），複掃零命中。cache-buster `v=20260722b → v=20260725a`。
+
+---
+
 ## 2026-07-22（P2-26 Part A/B：SP（賣Put）訊號 20 日彈窗顯示；Part C 評分依 P1-25 結論不接線）
 
 **Request：** SP_FEATURE_SPEC（Opus 撰，P1-24 二期·顯示軌，兩軌制）——Part A 爬蟲補 SP 契約金額入 settlement_history；Part B 20日彈窗標記 SP 訊號；Part C 評分 +1 需 P1-25 回測驗過才接線。
