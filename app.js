@@ -1493,17 +1493,15 @@ function scoreEntry(e) {
   const signals = [];
   let score = 0; // 正=多 負=空
 
-  // 1. 外資現貨買賣超（高權重）— P2-29 改滾動百分位，取代絕對門檻（>=30億太低，92%天數判±2、中間帶死碼）
+  // 1. 外資現貨買賣超（高權重）— P2-29 一度改滾動百分位，reviewer 抓到 sign-confusion bug 退回：
+  // 外資現貨是有自然零點的正負震盪序列（非結構性單向漂移），連續大賣超窗口下「較小賣超」會落高百分位、
+  // 誤判偏多，跟數字本身的正負矛盾。改回絕對門檻，只放寬granularity（原±30億/±5億太細，92%天數判±2）。
   const foreign = e.foreign ?? null;
   if (foreign !== null) {
-    const win = e.foreignWindow || [];
-    const p = rollingPercentile(foreign, win);
-    const s = p == null ? 0 : (p <= 10 ? -2 : p <= 30 ? -1 : p >= 90 ? 2 : p >= 70 ? 1 : 0);
+    const s = foreign >= 300 ? 2 : foreign >= 50 ? 1 : foreign <= -300 ? -2 : foreign <= -50 ? -1 : 0;
     score += s * 2;
     const label = foreign >= 0 ? `+${foreign}億` : `${foreign}億`;
-    signals.push(p == null
-      ? `外資現貨 ${label}（近期樣本<20日，不計分）`
-      : `外資現貨 ${label}（近${win.length}日 p${p.toFixed(0)}%） → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+    signals.push(`外資現貨 ${label} → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
   }
 
   // 2. 外資期貨淨部位（高權重）— P2-25 改制，見上方 rollingPercentile 說明
@@ -1581,9 +1579,8 @@ async function loadSignalSummary() {
     const hist = data.settlement_history || [];
     const latest = hist.length ? hist[hist.length - 1] : null;
     // P2-25：今日 futures.txF/mtxF 與 settlement_history 最新一筆同日同值（已核對）
-    // → 近 N 日窗口可直接取 hist 尾段，不需另外拼接今日值。P2-29：外資現貨/結算比同理。
+    // → 近 N 日窗口可直接取 hist 尾段，不需另外拼接今日值。P2-29：結算比同理（外資現貨已退回絕對門檻，不需窗口）。
     const futWindow = hist.slice(-PCT_WIN).map(r => (r.txF ?? 0) + (r.mtxF ?? 0) / 4);
-    const foreignWindow = hist.slice(-PCT_WIN).filter(r => r.foreign != null).map(r => r.foreign);
     const ratioWindow = hist.slice(-PCT_WIN).filter(r => r.ratio != null).map(r => r.ratio);
 
     const { score, signals, futNet } = scoreEntry({
@@ -1593,7 +1590,7 @@ async function loadSignalSummary() {
       bc: o.bc, sc: o.sc, bp: o.bp, sp: o.sp,
       ratio: latest ? (latest.ratio ?? 0) : null,
       tdays: latest ? latest.tdays : null,
-      futWindow, foreignWindow, ratioWindow,
+      futWindow, ratioWindow,
     });
     const { label: summary, color: summaryColor } = rateScore(score);
 
@@ -1623,13 +1620,12 @@ function openSignalModal() {
     let hasPartial = false;
     // P2-25：逐日回算改「walk-forward」——第 i 天的百分位窗口只用第 i 天(含)以前的資料，
     // 不可用未來資料算過去分數（否則會有 lookahead bias：用未來才知道的資料計算過去分數）。hist 為升冪（舊→新）。
-    // P2-29：外資現貨/結算比同樣改滾動百分位，窗口取法與外資期貨共用同一段 slice。
+    // P2-29：結算比同樣改滾動百分位，窗口取法與外資期貨共用同一段 slice（外資現貨已退回絕對門檻，不需窗口）。
     const rows = hist.map((r, i) => {
       const slice = hist.slice(Math.max(0, i - PCT_WIN + 1), i + 1);
       const win = slice.map(x => (x.txF ?? 0) + (x.mtxF ?? 0) / 4);
-      const foreignWindow = slice.filter(x => x.foreign != null).map(x => x.foreign);
       const ratioWindow = slice.filter(x => x.ratio != null).map(x => x.ratio);
-      const { score } = scoreEntry({ ...r, futWindow: win, foreignWindow, ratioWindow });
+      const { score } = scoreEntry({ ...r, futWindow: win, ratioWindow });
       const partial = r.foreign == null;
       if (partial) hasPartial = true;
       const { label, color } = rateScore(score);
