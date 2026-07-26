@@ -1476,8 +1476,12 @@ async function loadOptions() {
 // 起因：外資淨OI有結構性單向漂移（年度中位 2022 +760／2024 −27,112／2025 −31,474／2026 −40,428），
 // 固定門檻在 2024 年起幾乎恆判 −2 分（×2 權重＝恆扣 4 分）、已無鑑別力兩年多，持續把綜合評分往空方拉。
 // 改法語意變更：從「絕對站多/站空」→「相對近期部位偏多/偏空」，regime-adaptive、隨結構水位自動重新置中。
-const FUT_PCT_WIN = 40;   // 窗口天數（settlement_history 現滾動可得 ~44-60 天）
-function futNetPercentile(current, windowVals) {
+// P2-29（Opus 稽核發現同類問題）：結算比／外資現貨兩項固定門檻也已失效——
+// 結算比 ratio 實際範圍 0~109,300，但門檻 >=5000 封頂已無鑑別（33/49天同判−2）；
+// 外資現貨 >=30億 門檻太低，92% 的日子判 ±2、中間帶死碼。兩項比照同一套滾動百分位改法，
+// 共用下面這個通用函式（原僅供外資期貨用，改名去掉 fut 專屬字樣）。
+const PCT_WIN = 40;   // 窗口天數（settlement_history 現滾動可得 ~44-60 天）
+function rollingPercentile(current, windowVals) {
   // p = 窗內 <= current 的比例（windowVals 含 current 本身）；樣本 <20 天不計分（回 null）
   const n = windowVals.length;
   if (n < 20) return null;
@@ -1489,20 +1493,24 @@ function scoreEntry(e) {
   const signals = [];
   let score = 0; // 正=多 負=空
 
-  // 1. 外資現貨買賣超（高權重）
+  // 1. 外資現貨買賣超（高權重）— P2-29 改滾動百分位，取代絕對門檻（>=30億太低，92%天數判±2、中間帶死碼）
   const foreign = e.foreign ?? null;
   if (foreign !== null) {
-    const s = foreign >= 30 ? 2 : foreign >= 5 ? 1 : foreign <= -30 ? -2 : foreign <= -5 ? -1 : 0;
+    const win = e.foreignWindow || [];
+    const p = rollingPercentile(foreign, win);
+    const s = p == null ? 0 : (p <= 10 ? -2 : p <= 30 ? -1 : p >= 90 ? 2 : p >= 70 ? 1 : 0);
     score += s * 2;
     const label = foreign >= 0 ? `+${foreign}億` : `${foreign}億`;
-    signals.push(`外資現貨 ${label} → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
+    signals.push(p == null
+      ? `外資現貨 ${label}（近期樣本<20日，不計分）`
+      : `外資現貨 ${label}（近${win.length}日 p${p.toFixed(0)}%） → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
   }
 
-  // 2. 外資期貨淨部位（高權重）— P2-25 改制，見上方 futNetPercentile 說明
+  // 2. 外資期貨淨部位（高權重）— P2-25 改制，見上方 rollingPercentile 說明
   const futNet = (e.txF ?? 0) + (e.mtxF ?? 0) / 4;
   {
     const win = e.futWindow || [];
-    const p = futNetPercentile(futNet, win);
+    const p = rollingPercentile(futNet, win);
     const s = p == null ? 0 : (p <= 10 ? -2 : p <= 30 ? -1 : p >= 90 ? 2 : p >= 70 ? 1 : 0);
     score += s * 2;
     const label = `${Math.round(futNet) >= 0 ? '+' : ''}${Math.round(futNet).toLocaleString()}口`;
@@ -1511,13 +1519,17 @@ function scoreEntry(e) {
       : `外資期貨 ${label}（近${win.length}日 p${p.toFixed(0)}%） → ${s > 0 ? '偏多' : s < 0 ? '偏空' : '中性'}`);
   }
 
-  // 3. 結算比（高權重，正值代表空方壓力大）
+  // 3. 結算比（高權重，正值代表空方壓力大）— P2-29 改滾動百分位，取代絕對門檻（>=5000封頂，實際範圍達109,300、高端零鑑別）
   if (e.ratio != null) {
     const ratio = e.ratio ?? 0;
     const tdays = e.tdays ?? 20;
-    const s = ratio >= 5000 ? -2 : ratio >= 2000 ? -1 : ratio <= 500 ? 1 : 0;
+    const win = e.ratioWindow || [];
+    const p = rollingPercentile(ratio, win);
+    const s = p == null ? 0 : (p >= 90 ? -2 : p >= 70 ? -1 : p <= 10 ? 1 : 0);
     score += s * 2;
-    signals.push(`結算比 ${ratio.toLocaleString()}（${tdays}日）→ ${s < 0 ? '空壓大' : s > 0 ? '壓力低' : '中性'}`);
+    signals.push(p == null
+      ? `結算比 ${ratio.toLocaleString()}（${tdays}日，近期樣本<20日，不計分）`
+      : `結算比 ${ratio.toLocaleString()}（${tdays}日，近${win.length}日 p${p.toFixed(0)}%）→ ${s < 0 ? '空壓大' : s > 0 ? '壓力低' : '中性'}`);
   }
 
   // 4. P/C Ratio（中權重）
@@ -1569,8 +1581,10 @@ async function loadSignalSummary() {
     const hist = data.settlement_history || [];
     const latest = hist.length ? hist[hist.length - 1] : null;
     // P2-25：今日 futures.txF/mtxF 與 settlement_history 最新一筆同日同值（已核對）
-    // → 近 N 日窗口可直接取 hist 尾段，不需另外拼接今日值
-    const futWindow = hist.slice(-FUT_PCT_WIN).map(r => (r.txF ?? 0) + (r.mtxF ?? 0) / 4);
+    // → 近 N 日窗口可直接取 hist 尾段，不需另外拼接今日值。P2-29：外資現貨/結算比同理。
+    const futWindow = hist.slice(-PCT_WIN).map(r => (r.txF ?? 0) + (r.mtxF ?? 0) / 4);
+    const foreignWindow = hist.slice(-PCT_WIN).filter(r => r.foreign != null).map(r => r.foreign);
+    const ratioWindow = hist.slice(-PCT_WIN).filter(r => r.ratio != null).map(r => r.ratio);
 
     const { score, signals, futNet } = scoreEntry({
       foreign: inst.foreign ?? null,
@@ -1579,7 +1593,7 @@ async function loadSignalSummary() {
       bc: o.bc, sc: o.sc, bp: o.bp, sp: o.sp,
       ratio: latest ? (latest.ratio ?? 0) : null,
       tdays: latest ? latest.tdays : null,
-      futWindow,
+      futWindow, foreignWindow, ratioWindow,
     });
     const { label: summary, color: summaryColor } = rateScore(score);
 
@@ -1609,10 +1623,13 @@ function openSignalModal() {
     let hasPartial = false;
     // P2-25：逐日回算改「walk-forward」——第 i 天的百分位窗口只用第 i 天(含)以前的資料，
     // 不可用未來資料算過去分數（否則會有 lookahead bias：用未來才知道的資料計算過去分數）。hist 為升冪（舊→新）。
+    // P2-29：外資現貨/結算比同樣改滾動百分位，窗口取法與外資期貨共用同一段 slice。
     const rows = hist.map((r, i) => {
-      const win = hist.slice(Math.max(0, i - FUT_PCT_WIN + 1), i + 1)
-        .map(x => (x.txF ?? 0) + (x.mtxF ?? 0) / 4);
-      const { score } = scoreEntry({ ...r, futWindow: win });
+      const slice = hist.slice(Math.max(0, i - PCT_WIN + 1), i + 1);
+      const win = slice.map(x => (x.txF ?? 0) + (x.mtxF ?? 0) / 4);
+      const foreignWindow = slice.filter(x => x.foreign != null).map(x => x.foreign);
+      const ratioWindow = slice.filter(x => x.ratio != null).map(x => x.ratio);
+      const { score } = scoreEntry({ ...r, futWindow: win, foreignWindow, ratioWindow });
       const partial = r.foreign == null;
       if (partial) hasPartial = true;
       const { label, color } = rateScore(score);
@@ -1934,11 +1951,10 @@ async function loadIndexYtd() {
     const nm = IDX_TARGETS[i].name;
     if (r.status !== "fulfilled") return `<tr class="border-b border-gray-800"><td class="py-1 text-gray-300">${nm}</td><td colspan="4" class="text-right text-gray-600 text-xs">—</td></tr>`;
     const d = r.value, pct = d.yearHigh > 0 ? (d.price - d.yearHigh) / d.yearHigh * 100 : null;
-    const pctClass = IDX_TARGETS[i].neutral ? "text-gray-400" : idxColor(pct);   // 匯率列不套紅綠
     return `<tr class="border-b border-gray-800">
       <td class="py-1 text-gray-300">${nm}${d.daily ? '<span class="text-gray-600 text-[10px]">日</span>' : ''}</td>
       <td class="text-right text-gray-200">${idxNum(d.price)}</td>
-      <td class="text-right font-bold ${pctClass}">${pct == null ? "—" : (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>
+      <td class="text-right font-bold ${idxColor(pct)}">${pct == null ? "—" : (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"}</td>
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
       <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
