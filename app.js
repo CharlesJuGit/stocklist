@@ -1842,7 +1842,17 @@ function idxColor(pct) {   // 台灣慣例紅多：貼近年高=紅、深回檔=
   if (pct >= -10) return "text-yellow-400";
   return "text-green-400";
 }
-function idxNum(n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+const SUP_DIGITS = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
+function idxSci(n) {   // 極小數值（如日圓兌美元 ~0.006）改科學記號，避免 maximumFractionDigits:2 四捨五入到看不出差異
+  const [mantissa, exp] = n.toExponential(3).split("e");
+  const expStr = String(parseInt(exp, 10)).split("").map(c => SUP_DIGITS[c] || c).join("");
+  return `${mantissa}×10${expStr}`;
+}
+function idxNum(n) {
+  if (n == null || isNaN(n)) return "—";
+  const v = Number(n);
+  return (v !== 0 && Math.abs(v) < 0.01) ? idxSci(v) : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
 function idxTime(v) {
   // 統一台灣時間「上午/下午 HH:MM」12小時制（Yahoo=epoch、OTC/小台=HH:MM字串，全部一致）
   if (v == null) return "—";
