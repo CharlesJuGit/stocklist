@@ -1832,7 +1832,8 @@ const IDX_TARGETS = [
   { name: "費城半導體", t: "y", sym: "^SOX" },
   { name: "台指期 小台", t: "mxf" },
   { name: "西德州原油", t: "y", sym: "CL=F" },
-  { name: "日圓 USD/JPY", t: "y", sym: "JPY=X", neutral: true },   // 貼近年高＝日圓最弱，非「好」，不套紅綠
+  { name: "日圓兌美元", t: "y", sym: "JPY=X", neutral: true },   // 貼近年高＝日圓最弱，非「好」，不套紅綠
+  { name: "黃金對美元", t: "y", sym: "GC=F" },
 ];
 
 function idxColor(pct) {   // 台灣慣例紅多：貼近年高=紅、深回檔=綠
@@ -1931,7 +1932,7 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-500">${idxNum(d.yearHigh)}</td>
       <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
-  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走 Val Town 代理即時，未設/失敗時退後端日更收盤(標「日」)。日圓 USD/JPY 距年高%為中性灰，僅數值參考、不代表多空（貼近年高＝日圓最弱，非利多）。";
+  if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走 Val Town 代理即時，未設/失敗時退後端日更收盤(標「日」)。日圓兌美元距年高%為中性灰，僅數值參考、不代表多空（貼近年高＝日圓最弱，非利多）。";
 }
 let idxTimer = null;
 function scheduleIndexRefresh() {
