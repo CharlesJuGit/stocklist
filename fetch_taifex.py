@@ -77,6 +77,24 @@ def scrape_taifex_web():
             html, re.IGNORECASE)
         return [(int(a.replace(",", "")), int(b.replace(",", ""))) for a, b in pairs]
 
+    def _find_sp_amt(opt_pairs, sp, expected_idx=34):
+        """依 sp 口數值反查對應契約金額，不死板信任固定 index（P2-26殘2，2026-07-27 實測踩到：
+        _nums_with_amt() 的配對正規表達式要求「口數 span 緊接著金額 TD」，若某一列的金額格式
+        跟預期結構有出入（該列就配不出 pair），後面所有列的 index 就整批往前位移一格，
+        原本「opt_pairs[34][0] == sp」的固定索引比對會直接判失敗、把整天的 sp_amt 標 null——
+        即使 sp 本身的金額其實有正確抓到，只是位置不在 34 而已。
+        改法：先查 expected_idx 本身（多數情況零額外開銷、行為不變），沒中則由近到遠往外找
+        第一個「口數＝sp」的 pair——愈靠近 expected_idx 愈可能是真正配對，避免撞到其他機構
+        巧合同值的口數（同一頁 36 個數字中，越接近 sp 位置的相鄰列越不容易剛好同值）。"""
+        n = len(opt_pairs)
+        if expected_idx < n and opt_pairs[expected_idx][0] == sp:
+            return opt_pairs[expected_idx][1]
+        for offset in range(1, n):
+            for idx in (expected_idx - offset, expected_idx + offset):
+                if 0 <= idx < n and opt_pairs[idx][0] == sp:
+                    return opt_pairs[idx][1]
+        return None
+
     def _date(html):
         m = re.search(r"(\d{4}/\d{2}/\d{2})", html)
         return m.group(1).replace("/", "") if m else None
@@ -141,9 +159,9 @@ def scrape_taifex_web():
         # 缺值防呆：解析失敗或索引不足 → None（settlement_history 該日 sp_amt: null，不強湊）。
         try:
             opt_pairs = _nums_with_amt(html_opt)
-            sp_amt = opt_pairs[34][1] if len(opt_pairs) > 34 and opt_pairs[34][0] == sp else None
+            sp_amt = _find_sp_amt(opt_pairs, sp)
             if sp_amt is None:
-                print(f"scrape TXO sp_amt 解析不一致（配對口數={opt_pairs[34][0] if len(opt_pairs)>34 else 'N/A'} vs sp={sp}），標 null")
+                print(f"scrape TXO sp_amt 解析失敗（opt_pairs 長度={len(opt_pairs)} 中找不到口數={sp} 的配對），標 null")
         except Exception as e_amt:
             print(f"scrape TXO sp_amt fail: {e_amt}")
             sp_amt = None
