@@ -8,6 +8,14 @@
 
 ---
 
+## 2026-07-29（微調：SP↑ 徽章移到 SP 數字左邊，版面對齊更好看）
+
+**Request：** Ball——SP↑ 徽章原本接在數字右邊，靠右對齊的欄位看起來版面不整齊。
+
+**Fix (Sonnet)：** 選擇權近20天彈窗（`openOptionModal`）的 SP 欄，`badge`（SP↑ 徽章）與數字順序互換＋間距由 `ml-1`（原：數字 在左、徽章 在右、徽章左邊留白）改 `mr-1`（改：徽章 在左、數字 在右、徽章右邊留白），視覺上徽章移到數字左側。純排版調整，判斷邏輯（`_spSignalDates`）未動。cache-buster `v=20260727b → v=20260729a`。
+
+---
+
 ## 2026-07-29（P2-26殘2 帶修：sp_amt 爬取對齊改穩健，07-27 缺值已回填、SP↑ 首次亮起）
 
 **Request：** Opus 稽核查碼定位——`fetch_taifex.py:144` 的 `sp_amt = opt_pairs[34][1] if opt_pairs[34][0] == sp else None` 是靠固定 index 34 比對，2026-07-27 該日 HTML 結構偶發位移導致 `opt_pairs[34][0] != sp`，被防呆判為不一致而標 null（口數 sp 本身有正確抓到 12297，只有金額配對失敗）。待辦：①查 07-27 Actions log 確認實際 mismatch ②把對齊邏輯改穩健，不靠固定 index ③考慮回填。

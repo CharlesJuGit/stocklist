@@ -1062,7 +1062,7 @@ function openOptionModal() {
     const c = v => (v == null || v === '' ? '—' : Number(v).toLocaleString());
     const rows = [...hist].reverse().slice(0, 20).map(r => {
       const badge = spFired.has(r.date)
-        ? `<span class="ml-1 text-[10px] px-1 py-0.5 rounded bg-orange-900/60 text-orange-300 align-middle"
+        ? `<span class="mr-1 text-[10px] px-1 py-0.5 rounded bg-orange-900/60 text-orange-300 align-middle"
              title="外資賣Put口數與金額同增＝大資金看不跌（觀察用，未接入評分）">SP↑</span>` : '';
       return `
       <tr class="border-b border-gray-800">
@@ -1070,7 +1070,7 @@ function openOptionModal() {
         <td class="text-right py-1 ${optColor(r.bc)}">${c(r.bc)}</td>
         <td class="text-right py-1 ${optColor(r.sc)}">${c(r.sc)}</td>
         <td class="text-right py-1 ${optColor(r.bp)}">${c(r.bp)}</td>
-        <td class="text-right py-1 ${optColor(r.sp)}">${c(r.sp)}${badge}</td>
+        <td class="text-right py-1 ${optColor(r.sp)}">${badge}${c(r.sp)}</td>
       </tr>`;
     }).join('');
     document.getElementById('option-modal-body').innerHTML = `
