@@ -214,6 +214,55 @@ function _sparkline(closes, w = 460, h = 40) {
   const up = v[v.length - 1] >= v[0];
   return `<svg viewBox="0 0 ${w} ${h}" height="${h}" class="w-full mt-1" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? '#f87171' : '#4ade80'}" stroke-width="1.5"/></svg>`;
 }
+// ── P2-30：Proxy CVD（純顯示，不進 scoreEntry／選股，定位＝觀察輔助）──────
+// delta = volume × ((close−low) − (high−close)) / (high−low)；CVD = delta 逐日累加。
+// 資料衛生（P1-13 教訓）：high>low 且 volume>0 且 close 有效（非 null/0）才計入；
+// 不合格的棒（含 Yahoo 當日未完成棒 close=null 或 volume=0）跳過不計入 delta，
+// 但仍輸出「維持前值」的累計點（不產生斷點/NaN，同一般 CVD 圖表慣例）。
+function _proxyCVD(highs, lows, closes, volumes) {
+  let cvd = 0;
+  const out = [];
+  for (let i = 0; i < closes.length; i++) {
+    const h = highs[i], l = lows[i], c = closes[i], v = volumes[i];
+    if (h != null && l != null && c != null && v != null && h > l && v > 0 && c > 0) {
+      cvd += v * ((c - l) - (h - c)) / (h - l);
+    }
+    out.push(cvd);
+  }
+  return out;
+}
+// 迷你 CVD 曲線＋背離標示：近 win 日內，若該日價格創（win日）高但 CVD 未同步創高＝橙點；
+// 價格創低但 CVD 未同步破低＝藍點。純視覺參考，title 明標「僅估算參考」。
+function _cvdChart(closes, cvd, w = 460, h = 44, win = 20) {
+  const n = closes.length;
+  if (n < 2) return '';
+  const cv = cvd.filter(x => x != null);
+  if (cv.length < 2) return '';
+  const cmin = Math.min(...cv), cmax = Math.max(...cv), crange = (cmax - cmin) || 1;
+  const X = i => w * i / (n - 1);
+  const Y = v => h - 2 - (v - cmin) / crange * (h - 4);
+  const pts = cvd.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  let dots = '';
+  for (let i = 0; i < n; i++) {
+    const lo = Math.max(0, i - win + 1);
+    const priceWin = closes.slice(lo, i + 1).filter(x => x != null);
+    const cvdWin = cvd.slice(lo, i + 1);
+    if (priceWin.length < 2 || closes[i] == null) continue;
+    const isPriceHigh = closes[i] === Math.max(...priceWin);
+    const isPriceLow = closes[i] === Math.min(...priceWin);
+    const isCvdHigh = cvd[i] === Math.max(...cvdWin);
+    const isCvdLow = cvd[i] === Math.min(...cvdWin);
+    if (isPriceHigh && !isCvdHigh) {
+      dots += `<circle cx="${X(i).toFixed(1)}" cy="${Y(cvd[i]).toFixed(1)}" r="3" fill="#fb923c"><title>價漲但估算買盤未同步（背離·僅估算參考）</title></circle>`;
+    } else if (isPriceLow && !isCvdLow) {
+      dots += `<circle cx="${X(i).toFixed(1)}" cy="${Y(cvd[i]).toFixed(1)}" r="3" fill="#60a5fa"><title>價跌但估算賣壓未同步破低（背離·僅估算參考）</title></circle>`;
+    }
+  }
+  return `<div class="text-[10px] text-gray-500 mt-1">Proxy CVD（日K估算，非逐筆真值）</div>
+    <svg viewBox="0 0 ${w} ${h}" height="${h}" class="w-full" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="#94a3b8" stroke-width="1.5"/>${dots}</svg>`;
+}
+
 // ── P2-14/P2-15 漲跌幅共用計算（彈窗與清單只寫一份，避免定義分岔）──────────
 // 台灣日期字串 YYYY-MM-DD（epoch 秒）
 function _twDate(sec) { return new Date(sec * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }); }
@@ -270,10 +319,18 @@ async function loadModalPrice(id) {
     // 重現改版前 range=1mo 的視覺範圍；位階仍取 closes.slice(-20)＝與改版前同一組數（天然零回歸）
     const cutTs = Math.floor(Date.now() / 1000) - 31 * 86400;
     const sparkCloses = pts.filter(p => p.t >= cutTs).map(p => p.c);
+    // P2-30：Proxy CVD——沿用同一次 fetch 的原始 high/low/close/volume（不新增請求），
+    // 累計用完整 3mo 序列（早期歷史也要算進累計基準），畫圖裁到跟 sparkline 同一個「近31天」窗口一致。
+    const ts = res.timestamp || [];
+    const q0 = res.indicators.quote[0];
+    const cvdFull = _proxyCVD(q0.high || [], q0.low || [], q0.close || [], q0.volume || []);
+    const cropFrom = ts.findIndex(t => t != null && t >= cutTs);
+    const cvdSlice = cropFrom >= 0 ? cvdFull.slice(cropFrom) : cvdFull;
+    const closeSlice = cropFrom >= 0 ? (q0.close || []).slice(cropFrom) : (q0.close || []);
     box.innerHTML = `<div class="flex items-center justify-between">
         <div><span class="text-lg font-bold">${idxNum(price)}</span>${dc}${wc}${mc}</div>
         <div class="text-xs text-gray-400">位階 ${pos == null ? '—' : pos.toFixed(0) + '%'}（20日高 ${idxNum(hi)}／低 ${idxNum(lo)}）</div>
-      </div>${_sparkline(sparkCloses.length ? sparkCloses : closes)}`;
+      </div>${_sparkline(sparkCloses.length ? sparkCloses : closes)}${_cvdChart(closeSlice, cvdSlice)}`;
     box.classList.remove('hidden');
   } catch (e) {
     // 抓不到報價（.TW/.TWO 皆 404）→ 顯示標註而非整塊隱藏，否則使用者點進來看不到任何說明
@@ -1891,7 +1948,9 @@ async function idxYahoo(t) {
   const res = j.chart.result[0];
   const price = res.meta.regularMarketPrice;
   const highs = (res.indicators.quote[0].high || []).filter(x => x != null);
-  return { name: t.name, price, yearHigh: Math.max(price, ...highs), time: res.meta.regularMarketTime };
+  // P2-30：連 quote 原始序列一起回傳（不新增請求）——只有 ^TWII 會用來算 proxy CVD，其餘標的忽略即可。
+  return { name: t.name, price, yearHigh: Math.max(price, ...highs), time: res.meta.regularMarketTime,
+          quote: res.indicators.quote[0] };
 }
 async function idxOtc(iy) {
   const j = await idxFetch(`/twse?ex_ch=otc_o00.tw&json=1&delay=0`);
@@ -1955,6 +2014,29 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
   if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走 Val Town 代理即時，未設/失敗時退後端日更收盤(標「日」)。日圓兌美元＝1日圓可換多少美元，貼近年高即日圓走強。";
+
+  // P2-30：^TWII proxy CVD——沿用上面同一次 idxYahoo 抓到的 quote（不新增請求），純顯示、不進 scoreEntry。
+  const cvdBox = document.getElementById("idx-cvd");
+  if (cvdBox) {
+    const twiiIdx = IDX_TARGETS.findIndex(t => t.sym === "^TWII");
+    const twiiResult = twiiIdx >= 0 ? results[twiiIdx] : null;
+    const q0 = (twiiResult && twiiResult.status === "fulfilled" && twiiResult.value.quote) || null;
+    if (q0) {
+      const cvd = _proxyCVD(q0.high || [], q0.low || [], q0.close || [], q0.volume || []);
+      const valid = cvd.filter(x => x != null);
+      if (valid.length >= 20) {
+        const cur = cvd[cvd.length - 1];
+        const avg20 = cvd.slice(-20).reduce((a, b) => a + b, 0) / 20;
+        const priorHigh = Math.max(...cvd);
+        cvdBox.textContent = `台股加權 Proxy CVD（日K估算，非逐筆真值）：現值 ${idxNum(cur)}｜近20日均 ${idxNum(avg20)}｜今年以來高點 ${idxNum(priorHigh)}`;
+        cvdBox.classList.remove("hidden");
+      } else {
+        cvdBox.classList.add("hidden");
+      }
+    } else {
+      cvdBox.classList.add("hidden");
+    }
+  }
 }
 let idxTimer = null;
 function scheduleIndexRefresh() {

@@ -16,6 +16,24 @@
 
 ---
 
+## 2026-07-29（P2-30：Proxy CVD 顯示工具 — 個股彈窗＋大盤，純顯示不進選股）
+
+**Request：** CVD_DISPLAY_SPEC（Opus 撰）——個股彈窗與大盤加 proxy CVD 曲線＋背離標示，🔴 純顯示定位（smell test 已顯示背離預測力弱），不進 scoreEntry/選股/評分。
+
+**Feat (Sonnet)：**
+- 新增共用 `_proxyCVD(highs,lows,closes,volumes)`：`delta = volume×((close−low)−(high−close))/(high−low)`，逐日累加；資料衛生（P1-13教訓）——`high>low`且`volume>0`且`close>0`才計入，不合格棒（含 Yahoo 當日未完成棒 close=null 或 volume=0）跳過不累加但輸出「維持前值」（不產生斷點/NaN）。
+- 新增 `_cvdChart(closes, cvd)`：迷你曲線＋背離標示——近20日內該日價格創(20日)高但CVD未同步創高＝橙點，價格創低但CVD未同步破低＝藍點，皆帶 title 註明「僅估算參考」。
+- **個股彈窗**：`loadModalPrice` 沿用同一次 `range=3mo` fetch 的原始 high/low/close/volume（不新增請求），CVD 累計用完整3個月序列（含早期歷史），畫圖裁到跟既有 sparkline 同一個「近31天」窗口，插在既有價格/位階/sparkline 下方。
+- **大盤 `^TWII`**：`idxYahoo()` 順便多回傳一份 `quote`（原始序列），`loadIndexYtd()` 只對 TWII 這一列額外算 CVD（其餘標的的 quote 欄位忽略不用），顯示「現值｜近20日均｜今年以來高點」文字列，插在距年高表下方新增的 `#idx-cvd` 區塊，樣本不足20天則整塊隱藏。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **CVD 手算錨 ✅**：直接打正式 CF Worker 代理抓 2330 近3個月真實 OHLCV，逐日手算 delta 累加（含最後一天 Yahoo 回傳 `close=null` 的未完成棒）與引擎輸出**逐位相符（5/5）**；未完成棒正確跳過、CVD 維持前值、無 NaN。
+  2. **零量濾除錨 ✅**：^TWII 真實 ytd 資料剛好有 2 根零量棒（其中一根正是最新一天），核對前後 CVD 皆維持不變、無斷點無 NaN。
+  3. **背離標示錨 ✅**：獨立重算（不呼叫 `_cvdChart`，另寫一份邏輯用真實 TWII 資料核對）——找到 24 個符合條件的日子，抽第一個（i=7，價格達20日窗最高但CVD低於窗內最高）與最後一個（i=136，價格達20日窗最低但CVD高於窗內最低）手動核對方向正確；另抽一個任意日（i=50）確認非背離日兩條件皆不成立、正確不標記。
+  4. **範圍紅線錨 ✅**：grep 確認 `scoreEntry` 函式本體與選股渲染路徑（`renderList` 等）零 CVD 相關字樣命中，CVD 僅存在於自己的獨立函式與其呼叫點。
+- 隱私掃描零命中（proxy CVD 為通用 TA 概念、無專案一參數字眼），cache-buster `v=20260729a → v=20260729b`。
+
+---
+
 ## 2026-07-29（P2-26殘2 帶修：sp_amt 爬取對齊改穩健，07-27 缺值已回填、SP↑ 首次亮起）
 
 **Request：** Opus 稽核查碼定位——`fetch_taifex.py:144` 的 `sp_amt = opt_pairs[34][1] if opt_pairs[34][0] == sp else None` 是靠固定 index 34 比對，2026-07-27 該日 HTML 結構偶發位移導致 `opt_pairs[34][0] != sp`，被防呆判為不一致而標 null（口數 sp 本身有正確抓到 12297，只有金額配對失敗）。待辦：①查 07-27 Actions log 確認實際 mismatch ②把對齊邏輯改穩健，不靠固定 index ③考慮回填。
