@@ -32,6 +32,10 @@
       class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-full transition">
       常用連結
     </a>
+    <button onclick="openEtfPanel()" id="etf-panel-btn"
+      class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1 rounded-full transition">
+      ETF 掛價
+    </button>
   </div>
 
   <!-- 市場資訊面板 -->
@@ -381,6 +385,29 @@
     </div>
   </div>
 
+  <!-- P2-33 ETF 掛價速查面板 -->
+  <div id="etf-panel-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">ETF 掛價速查</h2>
+        <button onclick="document.getElementById('etf-panel-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="etf-panel-body" class="text-xs max-h-96 overflow-y-auto">載入中…</div>
+      <div class="text-[10px] text-gray-600 mt-2">純顯示掛價參考，不進評分/選股。點列表可看漲跌停價格階梯。</div>
+    </div>
+  </div>
+  <div id="etf-ladder-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="etf-ladder-title" class="text-lg font-bold">—</h2>
+        <button onclick="document.getElementById('etf-ladder-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="etf-ladder-body" class="text-xs max-h-[28rem] overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- P2-31 地緣壓力觀察面板（TACO 近似）-->
   <div id="geo-stress-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
@@ -588,7 +615,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260802c"></script>
+  <script src="app.js?v=20260802d"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

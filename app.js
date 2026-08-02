@@ -2148,6 +2148,160 @@ document.getElementById("geo-stress-modal")?.addEventListener("click", function 
   if (e.target === this) this.classList.add("hidden");
 });
 
+// ── P2-33：ETF 掛價速查面板（漲跌停價格階梯，純顯示不進評分/選股）─────────
+// ⚠ Yahoo 只回英文基金公司名且截斷，中文名／漲跌幅上限皆硬編碼查證表（規格 §1，6個月實測反推）
+const ETF_LIST = [
+  { code: "0050",   name: "元大台灣50",       limit: 0.10 },
+  { code: "00631L", name: "元大台灣50正2",     limit: 0.20 },
+  { code: "00685L", name: "群益臺灣加權正2",   limit: 0.20 },
+  { code: "009816", name: "凱基台灣TOP50",     limit: 0.10 },
+  { code: "00981A", name: "主動統一台股增長",   limit: 0.10 },
+  { code: "00991A", name: "主動復華未來50",     limit: 0.10 },
+  { code: "00988A", name: "主動統一全球創新",   limit: null },   // 全球型＝無漲跌幅限制
+];
+
+function etfTickSize(p) {   // TWSE 升降單位對照表（獨立對 sinotrade/winvest 兩來源核對過）
+  if (p < 10) return 0.01;
+  if (p < 50) return 0.05;
+  if (p < 100) return 0.10;
+  if (p < 500) return 0.50;
+  if (p < 1000) return 1.00;
+  return 5.00;
+}
+function _etfRoundTick(raw, mode) {
+  // mode: floor(無條件捨去,漲停) / ceil(無條件進位,跌停) / round(四捨五入,中間階)
+  // tick 由「結果價」raw 本身的級距決定（非 ref 的級距）——跨級距時才會跟 ref 的 tick 不同
+  const tick = etfTickSize(raw);
+  const fn = mode === "floor" ? Math.floor : mode === "ceil" ? Math.ceil : Math.round;
+  return Math.round(fn(raw / tick) * tick * 100) / 100;
+}
+function etfLadder(ref, limit) {
+  const steps = Math.round(limit * 100);
+  const rows = [];
+  for (let i = steps; i >= -steps; i--) {
+    const pct = i / 100;
+    const raw = ref * (1 + pct);
+    let price, label;
+    if (i === steps)       { price = _etfRoundTick(raw, "floor"); label = "漲停"; }
+    else if (i === -steps) { price = _etfRoundTick(raw, "ceil");  label = "跌停"; }
+    else if (i === 0)      { price = ref; label = "平盤（昨收）"; }
+    else                   { price = _etfRoundTick(raw, "round"); label = (i > 0 ? "+" : "") + i + "%"; }
+    rows.push({ label, price, pct: i });
+  }
+  return rows;
+}
+
+let _etfQuoteCache = {};   // session 快取，lazy fetch（面板點開才抓，比照規格§2）
+async function _etfQuote(code) {
+  if (_etfQuoteCache[code]) return _etfQuoteCache[code];
+  const j = await idxFetch(`/yahoo/${encodeURIComponent(code + ".TW")}?range=5d&interval=1d`);
+  const res = j.chart.result[0];
+  const ts = res.timestamp || [];
+  const q = res.indicators.quote[0];
+  if (!ts.length) throw new Error("no bars");
+  // 🔴 不用 meta.chartPreviousClose（5d視窗的它是視窗前一日、非「昨收」）；用 bars 陣列 [-1]/[-2] 才對
+  const dateStr = t => new Date(t * 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  const last = ts.length - 1;
+  let ref, todayOpen;
+  if (dateStr(ts[last]) === todayStr && last > 0) {
+    todayOpen = q.open[last];
+    ref = q.close[last - 1];
+  } else {
+    todayOpen = null;   // 未開盤（週末/假日/開盤前）
+    ref = q.close[last];
+  }
+  const result = { code, ref, todayOpen, price: res.meta.regularMarketPrice };
+  _etfQuoteCache[code] = result;
+  return result;
+}
+
+let _etfData = {};   // code -> quote，供 openEtfLadder() 讀取（openEtfPanel() 填入）
+async function openEtfPanel() {
+  const modal = document.getElementById("etf-panel-modal");
+  const body = document.getElementById("etf-panel-body");
+  modal.classList.remove("hidden");
+  body.textContent = "載入中…";
+  const results = await Promise.allSettled(ETF_LIST.map(e => _etfQuote(e.code)));
+  const numFmt = v => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const rows = ETF_LIST.map((e, i) => {
+    const r = results[i];
+    if (r.status !== "fulfilled") {
+      return `<tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-300">${e.code}</td><td class="text-gray-400">${e.name}</td>
+        <td colspan="2" class="text-right text-gray-600">—</td></tr>`;
+    }
+    _etfData[e.code] = r.value;
+    const d = r.value;
+    return `<tr class="border-b border-gray-800 hover:bg-gray-800 cursor-pointer" onclick="openEtfLadder('${e.code}')">
+      <td class="py-1 text-blue-400 underline">${e.code}</td>
+      <td class="text-gray-300">${e.name}</td>
+      <td class="text-right text-gray-400">${numFmt(d.ref)}</td>
+      <td class="text-right text-gray-400">${d.todayOpen == null ? "—" : numFmt(d.todayOpen)}</td>
+    </tr>`;
+  }).join("");
+  body.innerHTML = `<table class="w-full text-xs">
+    <thead><tr class="text-gray-500 border-b border-gray-600">
+      <th class="text-left py-1">代碼</th><th class="text-left py-1">名稱</th>
+      <th class="text-right py-1">昨收</th><th class="text-right py-1">今開</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function openEtfLadder(code) {
+  const meta = ETF_LIST.find(e => e.code === code);
+  const d = _etfData[code];
+  if (!meta || !d) return;
+  const numFmt = v => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  document.getElementById("etf-ladder-title").textContent = `${meta.code} ${meta.name}`;
+  const body = document.getElementById("etf-ladder-body");
+
+  if (meta.limit == null) {
+    body.innerHTML = `
+      <div class="text-orange-400 text-xs bg-orange-900/30 rounded p-2 mb-3">⚠ 國外成分證券・無漲跌幅限制（無漲停/跌停價）</div>
+      <table class="w-full text-xs">
+        <tr class="border-b border-gray-800"><td class="py-1 text-gray-400">昨收</td>
+          <td class="text-right text-gray-200">${numFmt(d.ref)}</td></tr>
+        <tr class="border-b border-gray-800"><td class="py-1 text-gray-400">今開</td>
+          <td class="text-right text-gray-200">${d.todayOpen == null ? "—（未開盤）" : numFmt(d.todayOpen)}</td></tr>
+        <tr><td class="py-1 text-gray-400">現價</td>
+          <td class="text-right text-gray-200">${d.price == null ? "—" : numFmt(d.price)}</td></tr>
+      </table>`;
+  } else {
+    const rows = etfLadder(d.ref, meta.limit);
+    const rowsHtml = rows.map(r => {
+      const isEdge = r.label === "漲停" || r.label === "跌停" || r.pct === 0;
+      const color = r.pct > 0 ? "text-red-400" : r.pct < 0 ? "text-green-400" : "text-gray-300";
+      const tick = etfTickSize(r.price);
+      const nearOpen  = d.todayOpen != null && Math.abs(r.price - d.todayOpen) < tick / 2;
+      const nearPrice = d.price != null && Math.abs(r.price - d.price) < tick / 2;
+      const hl = (nearOpen || nearPrice) ? "bg-blue-900/40" : "";
+      const tag = nearOpen ? "◂今開" : nearPrice ? "◂現價" : "";
+      return `<tr class="border-b border-gray-800 ${hl}">
+        <td class="py-1 text-gray-400">${r.label}</td>
+        <td class="text-right ${color} ${isEdge ? "font-bold" : ""}">${numFmt(r.price)}</td>
+        <td class="text-right text-gray-600 text-[10px]">${r.pct > 0 ? "+" : ""}${r.pct}%</td>
+        <td class="text-left text-blue-400 text-[10px]">${tag}</td>
+      </tr>`;
+    }).join("");
+    body.innerHTML = `
+      <div class="text-[10px] text-gray-500 mb-2">昨收 ${numFmt(d.ref)}
+        ｜今開 ${d.todayOpen == null ? "—（未開盤）" : numFmt(d.todayOpen)}
+        ｜漲跌幅上限 ±${(meta.limit * 100).toFixed(0)}%</div>
+      <table class="w-full text-xs">
+        <thead><tr class="text-gray-500 border-b border-gray-600">
+          <th class="text-left py-1">階</th><th class="text-right py-1">價格</th><th class="text-right py-1">%</th><th></th>
+        </tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  }
+  document.getElementById("etf-panel-modal").classList.add("hidden");
+  document.getElementById("etf-ladder-modal").classList.remove("hidden");
+}
+document.getElementById("etf-panel-modal")?.addEventListener("click", function (e) {
+  if (e.target === this) this.classList.add("hidden");
+});
+document.getElementById("etf-ladder-modal")?.addEventListener("click", function (e) {
+  if (e.target === this) this.classList.add("hidden");
+});
+
 let idxTimer = null;
 function scheduleIndexRefresh() {
   if (idxTimer) clearInterval(idxTimer);
