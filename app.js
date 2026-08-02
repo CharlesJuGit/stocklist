@@ -2038,6 +2038,132 @@ async function loadIndexYtd() {
     }
   }
 }
+// ── P2-31：地緣壓力觀察面板（TACO 近似）─────────────────────────────
+// 🔴 純顯示、不進 scoreEntry/選股——同距年高%/市況燈號的「觀察雷達」哲學。
+// 本面板是 Signum Global Advisors「TACO 指數」的**非官方近似**：真實權重為商業機密未公開，
+// 「預測川普退縮」的說法金融界有重大爭議（見 businessfocus/cnyes），本面板只呈現公開成分＋
+// 自訂等權合成 z-score，非投資建議。
+const GEO_STRESS_SYMS = { oil: "CL=F", yield: "^TNX", sp500: "^GSPC" };
+// IMF PortWatch（官方、免key、有CORS，2026-08-02實測）chokepoint6＝Strait of Hormuz
+const GEO_HORMUZ_URL = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query";
+
+function _zscoreLast(series) {
+  // series 由舊到新；回傳最新值相對整段（含自身，252個交易日視窗）的 z-score
+  const n = series.length;
+  if (n < 20) return null;   // 樣本太少不計算（避免早期資料雜訊）
+  const mean = series.reduce((a, b) => a + b, 0) / n;
+  const variance = series.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  if (!std) return null;
+  return (series[n - 1] - mean) / std;
+}
+async function _geoYahooSeries(sym) {
+  const j = await idxFetch(`/yahoo/${encodeURIComponent(sym)}?range=1y&interval=1d`);
+  const res = j.chart.result[0];
+  const closes = (res.indicators.quote[0].close || []).filter(x => x != null);
+  return { series: closes, latest: closes[closes.length - 1], time: res.meta.regularMarketTime };
+}
+async function _geoHormuzSeries() {
+  // ArcGIS 有 CORS（Access-Control-Allow-Origin:*，2026-08-02 實測），前端直打不需 CF Worker
+  const qs = new URLSearchParams({
+    where: "portid='chokepoint6'", outFields: "date,n_total", orderByFields: "date DESC",
+    resultRecordCount: "252", f: "json",
+  });
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined;
+  const r = await fetch(GEO_HORMUZ_URL + "?" + qs.toString(), { signal });
+  if (!r.ok) throw new Error("http " + r.status);
+  const j = await r.json();
+  const feats = (j.features || []).map(f => f.attributes).sort((a, b) => a.date < b.date ? -1 : 1);
+  if (!feats.length) throw new Error("no hormuz data");
+  const series = feats.map(f => f.n_total);
+  return { series, latest: series[series.length - 1], date: feats[feats.length - 1].date };
+}
+
+let _geoStressData = null;   // 供 openGeoStressModal() 使用
+async function loadGeoStress() {
+  const line = document.getElementById("geo-stress-line");
+  const summary = document.getElementById("geo-stress-summary");
+  if (!line || !summary) return;
+
+  const [oilR, yieldR, spR, hormuzR] = await Promise.allSettled([
+    _geoYahooSeries(GEO_STRESS_SYMS.oil),
+    _geoYahooSeries(GEO_STRESS_SYMS.yield),
+    _geoYahooSeries(GEO_STRESS_SYMS.sp500),
+    _geoHormuzSeries(),
+  ]);
+  const comp = {};
+  if (oilR.status === "fulfilled")    comp.oil    = { ...oilR.value,    z: _zscoreLast(oilR.value.series) };
+  if (yieldR.status === "fulfilled")  comp.yield  = { ...yieldR.value,  z: _zscoreLast(yieldR.value.series) };
+  if (spR.status === "fulfilled")     comp.sp500  = { ...spR.value,     z: _zscoreLast(spR.value.series) };
+  if (hormuzR.status === "fulfilled") comp.hormuz = { ...hormuzR.value, z: _zscoreLast(hormuzR.value.series) };
+
+  // 合成方向：油/殖利率正向（高=壓力↑）；S&P/荷莫茲反轉（低=壓力↑）；算不出的成分不計入平均（不擋整塊）
+  const contribs = [];
+  if (comp.oil?.z != null)    contribs.push(comp.oil.z);
+  if (comp.yield?.z != null)  contribs.push(comp.yield.z);
+  if (comp.sp500?.z != null)  contribs.push(-comp.sp500.z);
+  if (comp.hormuz?.z != null) contribs.push(-comp.hormuz.z);
+  const composite = contribs.length ? contribs.reduce((a, b) => a + b, 0) / contribs.length : null;
+  _geoStressData = { comp, composite };
+
+  if (composite == null) { line.classList.add("hidden"); return; }
+  const color = composite >= 1.5 ? "text-red-400" : composite >= 0 ? "text-yellow-400" : "text-green-400";
+  summary.innerHTML = `地緣壓力（TACO）　綜合 <span class="font-bold ${color}">${composite >= 0 ? "+" : ""}${composite.toFixed(1)}σ</span>`;
+  line.classList.remove("hidden");
+}
+
+function openGeoStressModal() {
+  if (!_geoStressData) return;
+  const { comp, composite } = _geoStressData;
+  const defs = [
+    { key: "oil",    name: "布倫特/WTI原油 (CL=F)", note: "高油價＝壓力↑",         flip: false, unit: "" },
+    { key: "yield",  name: "美債10年殖利率 (^TNX)", note: "高殖利率＝壓力↑",       flip: false, unit: "" },
+    { key: "sp500",  name: "標普500 (^GSPC)",       note: "低S&P＝壓力↑（反轉）",   flip: true,  unit: "" },
+    { key: "hormuz", name: "荷莫茲海峽通行船數",     note: "低通行量＝壓力↑（反轉，週頻）", flip: true, unit: " 艘/日" },
+  ];
+  const rows = defs.map(d => {
+    const c = comp[d.key];
+    if (!c || c.z == null) {
+      return `<tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-300">${d.name}<div class="text-[10px] text-gray-600">${d.note}</div></td>
+        <td class="text-right text-gray-600" colspan="3">—</td></tr>`;
+    }
+    const contrib = d.flip ? -c.z : c.z;
+    const arrow = contrib >= 0 ? "▲壓力↑" : "▼壓力↓";
+    const color = contrib >= 1 ? "text-red-400" : contrib <= -1 ? "text-green-400" : "text-gray-300";
+    const valStr = Number(c.latest).toLocaleString(undefined, { maximumFractionDigits: 2 }) + d.unit;
+    const timeStr = d.key === "hormuz" ? `截至 ${c.date}（週頻）` : idxTime(c.time);
+    return `<tr class="border-b border-gray-800">
+      <td class="py-1 text-gray-300">${d.name}<div class="text-[10px] text-gray-600">${d.note}・${timeStr}</div></td>
+      <td class="text-right text-gray-200">${valStr}</td>
+      <td class="text-right ${color}">${c.z >= 0 ? "+" : ""}${c.z.toFixed(2)}σ</td>
+      <td class="text-right ${color} text-xs">${arrow}</td>
+    </tr>`;
+  }).join("");
+
+  const compColor = composite >= 1.5 ? "text-red-400" : composite >= 0 ? "text-yellow-400" : "text-green-400";
+  document.getElementById("geo-stress-modal-body").innerHTML = `
+    <div class="text-[11px] text-gray-500 mb-3 leading-relaxed bg-gray-800/60 rounded p-2">
+      ⚠ 本面板是 Signum Global Advisors「TACO 指數」的<b>非官方近似</b>——真實權重為商業機密未公開；
+      「預測川普退縮」的說法金融界有重大爭議；本面板僅呈現公開成分＋自訂等權合成 z-score，<b>非投資建議</b>。
+      荷莫茲資料為 IMF PortWatch 週頻更新，非日頻。
+    </div>
+    <div class="text-center mb-3">
+      <div class="text-xs text-gray-500">綜合壓力（4成分等權平均 z-score）</div>
+      <div class="text-2xl font-bold ${compColor}">${composite >= 0 ? "+" : ""}${composite.toFixed(2)}σ</div>
+      <div class="text-[10px] text-gray-600 mt-1">參考：Signum 稱其官方指數 ≥2.9σ 時川普傾向於貿易政策上退縮（本值為自訂近似，不做預測宣稱）</div>
+    </div>
+    <table class="w-full text-xs">
+      <thead><tr class="text-gray-500 border-b border-gray-600">
+        <th class="text-left py-1">成分</th><th class="text-right py-1">現值</th>
+        <th class="text-right py-1">Z-score</th><th class="text-right py-1">方向</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById("geo-stress-modal").classList.remove("hidden");
+}
+document.getElementById("geo-stress-modal")?.addEventListener("click", function (e) {
+  if (e.target === this) this.classList.add("hidden");
+});
+
 let idxTimer = null;
 function scheduleIndexRefresh() {
   if (idxTimer) clearInterval(idxTimer);
@@ -2047,7 +2173,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) load
 document.getElementById("idx-refresh")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget, orig = btn.textContent;
   btn.textContent = "更新中…"; btn.disabled = true; btn.classList.add("opacity-60");
-  try { await loadIndexYtd(); } finally {
+  try { await Promise.allSettled([loadIndexYtd(), loadGeoStress()]); } finally {
     btn.textContent = "↻ 已更新 " + new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" });
     btn.disabled = false; btn.classList.remove("opacity-60");
     setTimeout(() => { btn.textContent = orig; }, 2500);   // 2.5秒後還原按鈕字樣
@@ -2155,6 +2281,7 @@ function initStockPages() {
 loadStocks().then(loadListChanges);   // 清單渲染後再漸進補漲跌幅（自選列同批掃入）
 loadMarketInfo();
 loadIndexYtd();
+loadGeoStress();
 renderWatchlist();
 initStockPages();
 scheduleAutoRefresh();

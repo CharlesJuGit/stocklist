@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-08-02（P2-31：地緣壓力觀察面板 TACO 近似 — 4成分＋自訂等權合成 z-score）
+
+**Request：** GEO_STRESS_SPEC（Opus 撰，Ball 2026-08-02 核准）——距年高%表附近加「地緣壓力（TACO）▸」超連結，彈窗顯示4成分（布倫特/WTI原油、美債10年殖利率、標普500、荷莫茲海峽航運量）＋自訂等權合成壓力值。純顯示、不進評分/選股（同距年高%/市況燈號的觀察雷達定位）。🔴 誠實標示：本面板為 Signum Global Advisors「TACO指數」的非官方近似，非投資建議。
+
+**Feat (Sonnet)：**
+- **荷莫茲前置驗證（動工第一步）**：探勘 IMF PortWatch ArcGIS（`services9.arcgis.com/weJ1QsnbMYJlCHdG`），確認 `PortWatch_chokepoints_database` 服務的 `portid='chokepoint6'`＝Strait of Hormuz；`Daily_Chokepoints_Data` 服務提供其每日 `n_total`（總船隻通行數）時間序列（2019-01-01至今）。**CORS已開放**（`Access-Control-Allow-Origin:*`實測），前端可直打，不需 CF Worker 加路由。
+- 新增 `GEO_STRESS_SYMS`/`GEO_HORMUZ_URL`／`_zscoreLast()`（滾動252日z-score，自含當日）／`_geoYahooSeries()`（重用既有 `/yahoo/` 代理，`range=1y`取代距年高%表用的`range=ytd`以取得完整252個交易日）／`_geoHormuzSeries()`／`loadGeoStress()`／`openGeoStressModal()`。
+- **合成邏輯**：油/殖利率正向（高=壓力↑）、S&P/荷莫茲反轉（低=壓力↑）；四成分皆等權平均z（真實TACO權重未公開，UI明確標「自訂等權、非官方權重」）；任一成分抓不到時自動排除、不擋其餘成分計算（`Promise.allSettled`）。
+- UI：距年高%表下方新增「地緣壓力（TACO）　綜合 X.Xσ ▸」一行，彈窗顯示4成分（名稱/現值/z-score/壓力方向箭頭）＋頂部綜合值＋誠實標示（非官方/爭議/週頻）＋Signum 2.9σ參考線（不做預測宣稱）。彈窗仿照既有「選擇權近20天」`option-modal`模式。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **成分錨 ✅**：CL=F/^GSPC/^TNX 各對 Yahoo `range=1y` 直連（250/251/252筆），^TNX現值4.745與規格引用數字一致；荷莫茲對 IMF PortWatch 直連，最新2026-07-23、n_total=10（確認實際更新延遲約10天，比規格預期的「約2天」更久，UI已誠實標「週頻」而非承諾固定延遲天數）。
+  2. **z-score手算錨 ✅**：CL=F 用 Python 獨立算 `(現值-252日均)/252日std`＝0.7174，與JS `_zscoreLast()`（Bun執行）逐位相符。
+  3. **方向錨 ✅**：構造「油暴衝+S&P重挫+荷莫茲驟降」得 composite=+5.33（壓力↑）；反向構造「油崩+S&P噴出+荷莫茲暴增」得composite=-5.37（壓力↓）；構造「荷莫茲抓不到(null)」確認composite仍用其餘3成分算出（不擋整塊）。
+  4. **範圍錨 ✅**：grep 確認地緣壓力相關函式（`_geoYahooSeries`/`_geoHormuzSeries`/`_zscoreLast`/`loadGeoStress`）完全未與 `scoreEntry` 有任何呼叫關係，純顯示。
+  5. **結構錨**：`bun build app.js` 語法檢查通過；index.html div開合標籤數量前後一致（239/239平衡）。
+  6. **UI互動限制**：本次未能實際在瀏覽器點擊測試（Chrome擴充功能本session Ball選擇不安裝），僅完成邏輯層/資料層驗證，UI視覺呈現與互動流暢度待 Ball 或 reviewer 實機確認。
+- cache-buster `v=20260729b → v=20260802`；push前隱私關鍵字掃描：clean。
+- 隱私：4成分皆公開市場資料（Yahoo）／官方資料（IMF），無專案一策略字眼。
+
+---
+
 ## 2026-07-29（微調：SP↑ 徽章移到 SP 數字左邊，版面對齊更好看）
 
 **Request：** Ball——SP↑ 徽章原本接在數字右邊，靠右對齊的欄位看起來版面不整齊。
