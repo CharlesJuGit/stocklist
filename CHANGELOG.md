@@ -8,6 +8,18 @@
 
 ---
 
+## 2026-08-02（拿掉台股加權 Proxy CVD 顯示區塊 — Ball 反饋用不到）
+
+**Request：** Ball——「台股加權CVD那段我感覺用不到了，可以先拿掉？」
+
+**Fix (Sonnet)：** 移除 P2-30 加的 `^TWII` 指數層級 Proxy CVD 顯示（`idx-cvd` 區塊）：
+- `index.html`：刪 `#idx-cvd` div。
+- `app.js`：刪 `loadIndexYtd()` 尾端計算/渲染 `idx-cvd` 的區塊；`idxYahoo()` 一併移除只為此功能新增的 `quote` 回傳欄位（確認無其他呼叫方使用）。
+- **未動**：`_proxyCVD()`/`_cvdChart()` 共用函式本身、個股彈窗（`loadModalPrice`）的 CVD 顯示——這兩處是 Ball 沒說要拿掉的獨立功能，仍在使用同一組函式，只拆掉 TWII 指數層級這個消費端。
+- 驗證：grep 確認 `idx-cvd`/`cvdBox`/`twiiResult` 等相關識別字全數清乾淨、無殘留引用；`bun build app.js` 語法檢查通過。cache-buster `v=20260802 → v=20260802b`；隱私掃描 clean。
+
+---
+
 ## 2026-08-02（P2-31：地緣壓力觀察面板 TACO 近似 — 4成分＋自訂等權合成 z-score）
 
 **Request：** GEO_STRESS_SPEC（Opus 撰，Ball 2026-08-02 核准）——距年高%表附近加「地緣壓力（TACO）▸」超連結，彈窗顯示4成分（布倫特/WTI原油、美債10年殖利率、標普500、荷莫茲海峽航運量）＋自訂等權合成壓力值。純顯示、不進評分/選股（同距年高%/市況燈號的觀察雷達定位）。🔴 誠實標示：本面板為 Signum Global Advisors「TACO指數」的非官方近似，非投資建議。

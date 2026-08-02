@@ -1948,9 +1948,7 @@ async function idxYahoo(t) {
   const res = j.chart.result[0];
   const price = res.meta.regularMarketPrice;
   const highs = (res.indicators.quote[0].high || []).filter(x => x != null);
-  // P2-30：連 quote 原始序列一起回傳（不新增請求）——只有 ^TWII 會用來算 proxy CVD，其餘標的忽略即可。
-  return { name: t.name, price, yearHigh: Math.max(price, ...highs), time: res.meta.regularMarketTime,
-          quote: res.indicators.quote[0] };
+  return { name: t.name, price, yearHigh: Math.max(price, ...highs), time: res.meta.regularMarketTime };
 }
 async function idxOtc(iy) {
   const j = await idxFetch(`/twse?ex_ch=otc_o00.tw&json=1&delay=0`);
@@ -2014,29 +2012,6 @@ async function loadIndexYtd() {
       <td class="text-right text-gray-600 text-xs">${d.daily ? d.time : idxTime(d.time)}</td></tr>`;
   }).join("");
   if (note) note.textContent = "距年高＝(現價−年高)/年高；紅=貼近年高、綠=深回檔。年高：Yahoo=YTD盤中高、OTC=後端維護；小台走 Val Town 代理即時，未設/失敗時退後端日更收盤(標「日」)。日圓兌美元＝1日圓可換多少美元，貼近年高即日圓走強。";
-
-  // P2-30：^TWII proxy CVD——沿用上面同一次 idxYahoo 抓到的 quote（不新增請求），純顯示、不進 scoreEntry。
-  const cvdBox = document.getElementById("idx-cvd");
-  if (cvdBox) {
-    const twiiIdx = IDX_TARGETS.findIndex(t => t.sym === "^TWII");
-    const twiiResult = twiiIdx >= 0 ? results[twiiIdx] : null;
-    const q0 = (twiiResult && twiiResult.status === "fulfilled" && twiiResult.value.quote) || null;
-    if (q0) {
-      const cvd = _proxyCVD(q0.high || [], q0.low || [], q0.close || [], q0.volume || []);
-      const valid = cvd.filter(x => x != null);
-      if (valid.length >= 20) {
-        const cur = cvd[cvd.length - 1];
-        const avg20 = cvd.slice(-20).reduce((a, b) => a + b, 0) / 20;
-        const priorHigh = Math.max(...cvd);
-        cvdBox.textContent = `台股加權 Proxy CVD（日K估算，非逐筆真值）：現值 ${idxNum(cur)}｜近20日均 ${idxNum(avg20)}｜今年以來高點 ${idxNum(priorHigh)}`;
-        cvdBox.classList.remove("hidden");
-      } else {
-        cvdBox.classList.add("hidden");
-      }
-    } else {
-      cvdBox.classList.add("hidden");
-    }
-  }
 }
 // ── P2-31：地緣壓力觀察面板（TACO 近似）─────────────────────────────
 // 🔴 純顯示、不進 scoreEntry/選股——同距年高%/市況燈號的「觀察雷達」哲學。
