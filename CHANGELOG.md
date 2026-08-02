@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-08-02（P2-32：地緣壓力面板荷莫茲改即時源 straits.live＋60秒自動刷新）
+
+**Request：** GEO_STRESS_SPEC 更新（Opus 撰，Ball 2026-08-02 核准，P2-31 增強）——P2-31 驗收時發現 IMF PortWatch 船隻數延遲約10天，Ball 裁示改用 straits.live `/api/index`（免費第三方即時地緣壓力指數，5分更新，CORS開）取代，面板同時加60秒自動刷新（比照距年高%表）。
+
+**Feat (Sonnet)：**
+- 新增 `_geoStraitsLive()` 取代 `_geoHormuzSeries()`（移除 IMF ArcGIS 呼叫）：直打 `straits.live/api/index`，取 `indices.crisisPressure`（`value`0~100/`band`/`indexHealth`/`inputsAsOf`/`delta24h`）與 `indices.escalationProbability.value`。
+- **🔴 兩個易錯換算點都已處理**：①`crisisPressure` 本身已是壓力方向（高=壓力↑）——**不反轉**（composite計算改為 `+comp.hormuz.z` 而非舊船隻數的 `-z`）②0~100轉可比尺度用 `(value-50)/25`（50→0、75→+1、100→+2），非z-score但沿用同一份 σ 顯示邏輯。
+- 彈窗荷莫茲列改顯示「value/100（band）」＋更新時間（`asOf`轉台灣時間）＋底層船隻數時間戳（`inputsAsOf`）；誠實標示區塊新增「straits.live第三方beta模型／非官方船隻數／混合Polymarket·Kalshi等預測市場」文案。
+- 面板加 **60秒自動刷新**：`scheduleIndexRefresh()`/`visibilitychange`/手動刷新鈕三處都併入 `loadGeoStress()`（原本只一次載入）。
+- IMF PortWatch 船隻數整條移除（含 `GEO_HORMUZ_URL` 常數與相關 fetch），未保留結構性參考——面板只留 straits.live 一個荷莫茲來源，簡化 UI。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **成分/schema錨 ✅**：直連 `straits.live/api/index` 確認 `crisisPressure.value=92`／`band=extreme`／`indexHealth=fresh`／`inputsAsOf=2026-07-23`（底層船隻數仍延遲~10天，與規格描述一致）；CORS `access-control-allow-origin:*` 實測確認免代理。
+  2. **換算錨 ✅**：(92-50)/25=1.68，與JS執行結果逐位相符；4成分實跑composite=+0.870σ（油z=0.717/殖利率z=2.687/S&P z=1.604反轉為-1.604/荷莫茲z=1.680，四者平均=0.870，算術正確）。
+  3. **不反轉確認 ✅**：與P2-31舊邏輯對比——舊版對同一份92（換算成船隻數場景）會誤當低值反轉，新版直接用+z，人工核對合成方向未被誤植。
+  4. **時區轉換錨 ✅**：`asOf`="2026-08-02T08:41:03.535Z"經`idxTime()`轉換得「下午04:41」，UTC+8手算相符。
+  5. **範圍錨 ✅**：grep確認geo相關函式與scoreEntry零關聯。
+  6. **結構錨**：`bun build app.js`語法檢查通過。
+- cache-buster `v=20260802b → v=20260802c`；隱私掃描clean。
+- 隱私：straits.live/api/index為公開第三方API，無專案一策略字眼。
+
+---
+
 ## 2026-08-02（拿掉台股加權 Proxy CVD 顯示區塊 — Ball 反饋用不到）
 
 **Request：** Ball——「台股加權CVD那段我感覺用不到了，可以先拿掉？」

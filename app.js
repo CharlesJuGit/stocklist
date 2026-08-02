@@ -2019,8 +2019,6 @@ async function loadIndexYtd() {
 // 「預測川普退縮」的說法金融界有重大爭議（見 businessfocus/cnyes），本面板只呈現公開成分＋
 // 自訂等權合成 z-score，非投資建議。
 const GEO_STRESS_SYMS = { oil: "CL=F", yield: "^TNX", sp500: "^GSPC" };
-// IMF PortWatch（官方、免key、有CORS，2026-08-02實測）chokepoint6＝Strait of Hormuz
-const GEO_HORMUZ_URL = "https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0/query";
 
 function _zscoreLast(series) {
   // series 由舊到新；回傳最新值相對整段（含自身，252個交易日視窗）的 z-score
@@ -2038,20 +2036,23 @@ async function _geoYahooSeries(sym) {
   const closes = (res.indicators.quote[0].close || []).filter(x => x != null);
   return { series: closes, latest: closes[closes.length - 1], time: res.meta.regularMarketTime };
 }
-async function _geoHormuzSeries() {
-  // ArcGIS 有 CORS（Access-Control-Allow-Origin:*，2026-08-02 實測），前端直打不需 CF Worker
-  const qs = new URLSearchParams({
-    where: "portid='chokepoint6'", outFields: "date,n_total", orderByFields: "date DESC",
-    resultRecordCount: "252", f: "json",
-  });
+// P2-32：荷莫茲改 straits.live /api/index（2026-08-02 Ball 裁示，取代 IMF 延遲船隻數）
+// CORS 開放（Access-Control-Allow-Origin:*，2026-08-02實測），前端直打不需 CF Worker。
+// 🔴 誠實限制：這是第三方 beta 模型（schema v0.2/methodology v0.6），「即時」主要來自賭盤情緒
+// （Polymarket/Kalshi 等）＋GDELT/期權訊號，底層真實船隻計數（AIS）仍週級延遲（inputsAsOf 落後~10天）。
+const GEO_STRAITS_URL = "https://straits.live/api/index";
+async function _geoStraitsLive() {
   const signal = AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined;
-  const r = await fetch(GEO_HORMUZ_URL + "?" + qs.toString(), { signal });
+  const r = await fetch(GEO_STRAITS_URL, { signal });
   if (!r.ok) throw new Error("http " + r.status);
   const j = await r.json();
-  const feats = (j.features || []).map(f => f.attributes).sort((a, b) => a.date < b.date ? -1 : 1);
-  if (!feats.length) throw new Error("no hormuz data");
-  const series = feats.map(f => f.n_total);
-  return { series, latest: series[series.length - 1], date: feats[feats.length - 1].date };
+  const cp = j?.indices?.crisisPressure;
+  if (!cp || cp.value == null) throw new Error("no crisisPressure");
+  return {
+    value: cp.value, band: cp.band, delta24h: cp.delta24h, health: cp.indexHealth,
+    inputsAsOf: cp.inputsAsOf, asOf: j.asOf,
+    escalation: j?.indices?.escalationProbability?.value ?? null,
+  };
 }
 
 let _geoStressData = null;   // 供 openGeoStressModal() 使用
@@ -2064,20 +2065,21 @@ async function loadGeoStress() {
     _geoYahooSeries(GEO_STRESS_SYMS.oil),
     _geoYahooSeries(GEO_STRESS_SYMS.yield),
     _geoYahooSeries(GEO_STRESS_SYMS.sp500),
-    _geoHormuzSeries(),
+    _geoStraitsLive(),
   ]);
   const comp = {};
   if (oilR.status === "fulfilled")    comp.oil    = { ...oilR.value,    z: _zscoreLast(oilR.value.series) };
   if (yieldR.status === "fulfilled")  comp.yield  = { ...yieldR.value,  z: _zscoreLast(yieldR.value.series) };
   if (spR.status === "fulfilled")     comp.sp500  = { ...spR.value,     z: _zscoreLast(spR.value.series) };
-  if (hormuzR.status === "fulfilled") comp.hormuz = { ...hormuzR.value, z: _zscoreLast(hormuzR.value.series) };
+  // P2-32：crisisPressure 是 0~100 壓力值（非歷史序列），轉可比尺度用 (v-50)/25；本身已是壓力方向，不反轉
+  if (hormuzR.status === "fulfilled") comp.hormuz = { ...hormuzR.value, z: (hormuzR.value.value - 50) / 25 };
 
-  // 合成方向：油/殖利率正向（高=壓力↑）；S&P/荷莫茲反轉（低=壓力↑）；算不出的成分不計入平均（不擋整塊）
+  // 合成方向：油/殖利率/荷莫茲正向（高=壓力↑）；S&P反轉（低=壓力↑）；算不出的成分不計入平均（不擋整塊）
   const contribs = [];
   if (comp.oil?.z != null)    contribs.push(comp.oil.z);
   if (comp.yield?.z != null)  contribs.push(comp.yield.z);
   if (comp.sp500?.z != null)  contribs.push(-comp.sp500.z);
-  if (comp.hormuz?.z != null) contribs.push(-comp.hormuz.z);
+  if (comp.hormuz?.z != null) contribs.push(comp.hormuz.z);
   const composite = contribs.length ? contribs.reduce((a, b) => a + b, 0) / contribs.length : null;
   _geoStressData = { comp, composite };
 
@@ -2094,7 +2096,7 @@ function openGeoStressModal() {
     { key: "oil",    name: "布倫特/WTI原油 (CL=F)", note: "高油價＝壓力↑",         flip: false, unit: "" },
     { key: "yield",  name: "美債10年殖利率 (^TNX)", note: "高殖利率＝壓力↑",       flip: false, unit: "" },
     { key: "sp500",  name: "標普500 (^GSPC)",       note: "低S&P＝壓力↑（反轉）",   flip: true,  unit: "" },
-    { key: "hormuz", name: "荷莫茲海峽通行船數",     note: "低通行量＝壓力↑（反轉，週頻）", flip: true, unit: " 艘/日" },
+    { key: "hormuz", name: "荷莫茲地緣壓力 (straits.live)", note: "第三方即時指數，0~100本身即壓力值（不反轉）",  flip: false, unit: "" },
   ];
   const rows = defs.map(d => {
     const c = comp[d.key];
@@ -2106,8 +2108,14 @@ function openGeoStressModal() {
     const contrib = d.flip ? -c.z : c.z;
     const arrow = contrib >= 0 ? "▲壓力↑" : "▼壓力↓";
     const color = contrib >= 1 ? "text-red-400" : contrib <= -1 ? "text-green-400" : "text-gray-300";
-    const valStr = Number(c.latest).toLocaleString(undefined, { maximumFractionDigits: 2 }) + d.unit;
-    const timeStr = d.key === "hormuz" ? `截至 ${c.date}（週頻）` : idxTime(c.time);
+    let valStr, timeStr;
+    if (d.key === "hormuz") {
+      valStr = `${c.value}/100（${c.band}）`;
+      timeStr = `更新 ${idxTime(new Date(c.asOf).getTime() / 1000)}・底層船隻數截至 ${(c.inputsAsOf || "").slice(0, 10)}`;
+    } else {
+      valStr = Number(c.latest).toLocaleString(undefined, { maximumFractionDigits: 2 }) + d.unit;
+      timeStr = idxTime(c.time);
+    }
     return `<tr class="border-b border-gray-800">
       <td class="py-1 text-gray-300">${d.name}<div class="text-[10px] text-gray-600">${d.note}・${timeStr}</div></td>
       <td class="text-right text-gray-200">${valStr}</td>
@@ -2121,7 +2129,8 @@ function openGeoStressModal() {
     <div class="text-[11px] text-gray-500 mb-3 leading-relaxed bg-gray-800/60 rounded p-2">
       ⚠ 本面板是 Signum Global Advisors「TACO 指數」的<b>非官方近似</b>——真實權重為商業機密未公開；
       「預測川普退縮」的說法金融界有重大爭議；本面板僅呈現公開成分＋自訂等權合成 z-score，<b>非投資建議</b>。
-      荷莫茲資料為 IMF PortWatch 週頻更新，非日頻。
+      荷莫茲成分改用 <b>straits.live 第三方 beta 模型</b>（非官方船隻數，5分更新但主要來自
+      GDELT事件/選擇權/<b>Polymarket・Kalshi 等混合預測市場</b>情緒，底層真實 AIS 船隻計數仍週級延遲）。
     </div>
     <div class="text-center mb-3">
       <div class="text-xs text-gray-500">綜合壓力（4成分等權平均 z-score）</div>
@@ -2142,9 +2151,10 @@ document.getElementById("geo-stress-modal")?.addEventListener("click", function 
 let idxTimer = null;
 function scheduleIndexRefresh() {
   if (idxTimer) clearInterval(idxTimer);
-  idxTimer = setInterval(() => { if (!document.hidden) loadIndexYtd(); }, 60000);
+  // P2-32：荷莫茲改 straits.live 即時源（5分更新）後，地緣壓力面板比照距年高%表 60秒自動刷新
+  idxTimer = setInterval(() => { if (!document.hidden) { loadIndexYtd(); loadGeoStress(); } }, 60000);
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) loadIndexYtd(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadIndexYtd(); loadGeoStress(); } });
 document.getElementById("idx-refresh")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget, orig = btn.textContent;
   btn.textContent = "更新中…"; btn.disabled = true; btn.classList.add("opacity-60");
