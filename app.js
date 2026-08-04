@@ -2203,15 +2203,19 @@ async function _etfQuote(code) {
   const dateStr = t => new Date(t * 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
   const last = ts.length - 1;
-  let ref, todayOpen;
-  if (dateStr(ts[last]) === todayStr && last > 0) {
-    todayOpen = q.open[last];
-    ref = q.close[last - 1];
-  } else {
-    todayOpen = null;   // 未開盤（週末/假日/開盤前）
-    ref = q.close[last];
+  const lastIsToday = dateStr(ts[last]) === todayStr;
+  const todayOpen = lastIsToday ? (q.open[last] ?? null) : null;   // 盤中/開盤後才有今開
+  // 昨收(ref)＝最後一根「日期早於今天 且 close 有效」的收盤；🔴 必須跳過 null bar——
+  // Yahoo 5d 視窗對部分新 ETF 會塞 null bar（如 08-03 收盤=null），死取 close[last-1] 會得 null
+  // → 前端 numFmt(null) 同步 throw → 整個面板卡死在「載入中」（2026-08-04 盤中實測踩到）。
+  let ref = null, refDate = null;
+  for (let i = last; i >= 0; i--) {
+    if (dateStr(ts[i]) < todayStr && q.close[i] != null) { ref = q.close[i]; refDate = dateStr(ts[i]); break; }
   }
-  const result = { code, ref, todayOpen, price: res.meta.regularMarketPrice };
+  if (ref == null) {   // 極端退路（剛上市只有今天一根之類）：取最後一根有效 close
+    for (let i = last; i >= 0; i--) { if (q.close[i] != null) { ref = q.close[i]; refDate = dateStr(ts[i]); break; } }
+  }
+  const result = { code, ref, refDate, todayOpen, price: res.meta.regularMarketPrice };
   _etfQuoteCache[code] = result;
   return result;
 }
@@ -2223,7 +2227,7 @@ async function openEtfPanel() {
   modal.classList.remove("hidden");
   body.textContent = "載入中…";
   const results = await Promise.allSettled(ETF_LIST.map(e => _etfQuote(e.code)));
-  const numFmt = v => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const numFmt = v => v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
   const rows = ETF_LIST.map((e, i) => {
     const r = results[i];
     if (r.status !== "fulfilled") {
@@ -2251,7 +2255,7 @@ function openEtfLadder(code) {
   const meta = ETF_LIST.find(e => e.code === code);
   const d = _etfData[code];
   if (!meta || !d) return;
-  const numFmt = v => v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const numFmt = v => v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
   document.getElementById("etf-ladder-title").textContent = `${meta.code} ${meta.name}`;
   const body = document.getElementById("etf-ladder-body");
 
@@ -2266,6 +2270,8 @@ function openEtfLadder(code) {
         <tr><td class="py-1 text-gray-400">現價</td>
           <td class="text-right text-gray-200">${d.price == null ? "—" : numFmt(d.price)}</td></tr>
       </table>`;
+  } else if (d.ref == null) {
+    body.innerHTML = `<div class="text-orange-400 text-xs bg-orange-900/30 rounded p-2">昨收資料暫缺，無法計算漲跌停階梯</div>`;
   } else {
     const rows = etfLadder(d.ref, meta.limit);
     const rowsHtml = rows.map(r => {
@@ -2284,7 +2290,7 @@ function openEtfLadder(code) {
       </tr>`;
     }).join("");
     body.innerHTML = `
-      <div class="text-[10px] text-gray-500 mb-2">昨收 ${numFmt(d.ref)}
+      <div class="text-[10px] text-gray-500 mb-2">昨收 ${numFmt(d.ref)}${d.refDate ? "（" + d.refDate.slice(5) + "）" : ""}
         ｜今開 ${d.todayOpen == null ? "—（未開盤）" : numFmt(d.todayOpen)}
         ｜漲跌幅上限 ±${(meta.limit * 100).toFixed(0)}%</div>
       <table class="w-full text-xs">
