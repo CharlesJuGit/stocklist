@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-08-09（P2-34：漲跌家數比＋融資維持率(A自算) — 成交量區・20天彈窗）
+
+**Request：** MARKET_BREADTH_MARGIN_SPEC（Opus 撰，Ball 2026-08-09 核准）——成交量區加兩指標：漲跌家數比（上漲÷下跌家數×100%）、融資維持率（A自算：Σ個股融資張×收盤÷官方融資金額餘額）。比照`market_volume`模式（後端存歷史陣列→前端顯示最新+20天彈窗），純顯示不進評分/選股。
+
+**Feat (Sonnet)：**
+- **§0前置驗證（動工第一步）**：確認四個資料源皆單次請求取全市場（無2000次逐檔問題）——TWSE `MI_INDEX?type=ALLBUT0999`（同一回應含「漲跌證券數合計」表+「每日收盤行情」表）；TWSE `MI_MARGN?selectType=ALL`（同一回應含「信用交易統計」彙總表+「融資融券彙總」個股表，彙總表的「融資金額(仟元)今日餘額」即分母官方數字）；TPEx `openapi/tpex_mainboard_daily_close_quotes`（全市場含ETF/債券，用4位數股號過濾出純股票算漲跌家數+收盤）；TPEx `web/stock/margin_trading/margin_balance/margin_bal_result.php`（`summary`欄含「融資金(仟元)」官方彙總，同TWSE的彙總+個股一次到位）。
+- `fetch_taifex.py`新增`fetch_market_breadth_margin()`（單日快照，四來源各自try/except不互相擋）＋`merge_market_breadth_margin()`（累積制：同日重跑覆蓋不重複、抓取失敗原樣返回不假造、只留最新20天，比照`merge_market_volume`）。寫入`taifex_data.json`的`market_breadth`/`margin_ratio`兩個獨立陣列（規格§4）。
+- `app.js`新增`loadMarketBreadth()`/`openBreadthModal()`、`loadMarginRatio()`/`openMarginModal()`（比照`loadMarketVolume`/`openVolumeModal`）；`index.html`新增兩個顯示區塊+兩個歷史彈窗（比照成交量區樣式）。
+- **驗證（真實資料，[[verification_rule]]，基準2026-08-07最近交易日，today=週日無新資料故用明確日期直測）：**
+  1. **漲跌家數逐位錨 ✅**：TWSE 497漲/509跌，與前置驗證階段手動curl「漲跌證券數合計」表的原始數字逐位相符；TPEx 336漲/443跌（4位數股號過濾，排除ETF/債券/權證後863支中823支有效漲跌）。
+  2. **除零防呆 ✅**：構造down=0情境，`breadthRatioTxt`正確回傳「∞」（up>0時）或「—」（up=0時），不crash；null值同樣安全回「—」。
+  3. **融資維持率手算錨 ✅**：TWSE `Σ(融資張×收盤)=993,644,486` ÷ 融資金額餘額`537,664,510`(仟元) ×100 = **184.81%**；TPEx `Σ=310,182,106` ÷ `175,213,756` ×100 = **177.03%**。與後端`_ratio()`函式邏輯逐步核對一致（張→股×1000與仟元→元×1000兩者相消，公式不需額外換算，已在函式註解記錄推導）。
+  4. **外部交叉核對**：WebSearch查得TWSE官方公告07-27「整戶擔保維持率約175%」（相近日期）；本案自算184.81%/177.03%與此數量級相近（同屬140~185%正常區間），惟計算方法論不同（官方「整戶擔保」含融券等完整信用交易因素，本案僅算融資簡化版，規格已言明「驗算法對非抄它」，誠實記錄方法論差異非精確對齊）。
+  5. **累積邏輯錨 ✅**：構造測試——第1天/第2天正常累積、同日重跑覆蓋不重複、抓取失敗(None)時原樣返回不補假資料，皆通過。
+  6. **紅線錨 ✅**：grep確認兩指標與`scoreEntry`零關聯。
+  7. **結構錨**：`bun build app.js`語法檢查通過；index.html div開合標籤前後平衡(279/279)。
+- cache-buster `v=20260804a → v=20260809`；隱私掃描clean（純公開市場統計資料，無專案一策略字眼）。
+- 隱私：純顯示，資料源皆TWSE/TPEx官方公開端點。
+
+---
+
 ## 2026-08-02（P2-33：ETF 掛價速查面板 — 漲跌停價格階梯）
 
 **Request：** ETF_PANEL_SPEC（Opus 撰，Ball 2026-08-02 核准）——常用連結右邊加「ETF 掛價」按鈕，列出7支常用ETF（代碼/中文名/昨收/今開），點單支彈窗顯示今日漲停→1%一階→跌停的價格階梯供掛價參考。純顯示不進評分/選股。

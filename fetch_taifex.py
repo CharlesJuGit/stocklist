@@ -461,6 +461,163 @@ def merge_market_volume(existing: list, fetched: list, keep: int = 30) -> list:
     return [by_date[d] for d in sorted(by_date)][-keep:]
 
 
+# ── P2-34：漲跌家數比 ＋ 融資維持率（A 自算）─────────────────────
+def fetch_market_breadth_margin():
+    """
+    抓當日快照：TWSE/TPEx 漲跌家數 ＋ 融資維持率（A 自算：Σ個股融資張×收盤／官方融資金額餘額）。
+    四個來源皆單次請求取得全市場（前置驗證見 MARKET_BREADTH_MARGIN_SPEC.md §0，無逐檔查詢）：
+      TWSE 漲跌家數/收盤 → MI_INDEX type=ALLBUT0999（同一次回應含兩張表）
+      TWSE 融資（個股+彙總）→ MI_MARGN selectType=ALL（同一次回應含彙總與個股兩張表）
+      TPEx 漲跌家數/收盤 → openapi tpex_mainboard_daily_close_quotes（全市場，用4位數股號過濾掉ETF/債券/權證）
+      TPEx 融資（個股+彙總）→ web/stock margin_bal_result.php（summary 欄含官方彙總，同 TWSE 那道題目）
+    單日快照無官方月表可回補，累積邏輯見 merge_market_breadth_margin（上線起累積、不回填）。
+    回傳 (breadth_record|None, margin_record|None)；任一邊來源失敗只影響該邊欄位（None），不擋另一邊。
+    """
+    import ssl as _ssl
+
+    ctx = _ssl._create_unverified_context()
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    ymd = now.strftime("%Y%m%d")
+    roc = f"{now.year - 1911}/{now.month:02d}/{now.day:02d}"
+
+    def _get(url):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+
+    twse_up = twse_down = None
+    twse_close = {}
+    try:
+        d = _get(f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd}&type=ALLBUT0999&response=json")
+        for t in d.get("tables", []):
+            if t.get("title") == "漲跌證券數合計":
+                fields = t["fields"]
+                idx = fields.index("股票")   # 只取「股票」欄，非「整體市場」（含ETF/權證等）
+                for row in t["data"]:
+                    label = row[0]
+                    val = row[idx].split("(")[0].replace(",", "").strip()
+                    if not val:
+                        continue
+                    if label.startswith("上漲"):
+                        twse_up = int(val)
+                    elif label.startswith("下跌"):
+                        twse_down = int(val)
+            elif (t.get("fields") or [None])[0] == "證券代號":
+                for row in t["data"]:
+                    sid = row[0].strip()
+                    try:
+                        c = float(row[8].replace(",", ""))   # 收盤價
+                    except (ValueError, IndexError):
+                        continue
+                    if c > 0:
+                        twse_close[sid] = c
+    except Exception as e:
+        print(f"market_breadth TWSE漲跌家數/收盤 FAIL: {e}")
+
+    twse_margin_total = None
+    twse_margin_lots = {}
+    try:
+        d = _get(f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={ymd}&selectType=ALL&response=json")
+        for t in d.get("tables", []):
+            title = t.get("title", "")
+            if "信用交易統計" in title:
+                for row in t["data"]:
+                    if row[0].startswith("融資金額"):
+                        twse_margin_total = float(row[-1].replace(",", ""))   # 仟元，今日餘額
+            elif "融資融券彙總" in title:
+                for row in t["data"]:
+                    sid = row[0].strip()
+                    try:
+                        lots = float(row[6].replace(",", ""))   # 融資今日餘額(張)
+                    except (ValueError, IndexError):
+                        continue
+                    twse_margin_lots[sid] = lots
+    except Exception as e:
+        print(f"market_breadth TWSE融資 FAIL: {e}")
+
+    tpex_up = tpex_down = None
+    tpex_close = {}
+    try:
+        rows = _get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes")
+        u = dn = 0
+        for r in rows:
+            sid = (r.get("SecuritiesCompanyCode") or "").strip()
+            if not (len(sid) == 4 and sid.isdigit()):   # 只算4位數股票代碼，排除ETF/債券/權證
+                continue
+            try:
+                c = float((r.get("Close") or "").strip())
+                chg = float((r.get("Change") or "").strip())
+            except ValueError:
+                continue
+            if c > 0:
+                tpex_close[sid] = c
+            if chg > 0:
+                u += 1
+            elif chg < 0:
+                dn += 1
+        if rows:
+            tpex_up, tpex_down = u, dn
+    except Exception as e:
+        print(f"market_breadth TPEx漲跌家數/收盤 FAIL: {e}")
+
+    tpex_margin_total = None
+    tpex_margin_lots = {}
+    try:
+        d = _get(f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php"
+                 f"?l=zh-tw&d={roc}&o=json")
+        t = d["tables"][0]
+        idx = t["fields"].index("資餘額")   # 融資今日餘額欄（個股列與summary列欄位對齊）
+        for row in t.get("summary", []):
+            if row[1] == "融資金(仟元)":
+                tpex_margin_total = float(row[idx].replace(",", ""))
+        for row in t["data"]:
+            sid = row[0].strip()
+            try:
+                lots = float(row[idx].replace(",", ""))
+            except (ValueError, IndexError):
+                continue
+            tpex_margin_lots[sid] = lots
+    except Exception as e:
+        print(f"market_breadth TPEx融資 FAIL: {e}")
+
+    breadth = None
+    if twse_up is not None or tpex_up is not None:
+        breadth = {"date": date_str, "twse_up": twse_up, "twse_down": twse_down,
+                   "tpex_up": tpex_up, "tpex_down": tpex_down}
+
+    def _ratio(lots_map, close_map, total_qianyuan):
+        # Σ(張×收盤) 單位=張×元；total是仟元。張→股要×1000、仟元→元要×1000，兩者相消，
+        # 故 Σ(張×收盤)/total×100 即為正確百分比，不需額外換算（見 CHANGELOG 驗證）。
+        if not lots_map or not close_map or not total_qianyuan:
+            return None
+        numer = sum(lots_map[s] * close_map[s] for s in lots_map if s in close_map)
+        if numer <= 0:
+            return None
+        return round(numer / total_qianyuan * 100, 2)
+
+    twse_ratio = _ratio(twse_margin_lots, twse_close, twse_margin_total)
+    tpex_ratio = _ratio(tpex_margin_lots, tpex_close, tpex_margin_total)
+    margin = None
+    if twse_ratio is not None or tpex_ratio is not None:
+        margin = {"date": date_str, "twse": twse_ratio, "tpex": tpex_ratio}
+
+    return breadth, margin
+
+
+def merge_market_breadth_margin(existing: list, today_record: dict | None, keep: int = 20) -> list:
+    """
+    累積制（規格§3：20天=累積不回填）：今天已有記錄則覆蓋同日那筆（重跑同一天不重複），
+    否則附加新一筆；只留最新 keep 天。today_record=None（抓取失敗）時原樣返回，不假造。
+    上線初期天數不足 keep 天時，原樣回傳目前累積的天數，不補假資料。
+    """
+    if today_record is None:
+        return existing[-keep:]
+    by_date = {r["date"]: r for r in existing if r.get("date")}
+    by_date[today_record["date"]] = today_record
+    return [by_date[d] for d in sorted(by_date)][-keep:]
+
+
 # ── FinMind 台指期 OHLC ──────────────────────────────────────
 
 def fetch_tx_ohlc(n_days=25):
@@ -1277,6 +1434,17 @@ def main():
     market_volume = merge_market_volume(existing_json.get("market_volume", []), fetched_volume)
     print(f"Market volume merged → {len(market_volume)} days")
 
+    # ── P2-34：漲跌家數比＋融資維持率 ──────────────────────────
+    breadth_today = margin_today = None
+    try:
+        breadth_today, margin_today = fetch_market_breadth_margin()
+        print(f"market_breadth/margin_ratio fetched: breadth={breadth_today} margin={margin_today}")
+    except Exception as e:
+        print(f"market_breadth/margin_ratio FAIL: {e}")
+    market_breadth = merge_market_breadth_margin(existing_json.get("market_breadth", []), breadth_today)
+    margin_ratio = merge_market_breadth_margin(existing_json.get("margin_ratio", []), margin_today)
+    print(f"market_breadth 累積 → {len(market_breadth)} 天｜margin_ratio 累積 → {len(margin_ratio)} 天")
+
     tx_vol = build_vol_data(tx_records, "TX")
     nq_vol = build_vol_data(nq_records, "NQ")
 
@@ -1417,6 +1585,8 @@ def main():
         "settlement_history": existing_history,
         "volatility":         {"tx": tx_vol, "nq": nq_vol},
         "market_volume":      market_volume,
+        "market_breadth":     market_breadth,
+        "margin_ratio":       margin_ratio,
         "basis":              basis,
         "update_log":         update_log,
         "earnings":           earnings,

@@ -878,6 +878,8 @@ async function loadMarketInfo() {
     loadVolatility(),
     loadBasis(),
     loadMarketVolume(),
+    loadMarketBreadth(),
+    loadMarginRatio(),
     loadEarnings(),
   ]);
   await loadSignalSummary();
@@ -902,6 +904,95 @@ async function loadMarketVolume() {
     document.getElementById('vol-date').textContent  = last.date ?? '';
   } catch (e) { console.error('loadMarketVolume:', e); }
 }
+
+// ── P2-34：漲跌家數比（純顯示，不進 scoreEntry/選股）───────────────
+// 上漲÷下跌家數×100%，只算「股票」（TWSE漲跌證券數合計的股票欄；TPEx用4位數股號過濾ETF/債券/權證）。
+// 平盤不計；下跌家數=0 時顯示「∞」（極端全漲）不 crash（規格§1除零防呆）。
+function breadthRatioTxt(up, down) {
+  if (up == null || down == null) return '—';
+  if (down === 0) return up > 0 ? '∞' : '—';
+  return (up / down * 100).toFixed(1) + '%';
+}
+function breadthColor(up, down) {
+  if (up == null || down == null || down === 0) return 'text-gray-500';
+  return (up / down * 100) >= 100 ? 'text-red-400' : 'text-green-400';
+}
+async function loadMarketBreadth() {
+  try {
+    const data = await loadTaifexJson();
+    const hist = data?.market_breadth;
+    if (!hist || !hist.length) return;
+    const last = hist[hist.length - 1];
+    const twseEl = document.getElementById('breadth-twse'), tpexEl = document.getElementById('breadth-tpex');
+    twseEl.textContent = breadthRatioTxt(last.twse_up, last.twse_down);
+    twseEl.className = 'text-lg font-bold ' + breadthColor(last.twse_up, last.twse_down);
+    tpexEl.textContent = breadthRatioTxt(last.tpex_up, last.tpex_down);
+    tpexEl.className = 'text-lg font-bold ' + breadthColor(last.tpex_up, last.tpex_down);
+    document.getElementById('breadth-date').textContent = last.date ?? '';
+  } catch (e) { console.error('loadMarketBreadth:', e); }
+}
+function openBreadthModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.market_breadth;
+    if (!hist?.length) return;
+    const rows = [...hist].reverse().map(r => `
+      <div class="flex justify-between py-1 border-b border-gray-700">
+        <span class="text-gray-400">${r.date}</span>
+        <span class="${breadthColor(r.twse_up, r.twse_down)}">${breadthRatioTxt(r.twse_up, r.twse_down)}</span>
+        <span class="${breadthColor(r.tpex_up, r.tpex_down)}">${breadthRatioTxt(r.tpex_up, r.tpex_down)}</span>
+      </div>`).join('');
+    document.getElementById('breadth-modal-body').innerHTML =
+      `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
+        <span>日期</span><span>上市</span><span>上櫃</span>
+      </div>` + rows;
+    document.getElementById('breadth-modal').classList.remove('hidden');
+  });
+}
+document.getElementById('breadth-modal')?.addEventListener('click', function (e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+// ── P2-34：融資維持率（A自算，純顯示，不進 scoreEntry/選股）─────────
+// Σ(個股融資餘額張×收盤) ÷ 官方融資金額餘額 × 100%，上市/上櫃分開算（分子分母同市場同日）。
+function marginColor(v) {
+  if (v == null) return 'text-gray-500';
+  return v < 130 ? 'text-red-400' : 'text-gray-200';   // <130%偏低（槓桿去化/風險）提示
+}
+async function loadMarginRatio() {
+  try {
+    const data = await loadTaifexJson();
+    const hist = data?.margin_ratio;
+    if (!hist || !hist.length) return;
+    const last = hist[hist.length - 1];
+    const twseEl = document.getElementById('margin-twse'), tpexEl = document.getElementById('margin-tpex');
+    twseEl.textContent = last.twse != null ? last.twse.toFixed(1) + '%' : '—';
+    twseEl.className = 'text-lg font-bold ' + marginColor(last.twse);
+    tpexEl.textContent = last.tpex != null ? last.tpex.toFixed(1) + '%' : '—';
+    tpexEl.className = 'text-lg font-bold ' + marginColor(last.tpex);
+    document.getElementById('margin-date').textContent = last.date ?? '';
+  } catch (e) { console.error('loadMarginRatio:', e); }
+}
+function openMarginModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.margin_ratio;
+    if (!hist?.length) return;
+    const cell = v => (v != null ? v.toFixed(1) + '%' : '—');
+    const rows = [...hist].reverse().map(r => `
+      <div class="flex justify-between py-1 border-b border-gray-700">
+        <span class="text-gray-400">${r.date}</span>
+        <span class="${marginColor(r.twse)}">${cell(r.twse)}</span>
+        <span class="${marginColor(r.tpex)}">${cell(r.tpex)}</span>
+      </div>`).join('');
+    document.getElementById('margin-modal-body').innerHTML =
+      `<div class="flex justify-between text-xs text-gray-500 mb-2 pb-1 border-b border-gray-600">
+        <span>日期</span><span>上市</span><span>上櫃</span>
+      </div>` + rows;
+    document.getElementById('margin-modal').classList.remove('hidden');
+  });
+}
+document.getElementById('margin-modal')?.addEventListener('click', function (e) {
+  if (e.target === this) this.classList.add('hidden');
+});
 
 // ── 台指期正價差 ──────────────────────────────────────────────
 
