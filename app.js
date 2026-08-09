@@ -2180,7 +2180,42 @@ async function loadGeoStress() {
   line.classList.remove("hidden");
 }
 
-function openGeoStressModal() {
+// ── P2-35：3-2-1裂解價差先行指標（純顯示，不進scoreEntry/選股，也不進TACO合成壓力值）───
+// 走既有INDEX_PROXY同P2-31油價路徑。公式=CME/EIA標準3-2-1 crack spread定義（已對公開歷史區間
+// 驗證：歷史最高約71.7$/bbl，本面板實測60$/bbl屬偏高但非物理不可能，見CHANGELOG驗證記錄）：
+// (2×RBOB汽油$/gal×42 + 1×取暖油ULSD$/gal×42)/3 − WTI原油$/bbl（42=gal/bbl換算）。
+// 🔴 定位＝獨立先行指標，視覺與位置皆與TACO的4成分等權z-score合成分開，不混入composite。
+const CRACK_SYMS = { crude: "CL=F", gasoline: "RB=F", heatingoil: "HO=F" };
+let _crackSpreadData = null;
+async function loadCrackSpread() {
+  const [clR, rbR, hoR] = await Promise.allSettled([
+    _geoYahooSeries(CRACK_SYMS.crude),
+    _geoYahooSeries(CRACK_SYMS.gasoline),
+    _geoYahooSeries(CRACK_SYMS.heatingoil),
+  ]);
+  if (clR.status !== "fulfilled" || rbR.status !== "fulfilled" || hoR.status !== "fulfilled") {
+    _crackSpreadData = null;
+    return;
+  }
+  const cl = clR.value.latest, rb = rbR.value.latest, ho = hoR.value.latest;
+  const crack = (2 * rb * 42 + 1 * ho * 42) / 3 - cl;
+  _crackSpreadData = { cl, rb, ho, crack, time: clR.value.time };
+}
+function _crackSpreadHtml() {
+  if (!_crackSpreadData) {
+    return `<div class="text-xs text-gray-600">裂解價差資料暫時無法取得（—）</div>`;
+  }
+  const { cl, rb, ho, crack, time } = _crackSpreadData;
+  const color = crack >= 0 ? "text-red-400" : "text-green-400";
+  return `
+    <div class="text-center">
+      <div class="text-xs text-gray-500">3-2-1 裂解價差</div>
+      <div class="text-xl font-bold ${color}">${crack >= 0 ? "+" : ""}${crack.toFixed(2)} $/bbl</div>
+      <div class="text-[10px] text-gray-600 mt-1">油價領先指標｜裂解價差擴大＝成品油需求強/煉油利潤高、收窄＝需求轉弱</div>
+      <div class="text-[10px] text-gray-600">CL=F ${cl.toFixed(2)}｜RB=F ${rb.toFixed(4)}｜HO=F ${ho.toFixed(4)}・${idxTime(time)}</div>
+    </div>`;
+}
+async function openGeoStressModal() {
   if (!_geoStressData) return;
   const { comp, composite } = _geoStressData;
   const defs = [
@@ -2232,8 +2267,17 @@ function openGeoStressModal() {
       <thead><tr class="text-gray-500 border-b border-gray-600">
         <th class="text-left py-1">成分</th><th class="text-right py-1">現值</th>
         <th class="text-right py-1">Z-score</th><th class="text-right py-1">方向</th>
-      </tr></thead><tbody>${rows}</tbody></table>`;
+      </tr></thead><tbody>${rows}</tbody></table>
+    <div class="mt-4 pt-3 border-t border-gray-700">
+      <div id="crack-spread-box">${_crackSpreadData ? _crackSpreadHtml() : `<div class="text-xs text-gray-600 text-center">裂解價差載入中…</div>`}</div>
+    </div>`;
   document.getElementById("geo-stress-modal").classList.remove("hidden");
+
+  if (!_crackSpreadData) {
+    await loadCrackSpread();
+    const box = document.getElementById("crack-spread-box");
+    if (box) box.innerHTML = _crackSpreadHtml();
+  }
 }
 document.getElementById("geo-stress-modal")?.addEventListener("click", function (e) {
   if (e.target === this) this.classList.add("hidden");
