@@ -20,10 +20,10 @@
   },
   "institute": {
     "date": "20260810",
-    "foreign": 517.1,
-    "trust": 29.8,
+    "foreign": 517.4,
+    "trust": 34.0,
     "dealer": 184.7,
-    "total": 731.6
+    "total": 736.1
   },
   "settlement_date": "2026-08-19",
   "recent_settlement_dates": [
@@ -1081,8 +1081,8 @@
       "ratio": 12866,
       "retail_total": 14484,
       "opt_strategy": "雙買",
-      "foreign": 517.1,
-      "trust": 29.8,
+      "foreign": 517.4,
+      "trust": 34.0,
       "dealer": 184.7
     }
   ],
@@ -1223,8 +1223,8 @@
       "yesterday": {
         "date": "2026-08-10",
         "high": 29984,
-        "low": 29788,
-        "range": 196
+        "low": 29737,
+        "range": 247
       },
       "avg20": 692,
       "category": "低",
@@ -1346,8 +1346,8 @@
         {
           "date": "2026-08-10",
           "high": 29984,
-          "low": 29788,
-          "range": 196
+          "low": 29737,
+          "range": 247
         }
       ]
     }
@@ -1543,7 +1543,13 @@
       "tpex_down": null
     }
   ],
-  "margin_ratio": [],
+  "margin_ratio": [
+    {
+      "date": "2026-08-10",
+      "twse": 189.82,
+      "tpex": null
+    }
+  ],
   "basis": {
     "date": "2026/08/10",
     "spot": 44929,
@@ -1702,14 +1708,6 @@
   },
   "update_log": [
     {
-      "at": "2026-08-07 17:40",
-      "trigger": "schedule",
-      "inst": "2026-08-07",
-      "fut": "2026-08-07",
-      "tx": "2026-08-07",
-      "nq": "2026-08-07"
-    },
-    {
       "at": "2026-08-07 18:11",
       "trigger": "schedule",
       "inst": "2026-08-07",
@@ -1796,6 +1794,14 @@
       "fut": "2026-08-10",
       "tx": "2026-08-10",
       "nq": "2026-08-10"
+    },
+    {
+      "at": "2026-08-10 21:45",
+      "trigger": "schedule",
+      "inst": "2026-08-10",
+      "fut": "2026-08-10",
+      "tx": "2026-08-10",
+      "nq": "2026-08-10"
     }
   ],
   "earnings": {
@@ -1833,5 +1839,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-08-10T11:20:55Z"
+  "updated_at": "2026-08-10T13:46:02Z"
 }
