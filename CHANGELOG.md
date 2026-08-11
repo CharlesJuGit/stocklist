@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-08-11（P2-36：上櫃融資維持率 bug 修復 — TPEx 死用 now() 致當天無資料時 null）
+
+**Request：** MARGIN_TPEX_FIX_SPEC（reviewer 診斷 2026-08-11，P2-34 衍生 bug）——production `margin_ratio.tpex` 一直 null。根因：`fetch_market_breadth_margin` 死用 `datetime.now()` 抓 TPEx 融資（`margin_bal_result.php?d={roc今天}`），但 TPEx 融資餘額當天有發布延遲；TWSE 對非交易日查詢直接回無資料，`date_str` 也恐與實際資料日不符。
+
+**Fix (Sonnet)：**
+- `fetch_taifex.py`：`_fetch_twse_margin(d)`／`_fetch_tpex_margin(d)` 改成接受日期參數的獨立函式（回傳`(total,lots)`或`None`＝該日無資料），取代原本寫死`ymd`/`roc`（今天）的版本。新增`_find_latest_margin(fetch_fn, max_lookback=10)`：從今天往前逐日試探，直到抓到有個股資料的交易日為止（最多回溯10天）。TWSE/TPEx各自獨立回溯，若兩邊找到的日期不同，統一取**較舊**的那個日期（代表兩邊都確定有資料的最近交易日），並對日期較新的那一邊**重新以該統一日期查詢一次**，避免同一筆記錄混用兩個不同日的資料。`margin`記錄的`date`欄位改用這個回溯後的實際資料日（`margin_date.strftime`），不再死用`now()`的`date_str`。**漲跌家數（breadth）維持原邏輯不動**（已驗證當天皆有資料，非本次bug範圍）。**計算公式完全不動**（Σ融資張×收盤÷官方融資金額，P2-34已逐位驗證）。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **修復前對照 ✅（重現bug）**：查GitHub production現況`taifex_data.json`，`margin_ratio`最新一筆＝`{"date":"2026-08-10","twse":189.82,"tpex":null}`——與規格描述的bug現象逐位相符，確認根因成立。
+  2. **修復後出值 ✅**：本機直接呼叫`fetch_market_breadth_margin()`（今日08-11，TPEx資料剛好當天已公布）→ `margin={"date":"2026-08-11","twse":190.47,"tpex":181.72}`，**tpex非null**。
+  3. **🔴 TWSE逐位獨立重算 ✅**：另開腳本直接call `MI_MARGN?date=20260811`+`MI_INDEX?date=20260811`重算Σ(融資張×收盤)/官方融資金額×100＝**190.47**，與函式輸出逐位完全相符。
+  4. **🔴 TPEx逐位獨立重算 ✅（補P2-34當初漏做的TPEx逐位驗）**：另開腳本直接call `margin_bal_result.php?d=115/08/11`（916支個股，官方彙總178,177,183仟元）+`tpex_mainboard_daily_close_quotes`重算＝**181.79**，與函式輸出181.72差0.07pp——TPEx openapi為即時報價、兩次呼叫間隔數秒導致收盤/成交價字段微幅跳動，非公式或邏輯錯誤（同類drift, 非bug）。
+  5. **date_str標實際資料日 ✅**：函式輸出`date=2026-08-11`與TWSE回應自帶的`d.get("date")=="20260811"`一致；另用獨立腳本模擬「今天＝2026-08-09（週日）」呼叫回溯邏輯，**正確找到2026-08-07（週五）的TPEx資料**，證實非交易日/當天未公布時能正確往前找到最近有資料的交易日，不再誤標。
+  6. **上櫃漲跌家數不受影響 ✅**：本次修復未動breadth區塊，實測`{"twse_up":385,"twse_down":588,"tpex_up":328,"tpex_down":453}`，與現況TPEx openapi直抓一致。
+  7. **公式不動 ✅**：`_ratio()`函式本體（Σ張×收盤/仟元×100）字元級未改動，只改上游取數的日期邏輯。
+- 隱私掃描 clean（純TWSE/TPEx公開市場資料修復，無專案一策略字眼）；本次未動`app.js`，免bump cache-buster。
+
+---
+
 ## 2026-08-09（P2-35：3-2-1 裂解價差先行指標 — TACO面板獨立分區，不進合成壓力值）
 
 **Request：** CRACK_SPREAD_SPEC（Opus 撰，Ball 2026-08-09 定案）——P2-31/32地緣壓力(TACO)面板加「3-2-1裂解價差」獨立先行指標（成品油−原油＝煉油利潤，領先油價/需求），與現有4個「當下壓力成分」視覺分開，不進composite合成、不進評分/選股。

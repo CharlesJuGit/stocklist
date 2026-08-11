@@ -479,7 +479,6 @@ def fetch_market_breadth_margin():
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     ymd = now.strftime("%Y%m%d")
-    roc = f"{now.year - 1911}/{now.month:02d}/{now.day:02d}"
 
     def _get(url):
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -515,26 +514,31 @@ def fetch_market_breadth_margin():
     except Exception as e:
         print(f"market_breadth TWSE漲跌家數/收盤 FAIL: {e}")
 
-    twse_margin_total = None
-    twse_margin_lots = {}
-    try:
-        d = _get(f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={ymd}&selectType=ALL&response=json")
-        for t in d.get("tables", []):
+    def _fetch_twse_margin(d):
+        """回傳 (total_仟元, lots_map) 或 None（該日無資料，如假日）。"""
+        ymd_d = d.strftime("%Y%m%d")
+        try:
+            resp = _get(f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={ymd_d}&selectType=ALL&response=json")
+        except Exception as e:
+            print(f"market_breadth TWSE融資 FAIL({ymd_d}): {e}")
+            return None
+        if resp.get("stat") != "OK":
+            return None
+        total, lots = None, {}
+        for t in resp.get("tables", []):
             title = t.get("title", "")
             if "信用交易統計" in title:
                 for row in t["data"]:
                     if row[0].startswith("融資金額"):
-                        twse_margin_total = float(row[-1].replace(",", ""))   # 仟元，今日餘額
+                        total = float(row[-1].replace(",", ""))   # 仟元，餘額
             elif "融資融券彙總" in title:
                 for row in t["data"]:
                     sid = row[0].strip()
                     try:
-                        lots = float(row[6].replace(",", ""))   # 融資今日餘額(張)
+                        lots[sid] = float(row[6].replace(",", ""))   # 融資餘額(張)
                     except (ValueError, IndexError):
                         continue
-                    twse_margin_lots[sid] = lots
-    except Exception as e:
-        print(f"market_breadth TWSE融資 FAIL: {e}")
+        return (total, lots) if lots else None
 
     tpex_up = tpex_down = None
     tpex_close = {}
@@ -561,25 +565,60 @@ def fetch_market_breadth_margin():
     except Exception as e:
         print(f"market_breadth TPEx漲跌家數/收盤 FAIL: {e}")
 
-    tpex_margin_total = None
-    tpex_margin_lots = {}
-    try:
-        d = _get(f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php"
-                 f"?l=zh-tw&d={roc}&o=json")
-        t = d["tables"][0]
-        idx = t["fields"].index("資餘額")   # 融資今日餘額欄（個股列與summary列欄位對齊）
+    def _fetch_tpex_margin(d):
+        """回傳 (total_仟元, lots_map) 或 None（該日無資料，如假日或當天未公布）。"""
+        roc_d = f"{d.year - 1911}/{d.month:02d}/{d.day:02d}"
+        try:
+            resp = _get(f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php"
+                        f"?l=zh-tw&d={roc_d}&o=json")
+        except Exception as e:
+            print(f"market_breadth TPEx融資 FAIL({roc_d}): {e}")
+            return None
+        tables = resp.get("tables") or []
+        if not tables or not tables[0].get("data"):
+            return None
+        t = tables[0]
+        idx = t["fields"].index("資餘額")   # 融資餘額欄（個股列與summary列欄位對齊）
+        total, lots = None, {}
         for row in t.get("summary", []):
             if row[1] == "融資金(仟元)":
-                tpex_margin_total = float(row[idx].replace(",", ""))
+                total = float(row[idx].replace(",", ""))
         for row in t["data"]:
             sid = row[0].strip()
             try:
-                lots = float(row[idx].replace(",", ""))
+                lots[sid] = float(row[idx].replace(",", ""))
             except (ValueError, IndexError):
                 continue
-            tpex_margin_lots[sid] = lots
-    except Exception as e:
-        print(f"market_breadth TPEx融資 FAIL: {e}")
+        return (total, lots) if lots else None
+
+    # 🔴 P2-36：TPEx 融資餘額當天恐未公布、TWSE 對非交易日查詢直接回無資料——
+    # 兩者皆「往前找最近一個有個股資料的交易日」而非死用 now()，date_str 標實際資料日
+    def _find_latest_margin(fetch_fn, max_lookback=10):
+        d = now.date()
+        for _ in range(max_lookback):
+            result = fetch_fn(d)
+            if result is not None:
+                return d, result
+            d -= timedelta(days=1)
+        return None, None
+
+    twse_margin_date, twse_margin_result = _find_latest_margin(_fetch_twse_margin)
+    tpex_margin_date, tpex_margin_result = _find_latest_margin(_fetch_tpex_margin)
+
+    margin_date = None
+    if twse_margin_date and tpex_margin_date:
+        margin_date = min(twse_margin_date, tpex_margin_date)
+        if twse_margin_date != margin_date:
+            twse_margin_result = _fetch_twse_margin(margin_date)
+        if tpex_margin_date != margin_date:
+            tpex_margin_result = _fetch_tpex_margin(margin_date)
+    elif twse_margin_date:
+        margin_date = twse_margin_date
+    elif tpex_margin_date:
+        margin_date = tpex_margin_date
+
+    twse_margin_total, twse_margin_lots = twse_margin_result if twse_margin_result else (None, {})
+    tpex_margin_total, tpex_margin_lots = tpex_margin_result if tpex_margin_result else (None, {})
 
     breadth = None
     if twse_up is not None or tpex_up is not None:
@@ -599,8 +638,8 @@ def fetch_market_breadth_margin():
     twse_ratio = _ratio(twse_margin_lots, twse_close, twse_margin_total)
     tpex_ratio = _ratio(tpex_margin_lots, tpex_close, tpex_margin_total)
     margin = None
-    if twse_ratio is not None or tpex_ratio is not None:
-        margin = {"date": date_str, "twse": twse_ratio, "tpex": tpex_ratio}
+    if margin_date and (twse_ratio is not None or tpex_ratio is not None):
+        margin = {"date": margin_date.strftime("%Y-%m-%d"), "twse": twse_ratio, "tpex": tpex_ratio}
 
     return breadth, margin
 
