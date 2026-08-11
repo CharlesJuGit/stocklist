@@ -2124,8 +2124,12 @@ function _zscoreLast(series) {
 async function _geoYahooSeries(sym) {
   const j = await idxFetch(`/yahoo/${encodeURIComponent(sym)}?range=1y&interval=1d`);
   const res = j.chart.result[0];
-  const closes = (res.indicators.quote[0].close || []).filter(x => x != null);
-  return { series: closes, latest: closes[closes.length - 1], time: res.meta.regularMarketTime };
+  const ts = res.timestamp || [];
+  const rawCloses = res.indicators.quote[0].close || [];
+  // P2-37：連 timestamp 一起帶出（dated），供跨symbol按日期對齊用；series/latest/time 既有欄位不變
+  const dated = ts.map((t, i) => ({ t, c: rawCloses[i] })).filter(p => p.c != null);
+  const closes = dated.map(p => p.c);
+  return { series: closes, dated, latest: closes[closes.length - 1], time: res.meta.regularMarketTime };
 }
 // P2-32：荷莫茲改 straits.live /api/index（2026-08-02 Ball 裁示，取代 IMF 延遲船隻數）
 // CORS 開放（Access-Control-Allow-Origin:*，2026-08-02實測），前端直打不需 CF Worker。
@@ -2187,6 +2191,22 @@ async function loadGeoStress() {
 // 🔴 定位＝獨立先行指標，視覺與位置皆與TACO的4成分等權z-score合成分開，不混入composite。
 const CRACK_SYMS = { crude: "CL=F", gasoline: "RB=F", heatingoil: "HO=F" };
 let _crackSpreadData = null;
+let _crackHistoryData = null;   // P2-37：近20交易日 crack 逐日（新→舊），跟 _crackSpreadData 同一次 fetch 算出
+// P2-37：三symbol按「日期」對齊（不是按陣列索引），某日缺任一symbol該日跳過不硬算
+function _crackAlignHistory(clDated, rbDated, hoDated, n = 20) {
+  const dateKey = t => new Date(t * 1000).toISOString().slice(0, 10);
+  const clMap = new Map(clDated.map(p => [dateKey(p.t), p.c]));
+  const rbMap = new Map(rbDated.map(p => [dateKey(p.t), p.c]));
+  const hoMap = new Map(hoDated.map(p => [dateKey(p.t), p.c]));
+  const dates = [...new Set([...clMap.keys(), ...rbMap.keys(), ...hoMap.keys()])].sort();
+  const rows = [];
+  for (const d of dates) {
+    const cl = clMap.get(d), rb = rbMap.get(d), ho = hoMap.get(d);
+    if (cl == null || rb == null || ho == null) continue;
+    rows.push({ date: d, cl, rb, ho, crack: (2 * rb * 42 + 1 * ho * 42) / 3 - cl });
+  }
+  return rows.slice(-n).reverse();   // 最近n個交易日，新→舊
+}
 async function loadCrackSpread() {
   const [clR, rbR, hoR] = await Promise.allSettled([
     _geoYahooSeries(CRACK_SYMS.crude),
@@ -2195,11 +2215,13 @@ async function loadCrackSpread() {
   ]);
   if (clR.status !== "fulfilled" || rbR.status !== "fulfilled" || hoR.status !== "fulfilled") {
     _crackSpreadData = null;
+    _crackHistoryData = null;
     return;
   }
   const cl = clR.value.latest, rb = rbR.value.latest, ho = hoR.value.latest;
   const crack = (2 * rb * 42 + 1 * ho * 42) / 3 - cl;
   _crackSpreadData = { cl, rb, ho, crack, time: clR.value.time };
+  _crackHistoryData = _crackAlignHistory(clR.value.dated, rbR.value.dated, hoR.value.dated);
 }
 function _crackSpreadHtml() {
   if (!_crackSpreadData) {
@@ -2208,13 +2230,44 @@ function _crackSpreadHtml() {
   const { cl, rb, ho, crack, time } = _crackSpreadData;
   const color = crack >= 0 ? "text-red-400" : "text-green-400";
   return `
-    <div class="text-center">
-      <div class="text-xs text-gray-500">3-2-1 裂解價差</div>
+    <div class="text-center cursor-pointer" onclick="openCrackHistoryModal()">
+      <div class="text-xs text-gray-500">3-2-1 裂解價差（點看近20天）</div>
       <div class="text-xl font-bold ${color}">${crack >= 0 ? "+" : ""}${crack.toFixed(2)} $/bbl</div>
       <div class="text-[10px] text-gray-600 mt-1">油價領先指標｜裂解價差擴大＝成品油需求強/煉油利潤高、收窄＝需求轉弱</div>
       <div class="text-[10px] text-gray-600">CL=F ${cl.toFixed(2)}｜RB=F ${rb.toFixed(4)}｜HO=F ${ho.toFixed(4)}・${idxTime(time)}</div>
     </div>`;
 }
+// P2-37：裂解價差近20天歷史彈窗
+function openCrackHistoryModal() {
+  const body = document.getElementById("crack-history-modal-body");
+  if (!body) return;
+  if (!_crackHistoryData || !_crackHistoryData.length) {
+    body.innerHTML = `<div class="text-xs text-gray-600 text-center py-4">歷史資料暫時無法取得（—）</div>`;
+  } else {
+    const rows = _crackHistoryData.map(r => {
+      const color = r.crack >= 0 ? "text-red-400" : "text-green-400";
+      return `<tr class="border-b border-gray-800">
+        <td class="py-1 text-gray-400">${r.date}</td>
+        <td class="text-right text-gray-300">${r.cl.toFixed(2)}</td>
+        <td class="text-right text-gray-300">${r.rb.toFixed(4)}</td>
+        <td class="text-right text-gray-300">${r.ho.toFixed(4)}</td>
+        <td class="text-right font-bold ${color}">${r.crack >= 0 ? "+" : ""}${r.crack.toFixed(2)}</td>
+      </tr>`;
+    }).join("");
+    body.innerHTML = `
+      <div class="text-[10px] text-gray-600 mb-2">油價領先指標｜裂解價差擴大＝成品油需求強/煉油利潤高、收窄＝需求轉弱｜值偏高在歷史真實區間內（見主面板說明）</div>
+      <table class="w-full text-xs">
+        <thead><tr class="text-gray-500 border-b border-gray-600">
+          <th class="text-left py-1">日期</th><th class="text-right py-1">CL=F</th>
+          <th class="text-right py-1">RB=F</th><th class="text-right py-1">HO=F</th>
+          <th class="text-right py-1">crack($/bbl)</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  document.getElementById("crack-history-modal").classList.remove("hidden");
+}
+document.getElementById("crack-history-modal")?.addEventListener("click", function (e) {
+  if (e.target === this) this.classList.add("hidden");
+});
 async function openGeoStressModal() {
   if (!_geoStressData) return;
   const { comp, composite } = _geoStressData;

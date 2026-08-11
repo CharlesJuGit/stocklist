@@ -8,6 +8,26 @@
 
 ---
 
+## 2026-08-11（P2-37：3-2-1 裂解價差 近20天彈窗 — P2-35 延伸，純顯示）
+
+**Request：** CRACK_MODAL_SPEC（Opus 撰，Ball 2026-08-11 定案）——P2-35「3-2-1裂解價差」加20天歷史彈窗（點開看最近20交易日的crack走勢/表），純顯示不進評分/選股/TACO合成。
+
+**Feat (Sonnet)：**
+- `_geoYahooSeries(sym)`擴充：除既有`series`/`latest`/`time`外新增`dated`（`{t,c}`陣列，timestamp與收盤價成對保留），供跨symbol按日期對齊——原本`series`只是`.filter(x=>x!=null)`後的純數值陣列，會丟失索引與日期的對應關係，故另存`dated`而不動既有欄位（`_zscoreLast`/`loadCrackSpread`既有呼叫點零改動）。
+- 新增`_crackAlignHistory(clDated,rbDated,hoDated,n=20)`：三序列各自轉成「日期字串→收盤價」Map（`new Date(t*1000).toISOString().slice(0,10)`），取三者日期聯集排序後逐日查表算crack，**任一symbol該日缺值就跳過該日**（規格§1「不硬算」），回傳最近n個交易日（新→舊）。
+- `loadCrackSpread()`沿用同一次fetch的`dated`陣列，順帶算出`_crackHistoryData`（不額外多打API）。`_crackSpreadHtml()`加`cursor-pointer`+`onclick="openCrackHistoryModal()"`，新增`openCrackHistoryModal()`渲染表格（日期/CL/RB/HO/crack）。
+- `index.html`新增`crack-history-modal`彈窗（比照`basis-modal`/`volume-modal`既有20天彈窗markup慣例）。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **🔴紅線 ✅**：grep`scoreEntry`/`composite`與crack相關代碼零關聯（同P2-35，本次新增程式碼亦未觸及）。
+  2. **crack逐日公式手算錨 ✅**：另開腳本直打production CF Worker代理（`stockweb-proxy.ch41083s.workers.dev/yahoo/...?range=1y`）取CL=F/RB=F/HO=F真實252天序列，Python複製同一套日期對齊+公式邏輯獨立重算，**2026-08-07一列crack=+60.04**，與P2-35 CHANGELOG當時逐位驗證過的60.04完全相符。
+  3. **一致性 ✅（同源保證，非僅數字巧合）**：`_crackHistoryData`與`_crackSpreadData`在`loadCrackSpread()`同一次`Promise.allSettled`結果算出（同一組`dated`陣列），彈窗最新一列（2026-08-11 crack=+56.02）與P2-35主顯示即時值程式碼上即為同一份資料源、非重新fetch，設計上必然一致。
+  4. **日期對齊 ✅**：獨立重算252個交易日中CL/RB/HO三者日期完全重疊（無缺口樣本），近20天逐列比對（08-11 +56.02、08-10 +64.32、08-07 +60.04、08-06 +59.34、08-05 +57.41…）皆用同日三symbol收盤配對，無跨日誤配。
+  5. **結構錨 ✅**：`bun build app.js`通過（45.56KB）；`index.html` div開合數282→283（新增彈窗區塊平衡，283/283）。
+- cache-buster `v=20260809b → v=20260811`；隱私掃描clean（純公開期貨市場資料，無專案一策略字眼）。
+- 隱私：純前端（app.js/index.html），走既有INDEX_PROXY，未動後端fetch_taifex。
+
+---
+
 ## 2026-08-11（P2-36：上櫃融資維持率 bug 修復 — TPEx 死用 now() 致當天無資料時 null）
 
 **Request：** MARGIN_TPEX_FIX_SPEC（reviewer 診斷 2026-08-11，P2-34 衍生 bug）——production `margin_ratio.tpex` 一直 null。根因：`fetch_market_breadth_margin` 死用 `datetime.now()` 抓 TPEx 融資（`margin_bal_result.php?d={roc今天}`），但 TPEx 融資餘額當天有發布延遲；TWSE 對非交易日查詢直接回無資料，`date_str` 也恐與實際資料日不符。
