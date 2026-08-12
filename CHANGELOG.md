@@ -8,6 +8,25 @@
 
 ---
 
+## 2026-08-12（P2-38：TACO 地緣壓力 20 天彈窗 — 後端每天存合成值，方案b）
+
+**Request：** TACO_MODAL_SPEC（Opus 撰，Ball 2026-08-11 定案，走方案b）——P2-31/32 TACO面板加20天歷史彈窗。荷莫茲(straits.live)只有即時值無歷史序列，故改後端每天算4成分z+composite存起來累積，前端彈窗讀歷史。核心挑戰＝後端存的合成公式須跟前端即時算逐字對齊，否則同一天會看到兩個不同的數字。
+
+**Feat (Sonnet)：**
+- `fetch_taifex.py`新增`_zscore_last()`/`_fetch_yahoo_close_series()`/`_fetch_straits_crisis_pressure()`/`fetch_geo_stress_today()`：**逐字對齊**app.js `_zscoreLast`/`_geoYahooSeries`/`_geoStraitsLive`/`loadGeoStress`（約L2114-2181）——母體變異數(除n非n-1)、range=1y整段序列(非嚴格rolling window)、`n<20`回None、composite＝油+z/殖利率+z/S&P−z/荷莫茲+z等權平均、算不出的成分跳過不擋其他成分。
+- 存入`taifex_data.json`的`geo_stress_history`（**複用`merge_market_breadth_margin`**，keep=20，含P2-36補修剛加的逐欄OR-fallback，同樣受益：某天某成分抓失敗不會洗掉舊值）。
+- `app.js`：`openGeoStressModal()`的綜合壓力區塊加`cursor-pointer`+點擊開`openGeoStressHistoryModal()`；新函式讀`taifex_data.json.geo_stress_history`渲染表格（日期/4成分z/綜合），色階同即時面板。`index.html`新增`geo-stress-history-modal`（比照P2-37`crack-history-modal`的markup慣例）。
+- **驗證（真實資料，[[verification_rule]]）：**
+  1. **🔴一致性錨（本案關鍵）✅**：先用同一份凍結的Yahoo CL=F歷史序列（curl存檔），分別餵給Python版`_zscore_last`與獨立寫的JS版`_zscoreLast`（bun執行）——**兩者算出逐位相同的z值(0.6409127480355984，完全一致到小數點後16位)**，證明兩套語言實作的公式/邏輯完全等價，非近似。另外用即時活資料端到端跑一次Python `fetch_geo_stress_today()`vs獨立bun腳本複製`loadGeoStress()`全流程直打Yahoo/straits.live，yield_z/sp_z/hormuz_z三項逐位相符，oil_z差0.0007（CL=F近24小時連續交易、兩次呼叫間隔數分鐘的正常價格drift，非公式錯誤——同P2-37/P2-36已記錄過的同類drift模式）。
+  2. **紅線 ✅**：grep確認`scoreEntry`與`geo_stress`/`composite`(TACO合成)零關聯，純顯示。
+  3. **累積機制 ✅**：合成測試「舊2天歷史+今天實抓」→合併結果3筆、日期正確、最新一筆為今天，長度隨每日累積不重複不回填。
+  4. **結構錨 ✅**：`bun build app.js`通過（45.71KB）；`index.html` div開合283→287（新增彈窗區塊平衡，287/287）。
+  5. 抓取前置驗證：straits.live直抓成功、Yahoo三symbol(CL=F/^TNX/^GSPC)直抓成功（後端直連query1.finance.yahoo.com，同fetch_yahoo_ohlc既有抓法，非經CF Worker代理）。
+- cache-buster `v=20260811 → v=20260812`；隱私掃描clean（純公開期貨/公開第三方指數，無專案一策略字眼）。
+- 隱私：純顯示先行觀察面板，資料皆公開來源。
+
+---
+
 ## 2026-08-12（P2-36補修：融資維持率收盤日未跟融資日對齊 — twse 曾回歸 null 的根源）
 
 **Request：** reviewer 二次診斷（2026-08-12）——P2-36 首次修復（commit `3ea58fa`）驗收通過後，08-12 cron 產出 `{"date":"2026-08-11","twse":null,"tpex":181.72}`，twse 從已驗收的190.47回歸成null（tpex/twse互換角色）。根因：首次修復只讓「融資lots/total」回溯對齊`margin_date`，但算比率用的**收盤價**（twse_close/tpex_close）仍死用「今天」抓——TWSE MI_INDEX當天若還沒發布收盤表就抓空、TPEx收盤openapi本身就是「當下」快照無歷史可查——融資日與收盤日一旦不同天，Σ(融資張×收盤)就會拿錯天的收盤價，或（如這次）TWSE收盤表當下是空的直接變null。

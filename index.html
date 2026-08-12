@@ -462,6 +462,18 @@
     </div>
   </div>
 
+  <!-- P2-38 TACO地緣壓力 近20天彈出視窗 -->
+  <div id="geo-stress-history-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold">地緣壓力（TACO）· 近20天</h2>
+        <button onclick="document.getElementById('geo-stress-history-modal').classList.add('hidden')"
+          class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div id="geo-stress-history-modal-body" class="text-sm max-h-96 overflow-y-auto"></div>
+    </div>
+  </div>
+
   <!-- P2-37 3-2-1裂解價差 近20天彈出視窗 -->
   <div id="crack-history-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50">
     <div class="bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4">
@@ -693,7 +705,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260811"></script>
+  <script src="app.js?v=20260812"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

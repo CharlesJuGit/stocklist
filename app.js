@@ -2311,8 +2311,8 @@ async function openGeoStressModal() {
       荷莫茲成分改用 <b>straits.live 第三方 beta 模型</b>（非官方船隻數，5分更新但主要來自
       GDELT事件/選擇權/<b>Polymarket・Kalshi 等混合預測市場</b>情緒，底層真實 AIS 船隻計數仍週級延遲）。
     </div>
-    <div class="text-center mb-3">
-      <div class="text-xs text-gray-500">綜合壓力（4成分等權平均 z-score）</div>
+    <div class="text-center mb-3 cursor-pointer" onclick="openGeoStressHistoryModal()">
+      <div class="text-xs text-gray-500">綜合壓力（4成分等權平均 z-score，點看近20天歷史）</div>
       <div class="text-2xl font-bold ${compColor}">${composite >= 0 ? "+" : ""}${composite.toFixed(2)}σ</div>
       <div class="text-[10px] text-gray-600 mt-1">參考：Signum 稱其官方指數 ≥2.9σ 時川普傾向於貿易政策上退縮（本值為自訂近似，不做預測宣稱）</div>
     </div>
@@ -2333,6 +2333,43 @@ async function openGeoStressModal() {
   }
 }
 document.getElementById("geo-stress-modal")?.addEventListener("click", function (e) {
+  if (e.target === this) this.classList.add("hidden");
+});
+// P2-38：TACO 地緣壓力 20 天歷史彈窗（後端每天存的 composite，累積制同 market_breadth）
+function openGeoStressHistoryModal() {
+  loadTaifexJson().then(data => {
+    const hist = data?.geo_stress_history;
+    const body = document.getElementById("geo-stress-history-modal-body");
+    if (!body) return;
+    if (!hist?.length) {
+      body.innerHTML = `<div class="text-xs text-gray-600 text-center py-4">歷史資料尚未累積（後端每日存一筆，需等下次排程）</div>`;
+    } else {
+      const zCell = z => z == null ? "—" : (z >= 0 ? "+" : "") + z.toFixed(2);
+      const rows = [...hist].reverse().map(r => {
+        const c = r.composite;
+        const color = c == null ? "text-gray-500" : c >= 1.5 ? "text-red-400" : c >= 0 ? "text-yellow-400" : "text-green-400";
+        return `<tr class="border-b border-gray-800">
+          <td class="py-1 text-gray-400">${r.date}</td>
+          <td class="text-right text-gray-300">${zCell(r.oil_z)}</td>
+          <td class="text-right text-gray-300">${zCell(r.yield_z)}</td>
+          <td class="text-right text-gray-300">${zCell(r.sp_z)}</td>
+          <td class="text-right text-gray-300">${zCell(r.hormuz_z)}</td>
+          <td class="text-right font-bold ${color}">${c == null ? "—" : (c >= 0 ? "+" : "") + c.toFixed(2) + "σ"}</td>
+        </tr>`;
+      }).join("");
+      body.innerHTML = `
+        <div class="text-[10px] text-gray-600 mb-2">4成分各自z-score（油/殖利率/S&P反轉/荷莫茲）＋等權合成，公式同上方即時面板；荷莫茲僅當天值、無歷史序列，靠每日累積長出來</div>
+        <table class="w-full text-xs">
+          <thead><tr class="text-gray-500 border-b border-gray-600">
+            <th class="text-left py-1">日期</th><th class="text-right py-1">油</th>
+            <th class="text-right py-1">殖利率</th><th class="text-right py-1">S&P</th>
+            <th class="text-right py-1">荷莫茲</th><th class="text-right py-1">綜合</th>
+          </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    document.getElementById("geo-stress-history-modal").classList.remove("hidden");
+  });
+}
+document.getElementById("geo-stress-history-modal")?.addEventListener("click", function (e) {
   if (e.target === this) this.classList.add("hidden");
 });
 

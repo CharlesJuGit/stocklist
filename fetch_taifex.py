@@ -699,6 +699,95 @@ def merge_market_breadth_margin(existing: list, today_record: dict | None, keep:
     return [by_date[d] for d in sorted(by_date)][-keep:]
 
 
+# ── P2-38：TACO 地緣壓力合成值 每日存檔（累積制，供20天彈窗）──────────────
+# 🔴 這裡的公式必須跟前端 app.js `loadGeoStress()`/`_zscoreLast()`（約L2114-2181）逐字對齊，
+# 否則後端存的歷史 composite 會跟前端即時算的分岔（規格§0核心挑戰）。
+def _zscore_last(series):
+    """對齊前端 _zscoreLast：整段序列(非嚴格252天rolling window，range=1y約252個交易日)、
+    母體變異數(除n非n-1)、取最後一筆相對序列的z。"""
+    n = len(series)
+    if n < 20:
+        return None
+    mean = sum(series) / n
+    variance = sum((x - mean) ** 2 for x in series) / n
+    std = variance ** 0.5
+    if not std:
+        return None
+    return (series[-1] - mean) / std
+
+
+def _fetch_yahoo_close_series(symbol):
+    """對齊前端 _geoYahooSeries：range=1y interval=1d，濾null，回收盤序列(舊→新)。"""
+    import ssl as _ssl
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1y&interval=1d"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20, context=_ssl._create_unverified_context()) as resp:
+        d = json.loads(resp.read().decode())
+    res = d["chart"]["result"][0]
+    closes = res["indicators"]["quote"][0].get("close") or []
+    return [c for c in closes if c is not None]
+
+
+def _fetch_straits_crisis_pressure():
+    """對齊前端 _geoStraitsLive：只取 crisisPressure.value（0~100壓力值，(v-50)/25轉可比尺度）。"""
+    req = urllib.request.Request("https://straits.live/api/index", headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        j = json.loads(resp.read().decode())
+    v = (j.get("indices") or {}).get("crisisPressure", {}).get("value")
+    if v is None:
+        raise ValueError("no crisisPressure")
+    return float(v)
+
+
+def fetch_geo_stress_today():
+    """
+    每日算一次 TACO 4成分z+composite（公式對齊app.js contribs，規格§0/§1）。
+    任一成分抓失敗就跳過該成分（同前端 contribs.push 只push非null），composite仍可算（其餘成分等權平均）；
+    全部失敗才回 None（不假造這天）。
+    """
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    oil_z = yield_z = sp_z = hormuz_z = None
+    try:
+        oil_z = _zscore_last(_fetch_yahoo_close_series("CL=F"))
+    except Exception as e:
+        print(f"geo_stress 油(CL=F) FAIL: {e}")
+    try:
+        yield_z = _zscore_last(_fetch_yahoo_close_series("%5ETNX"))
+    except Exception as e:
+        print(f"geo_stress 殖利率(^TNX) FAIL: {e}")
+    try:
+        sp_z = _zscore_last(_fetch_yahoo_close_series("%5EGSPC"))
+    except Exception as e:
+        print(f"geo_stress S&P(^GSPC) FAIL: {e}")
+    try:
+        hormuz_v = _fetch_straits_crisis_pressure()
+        hormuz_z = (hormuz_v - 50) / 25
+    except Exception as e:
+        print(f"geo_stress 荷莫茲(straits.live) FAIL: {e}")
+
+    contribs = []
+    if oil_z is not None:
+        contribs.append(oil_z)
+    if yield_z is not None:
+        contribs.append(yield_z)
+    if sp_z is not None:
+        contribs.append(-sp_z)   # S&P 反轉：低=壓力↑
+    if hormuz_z is not None:
+        contribs.append(hormuz_z)
+    composite = round(sum(contribs) / len(contribs), 4) if contribs else None
+
+    if oil_z is None and yield_z is None and sp_z is None and hormuz_z is None:
+        return None
+    return {
+        "date": date_str,
+        "oil_z": round(oil_z, 4) if oil_z is not None else None,
+        "yield_z": round(yield_z, 4) if yield_z is not None else None,
+        "sp_z": round(sp_z, 4) if sp_z is not None else None,
+        "hormuz_z": round(hormuz_z, 4) if hormuz_z is not None else None,
+        "composite": composite,
+    }
+
+
 # ── FinMind 台指期 OHLC ──────────────────────────────────────
 
 def fetch_tx_ohlc(n_days=25):
@@ -1526,6 +1615,16 @@ def main():
     margin_ratio = merge_market_breadth_margin(existing_json.get("margin_ratio", []), margin_today)
     print(f"market_breadth 累積 → {len(market_breadth)} 天｜margin_ratio 累積 → {len(margin_ratio)} 天")
 
+    # ── P2-38：TACO 地緣壓力合成值 每日存檔（20天彈窗用，複用 merge_market_breadth_margin 累積模式）──
+    geo_stress_today = None
+    try:
+        geo_stress_today = fetch_geo_stress_today()
+        print(f"geo_stress fetched: {geo_stress_today}")
+    except Exception as e:
+        print(f"geo_stress FAIL: {e}")
+    geo_stress_history = merge_market_breadth_margin(existing_json.get("geo_stress_history", []), geo_stress_today, keep=20)
+    print(f"geo_stress_history 累積 → {len(geo_stress_history)} 天")
+
     tx_vol = build_vol_data(tx_records, "TX")
     nq_vol = build_vol_data(nq_records, "NQ")
 
@@ -1668,6 +1767,7 @@ def main():
         "market_volume":      market_volume,
         "market_breadth":     market_breadth,
         "margin_ratio":       margin_ratio,
+        "geo_stress_history": geo_stress_history,
         "basis":              basis,
         "update_log":         update_log,
         "earnings":           earnings,
