@@ -597,6 +597,12 @@
       <!-- 多頭 -->
       <div class="snap-center shrink-0 w-full md:w-auto">
         <h2 class="text-red-400 font-bold text-lg mb-3 hidden md:block">▲ 多頭推薦</h2>
+        <!-- P2-39：日/週漲幅排序（純前端重排顯示順序，不動選股內容） -->
+        <div class="flex gap-1 mb-2 text-xs">
+          <button onclick="toggleListSort('long','chgDay')" data-sortbtn="long-chgDay" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">日漲幅</button>
+          <button onclick="toggleListSort('long','chgWeek')" data-sortbtn="long-chgWeek" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">週漲幅</button>
+          <button onclick="toggleListSort('long',null)" data-sortbtn="long-default" class="px-2 py-1 rounded bg-gray-600 text-white hover:bg-gray-500">預設</button>
+        </div>
         <div id="long-list" class="space-y-2"></div>
         <!-- P2-24：前三週入選・本週未續選（折疊，預設收合；history 為空時整塊不渲染） -->
         <div id="long-history" class="mt-3"></div>
@@ -604,6 +610,11 @@
       <!-- 空頭 -->
       <div class="snap-center shrink-0 w-full md:w-auto">
         <h2 class="text-green-400 font-bold text-lg mb-3 hidden md:block">▼ 空頭推薦</h2>
+        <div class="flex gap-1 mb-2 text-xs">
+          <button onclick="toggleListSort('short','chgDay')" data-sortbtn="short-chgDay" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">日漲幅</button>
+          <button onclick="toggleListSort('short','chgWeek')" data-sortbtn="short-chgWeek" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">週漲幅</button>
+          <button onclick="toggleListSort('short',null)" data-sortbtn="short-default" class="px-2 py-1 rounded bg-gray-600 text-white hover:bg-gray-500">預設</button>
+        </div>
         <div id="short-list" class="space-y-2"></div>
       </div>
       <!-- 自選 -->
@@ -620,6 +631,11 @@
           <input id="watch-input" placeholder="輸入股號後按＋" inputmode="numeric"
             class="flex-1 bg-gray-800 rounded px-2 py-1 text-sm text-white" onkeydown="if(event.key==='Enter')watchlistAdd()" />
           <button onclick="watchlistAdd()" class="bg-gray-700 hover:bg-gray-600 rounded px-3 text-sm">＋</button>
+        </div>
+        <div class="flex gap-1 mb-2 text-xs">
+          <button onclick="toggleListSort('watch','chgDay')" data-sortbtn="watch-chgDay" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">日漲幅</button>
+          <button onclick="toggleListSort('watch','chgWeek')" data-sortbtn="watch-chgWeek" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">週漲幅</button>
+          <button onclick="toggleListSort('watch',null)" data-sortbtn="watch-default" class="px-2 py-1 rounded bg-gray-600 text-white hover:bg-gray-500">預設</button>
         </div>
         <div id="watch-list" class="space-y-2"></div>
       </div>
@@ -705,7 +721,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260812"></script>
+  <script src="app.js?v=20260812b"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

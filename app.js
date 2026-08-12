@@ -10,7 +10,9 @@ async function loadStocks() {
   const hist = Array.isArray(data.history) ? data.history : [];      // P2-24：[{date, long:[{id,name,mkt}]}]，最多 3 筆（新→舊）
   [...(data.long || []), ...(data.short || []),
    ...hist.flatMap(h => h.long || [])].forEach(s => { STOCKS_BY_ID[s.id] = s; });   // 折疊區塊的股也要能開彈窗
-  renderList('long-list', data.long, 'red', { streak: _streakMap(data.long || [], hist) });
+  // P2-39：保留選股原始順序（RS/分數），供排序「預設」鈕還原用，不動 data 本身
+  window.STOCKS_DATA = { long: data.long || [], short: data.short || [], streak: _streakMap(data.long || [], hist) };
+  renderList('long-list', data.long, 'red', { streak: window.STOCKS_DATA.streak });
   renderList('short-list', data.short, 'green');
   renderHistoryBlock(data.long || [], hist);
   if (data.updated) {
@@ -111,6 +113,7 @@ function watchStarToggle(id) {
     setWatch(a);
   }
   _refreshStars();
+  _resetListSort('watch');   // P2-39：清單成員變動，排序狀態一併還原，避免鈕標示與實際順序不一致
   renderWatchlist();
   loadListChanges();                                    // 新入自選列補漲跌幅（快取命中不重打）
 }
@@ -260,7 +263,10 @@ function _cvdChart(closes, cvd, w = 460, h = 44, win = 20) {
   }
   return `<div class="text-[10px] text-gray-500 mt-1">Proxy CVD（日K估算，非逐筆真值）</div>
     <svg viewBox="0 0 ${w} ${h}" height="${h}" class="w-full" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="#94a3b8" stroke-width="1.5"/>${dots}</svg>`;
+      <polyline points="${pts}" fill="none" stroke="#94a3b8" stroke-width="1.5"/>${dots}</svg>
+    <div class="text-[10px] text-gray-600 mt-0.5">
+      <span style="color:#fb923c">●</span> 價漲買盤未同步　<span style="color:#60a5fa">●</span> 價跌賣壓未同步破低　（背離・僅估算參考）
+    </div>`;
 }
 
 // ── P2-14/P2-15 漲跌幅共用計算（彈窗與清單只寫一份，避免定義分岔）──────────
@@ -380,6 +386,76 @@ async function loadListChanges() {
     }));
     if (i + LIST_PRICE_BATCH < ids.length) await new Promise(r => setTimeout(r, LIST_PRICE_GAP_MS));
   }
+}
+
+// ── P2-39：清單日/週漲幅排序（純前端重排顯示順序，不動 data/選股邏輯，三清單各自獨立狀態）───
+const _listSort = { long: { key: null, dir: 'desc' }, short: { key: null, dir: 'desc' }, watch: { key: null, dir: 'desc' } };
+const _LIST_CONTAINER = { long: 'long-list', short: 'short-list', watch: 'watch-list' };
+const _SORT_LABEL = { chgDay: '日漲幅', chgWeek: '週漲幅' };
+
+function _listSourceStocks(listName) {
+  if (listName === 'watch') return getWatch();          // 自選＝目前localStorage順序即「預設」
+  return (window.STOCKS_DATA && window.STOCKS_DATA[listName]) || [];
+}
+function _renderListByName(listName, stocks) {
+  if (listName === 'long') renderList('long-list', stocks, 'red', { streak: (window.STOCKS_DATA || {}).streak || {} });
+  else if (listName === 'short') renderList('short-list', stocks, 'green');
+  else if (listName === 'watch') renderWatchlist(stocks);
+}
+function _updateSortBtnUI(listName) {
+  const st = _listSort[listName];
+  [null, 'chgDay', 'chgWeek'].forEach(k => {
+    const btn = document.querySelector(`[data-sortbtn="${listName}-${k || 'default'}"]`);
+    if (!btn) return;
+    const active = st.key === k;
+    btn.classList.toggle('bg-gray-600', active);
+    btn.classList.toggle('text-white', active);
+    btn.classList.toggle('bg-gray-800', !active);
+    btn.classList.toggle('text-gray-400', !active);
+    const base = k ? _SORT_LABEL[k] : '預設';
+    btn.textContent = (active && k) ? `${base} ${st.dir === 'desc' ? '▼' : '▲'}` : base;
+  });
+}
+// 自選股清單被外部操作（加/移除/匯入/清空）時排序狀態一併重置，避免排序鈕標示與實際顯示順序不一致
+function _resetListSort(listName) {
+  _listSort[listName] = { key: null, dir: 'desc' };
+  _updateSortBtnUI(listName);
+}
+async function toggleListSort(listName, key) {
+  const st = _listSort[listName];
+  const stocks = _listSourceStocks(listName);
+  if (key === null) {
+    st.key = null; st.dir = 'desc';
+    _renderListByName(listName, stocks);
+    _updateSortBtnUI(listName);
+    return;
+  }
+  st.key === key ? (st.dir = st.dir === 'desc' ? 'asc' : 'desc') : (st.key = key, st.dir = 'desc');
+
+  // 🔴 規格定案行為①：未到齊先抓完該清單全部股票的漲跌幅再排，不可拿半套資料排
+  const missing = stocks.map(s => s.id).filter(id => !priceCache[id]);
+  if (missing.length) {
+    const el = document.getElementById(_LIST_CONTAINER[listName]);
+    if (el) el.innerHTML = '<div class="text-gray-500 text-sm py-4 text-center">排序中…</div>';
+    for (let i = 0; i < missing.length; i += LIST_PRICE_BATCH) {
+      const batch = missing.slice(i, i + LIST_PRICE_BATCH);
+      await Promise.all(batch.map(async id => {
+        try { await _fetchChanges(id, (STOCKS_BY_ID[id] || {}).mkt); }
+        catch (e) { /* 抓不到＝priceCache仍無此id，排序比較時undefined視同null墊底 */ }
+      }));
+      if (i + LIST_PRICE_BATCH < missing.length) await new Promise(r => setTimeout(r, LIST_PRICE_GAP_MS));
+    }
+  }
+
+  const sorted = [...stocks].sort((a, b) => {
+    const va = priceCache[a.id]?.[st.key], vb = priceCache[b.id]?.[st.key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;    // null（抓不到報價）一律墊底，不分升降序
+    if (vb == null) return -1;
+    return st.dir === 'desc' ? vb - va : va - vb;
+  });
+  _renderListByName(listName, sorted);
+  _updateSortBtnUI(listName);
 }
 
 // ③ 基本資料（讀 stocks.json 擴欄；缺欄顯示—；大戶只給水位）
@@ -2557,10 +2633,10 @@ function getWatch() {
   catch (e) { return []; }   // 壞資料棄用重建
 }
 function setWatch(a) { localStorage.setItem(WATCH_KEY, JSON.stringify(a.slice(0, WATCH_MAX))); }
-function renderWatchlist() {
+function renderWatchlist(order) {
   const box = document.getElementById('watch-list'); if (!box) return;
   window.STOCKS_BY_ID = window.STOCKS_BY_ID || {};   // 初始化時可能早於 loadStocks 的 await，先保證存在
-  const a = getWatch();
+  const a = order || getWatch();   // P2-39：排序鈕傳入自訂順序；其餘呼叫點(加/刪/匯入等)不傳＝原本localStorage順序
   a.forEach(s => { if (!STOCKS_BY_ID[s.id]) STOCKS_BY_ID[s.id] = s; });  // 讓彈窗 mkt/後綴 fallback 有值
   if (!a.length) { box.innerHTML = '<div class="text-gray-600 text-sm py-2">尚無自選股，輸入股號按＋新增</div>'; return; }
   box.innerHTML = a.map(s => `
@@ -2592,11 +2668,11 @@ async function watchlistAdd() {
   if (a.some(x => x.id === id)) { alert('已在自選清單'); return; }
   if (a.length >= WATCH_MAX) { alert(`自選股已達 ${WATCH_MAX} 支上限，請先移除`); return; }
   if (typeof INDEX_PROXY === 'undefined' || !INDEX_PROXY) { alert('代理未設定，暫無法驗證股號'); return; }
-  try { a.push(await _resolveStock(id)); setWatch(a); renderWatchlist(); loadListChanges(); inp.value = ''; }
+  try { a.push(await _resolveStock(id)); setWatch(a); _resetListSort('watch'); renderWatchlist(); loadListChanges(); inp.value = ''; }
   catch (e) { alert('查無此股號'); }
 }
-function watchlistRemove(id) { setWatch(getWatch().filter(x => x.id !== id)); renderWatchlist(); }
-function watchlistClear() { if (confirm('確定清空自選股？')) { localStorage.removeItem(WATCH_KEY); renderWatchlist(); } }
+function watchlistRemove(id) { setWatch(getWatch().filter(x => x.id !== id)); _resetListSort('watch'); renderWatchlist(); }
+function watchlistClear() { if (confirm('確定清空自選股？')) { localStorage.removeItem(WATCH_KEY); _resetListSort('watch'); renderWatchlist(); } }
 function watchlistExport() {
   const s = getWatch().map(x => x.id).join(',');
   if (!s) { alert('自選清單為空'); return; }
@@ -2613,7 +2689,7 @@ async function watchlistImport() {
     if (a.some(x => x.id === id)) continue;
     try { a.push(await _resolveStock(id)); setWatch(a); added++; } catch (e) { /* 略過查無 */ }
   }
-  renderWatchlist(); loadListChanges(); alert(`匯入完成，新增 ${added} 支`);
+  _resetListSort('watch'); renderWatchlist(); loadListChanges(); alert(`匯入完成，新增 ${added} 支`);
 }
 function showWatchNotice() {
   localStorage.setItem(WATCH_NOTICE, '1');

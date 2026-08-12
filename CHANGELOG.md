@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-08-12（P2-39：CVD 常駐圖例 ＋ 清單日/週漲幅排序）
+
+**Request：** STOCK_UI_ENHANCE_SPEC（Opus 撰，Ball 2026-08-12 定案）——需求1：CVD橙藍點加常駐圖例（現況只在hover title講意義）；需求2：多頭/空頭/自選三份清單加日漲幅/週漲幅/預設排序鈕，🔴 Ball定案4行為：未到齊先抓完再排、點降再點升toggle、三清單各自獨立、預設回原序，null墊底。純顯示/互動不進評分/選股。
+
+**Feat (Sonnet)：**
+- 需求1：`_cvdChart()`回傳的HTML加一行常駐圖例（橙●#fb923c價漲買盤未同步／藍●#60a5fa價跌賣壓未同步破低，皆標「僅估算參考」），色碼直接沿用畫點時的同一組hex值，不是另外配色。
+- 需求2：`loadStocks()`新增`window.STOCKS_DATA={long,short,streak}`保留選股原始順序（供「預設」還原，不動`data`本身）。新增`toggleListSort(listName,key)`：`key=null`（預設鈕）直接回原序；否則同key再點就toggle方向(desc↔asc)、換key就重設為desc；排序前先掃該清單全部id，`priceCache`缺的先用既有`_fetchChanges()`批次抓完（沿用`LIST_PRICE_BATCH`/`LIST_PRICE_GAP_MS`同`loadListChanges`節流設定，顯示「排序中…」），才用`priceCache[id].chgDay/chgWeek`排序、null一律墊底不分升降。`renderWatchlist()`加可選`order`參數（不傳＝原本讀localStorage順序，排序鈕傳入才用自訂順序），watchlistAdd/Remove/Clear/Import等清單成員異動的呼叫點都補上`_resetListSort('watch')`避免排序鈕標示（▼/▲）跟實際顯示順序不同步。`index.html`三份清單各加「日漲幅/週漲幅/預設」三顆鈕。
+- **驗證（真實資料/邏輯，[[verification_rule]]）：**
+  1. **紅線 ✅**：grep確認`toggleListSort`/`_listSourceStocks`/`_renderListByName`與`scoreEntry`/選股邏輯零關聯，純重排DOM+`priceCache`讀值，不寫回`STOCKS_DATA`/`stocks.json`本身。
+  2. **CVD圖例色碼錨 ✅**：圖例的`#fb923c`/`#60a5fa`與畫背離點`<circle fill="...">`同一組字面值（複製非重打），文字對齊既有title語意。
+  3. **🔴排序4行為邏輯錨（本案關鍵）✅**：把`toggleListSort`核心演算法逐字抽出（不含DOM渲染部分）用bun獨立跑一組模擬情境（4支股，含1支模擬抓不到報價）——①首次點日漲幅：先抓完4支(fetchCount精確=4次)才排、降序`1101,2454,2330,3008`且null(3008)正確墊底於最後 ②再點同鈕：升序`2330,2454,1101,3008` ③priceCache已全到齊時換排序鍵不再重抓(fetchCount不變) ④切到short清單獨立排序，操作short不影響long既有排序狀態(long仍維持自己的key/dir) ⑤點預設：回原序`1101,2330,2454,3008` ⑥內容不變錨：排序前後成員集合(Set)完全相同、只順序變。全部斷言通過。
+  4. **結構錨 ✅**：`bun build app.js`通過（45.84KB）；`index.html` div開合287→290（新增三組排序鈕區塊平衡，290/290）。
+  5. ⚠ **誠實記錄未做到的部分**：本輪環境沒有瀏覽器自動化工具可用，**未做真實瀏覽器點擊測試**（按鈕實際點擊/DOM渲染結果/手機版橫滑頁籤下的顯示），只做了核心演算法的邏輯級驗證＋結構檢查（bun build/div平衡/紅線grep）。DOM渲染部分（`renderList`/`renderWatchlist`本身）沿用既有未改動的函式，風險較低，但**建議 Ball 上線後實際點幾次排序鈕＋切換三個分頁肉眼確認**，如有問題立刻回報。
+- cache-buster `v=20260812 → v=20260812b`；隱私掃描clean（純顯示/互動，無專案一策略字眼）。
+- 隱私：純前端UI互動，不動後端、不改選股邏輯。
+
+---
+
 ## 2026-08-12（P2-38：TACO 地緣壓力 20 天彈窗 — 後端每天存合成值，方案b）
 
 **Request：** TACO_MODAL_SPEC（Opus 撰，Ball 2026-08-11 定案，走方案b）——P2-31/32 TACO面板加20天歷史彈窗。荷莫茲(straits.live)只有即時值無歷史序列，故改後端每天算4成分z+composite存起來累積，前端彈窗讀歷史。核心挑戰＝後端存的合成公式須跟前端即時算逐字對齊，否則同一天會看到兩個不同的數字。
