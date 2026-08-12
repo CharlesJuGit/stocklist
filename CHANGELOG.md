@@ -8,6 +8,26 @@
 
 ---
 
+## 2026-08-12（P2-36補修：融資維持率收盤日未跟融資日對齊 — twse 曾回歸 null 的根源）
+
+**Request：** reviewer 二次診斷（2026-08-12）——P2-36 首次修復（commit `3ea58fa`）驗收通過後，08-12 cron 產出 `{"date":"2026-08-11","twse":null,"tpex":181.72}`，twse 從已驗收的190.47回歸成null（tpex/twse互換角色）。根因：首次修復只讓「融資lots/total」回溯對齊`margin_date`，但算比率用的**收盤價**（twse_close/tpex_close）仍死用「今天」抓——TWSE MI_INDEX當天若還沒發布收盤表就抓空、TPEx收盤openapi本身就是「當下」快照無歷史可查——融資日與收盤日一旦不同天，Σ(融資張×收盤)就會拿錯天的收盤價，或（如這次）TWSE收盤表當下是空的直接變null。
+
+**Fix (Sonnet)：**
+- `_parse_twse_close(resp)`：從 MI_INDEX 回應**額外取出回應自帶的`date`欄**（如`"20260811"`）當作這批收盤價的實際日期，不再假設等於查詢用的今天。
+- `_fetch_twse_close(d)`：可對任意日期重查 TWSE 收盤（MI_INDEX 真支援日期回溯查詢，已驗證）。
+- TPEx側：`tpex_mainboard_daily_close_quotes`openapi**不支援回溯查詢**（實測傳任何`d=`參數皆被忽略、永遠回傳「當下」快照），故改成**從回應本身逐筆帶的`Date`欄**（ROC格式，如`"1150812"`）取得這批收盤價的真實日期，記錄為`tpex_close_date`。
+- 算完`margin_date`（融資lots/total的回溯對齊日）後，新增一段**收盤↔融資日期對齊檢查**：若`twse_close_date != margin_date`→用`_fetch_twse_close(margin_date)`重查對齊；若`tpex_close_date != margin_date`→**TPEx沒有歷史收盤可查，寧可回None也不拿錯天的收盤硬算**（規格§2允許的「確保對齊」選項，而非湊出看似正常但實際跨日誤配的數字）。
+- **🔴 意外揪出的第二個根因（連帶修復，避免同一症狀再犯）**：`merge_market_breadth_margin`原本是「同日整列覆蓋」——若融資公布延遲導致backward-search連續數天都落在同一個舊日期重算，且TPEx收盤那天openapi已經看不到（只能看「現在」），重算會回`tpex:None`，整列覆蓋會把**昨天已經算對、已驗收的舊值洗掉**（這正是這次回歸實際發生的方式：08-11當天正確算出`{twse:190.47,tpex:181.72}`，08-12重算08-11這筆時tpex因收盤已翻頁只能回None，若無此修復連tpex也會被錯誤地蓋掉——本次修復前只影響twse是巧合，非結構性保證）。改成**逐欄OR-fallback**：新值`None`就沿用舊值，不None的欄位才覆蓋更新。
+- **驗證（真實資料，[[verification_rule]]，08-12 16:06本機即時測試，市場已收盤但當日融資尚未公布）：**
+  1. **回歸重現 ✅**：修復前直接測試會重演回歸——TWSE MI_INDEX今日收盤表其實已發布（1379檔，16:06已過收盤），但`margin_date`回溯落在08-11（今日融資未出）；若沿用舊碼死用今天收盤配08-11融資，等同拿今天/昨天兩個不同天的資料混算。
+  2. **TWSE對齊修復 ✅**：`margin_date=2026-08-11`與`twse_close_date`(今日08-12)不符→自動重查08-11收盤→算出**190.47**，與昨日(08-11同日執行、對齊天然成立時)驗證過的190.47逐位相符，證明回溯對齊機制正確運作。
+  3. **TPEx對齊防呆 ✅**：`tpex_close_date`取自回應逐列`Date`欄實測為`2026-08-12`（即時快照，非歷史）≠`margin_date`(08-11)→**正確回None並印出提醒訊息**，不硬湊；獨立curl `tpex_mainboard_daily_close_quotes`確認其`Date`欄確實跟著「現在」跑（無視任何查詢日期參數，即時性驗證）。
+  4. **merge OR-fallback單元測試 ✅**：模擬「舊記錄`{08-11,twse:190.47,tpex:181.72}`＋新記錄`{08-11,twse:190.47,tpex:None}`」→合併結果`tpex`正確保留181.72未被洗掉；同時驗證「兩邊都有新值時正常更新」與「全新日期無舊值可退回」兩個對照情境皆符合預期。
+  5. 公式`_ratio()`本體、breadth(漲跌家數)區塊皆未再改動。
+- 隱私掃描clean；本次未動`app.js`，免bump cache-buster。
+
+---
+
 ## 2026-08-11（P2-37：3-2-1 裂解價差 近20天彈窗 — P2-35 延伸，純顯示）
 
 **Request：** CRACK_MODAL_SPEC（Opus 撰，Ball 2026-08-11 定案）——P2-35「3-2-1裂解價差」加20天歷史彈窗（點開看最近20交易日的crack走勢/表），純顯示不進評分/選股/TACO合成。

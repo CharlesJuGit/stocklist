@@ -5,7 +5,7 @@
 """
 import json
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 
 # ── TAIFEX CSV 公用 ───────────────────────────────────────────
@@ -485,8 +485,36 @@ def fetch_market_breadth_margin():
         with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
             return json.loads(resp.read().decode("utf-8", errors="replace"))
 
+    def _parse_twse_close(resp):
+        """從 MI_INDEX 回應解析收盤價 map，回傳 (date|None, {sid: close})。date 取回應自帶的 date 欄(YYYYMMDD)。"""
+        close = {}
+        for t in resp.get("tables", []):
+            if (t.get("fields") or [None])[0] == "證券代號":
+                for row in t["data"]:
+                    sid = row[0].strip()
+                    try:
+                        c = float(row[8].replace(",", ""))   # 收盤價
+                    except (ValueError, IndexError):
+                        continue
+                    if c > 0:
+                        close[sid] = c
+        raw_date = resp.get("date")   # "20260811"
+        d = datetime.strptime(raw_date, "%Y%m%d").date() if raw_date else None
+        return d, close
+
+    def _fetch_twse_close(d):
+        """回傳 (date|None, {sid: close})；供融資維持率用（收盤須對到 margin_date，不死用今天）。"""
+        ymd_d = d.strftime("%Y%m%d")
+        try:
+            resp = _get(f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd_d}&type=ALLBUT0999&response=json")
+        except Exception as e:
+            print(f"market_breadth TWSE收盤(margin用) FAIL({ymd_d}): {e}")
+            return None, {}
+        return _parse_twse_close(resp)
+
     twse_up = twse_down = None
     twse_close = {}
+    twse_close_date = None
     try:
         d = _get(f"https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date={ymd}&type=ALLBUT0999&response=json")
         for t in d.get("tables", []):
@@ -502,15 +530,7 @@ def fetch_market_breadth_margin():
                         twse_up = int(val)
                     elif label.startswith("下跌"):
                         twse_down = int(val)
-            elif (t.get("fields") or [None])[0] == "證券代號":
-                for row in t["data"]:
-                    sid = row[0].strip()
-                    try:
-                        c = float(row[8].replace(",", ""))   # 收盤價
-                    except (ValueError, IndexError):
-                        continue
-                    if c > 0:
-                        twse_close[sid] = c
+        twse_close_date, twse_close = _parse_twse_close(d)
     except Exception as e:
         print(f"market_breadth TWSE漲跌家數/收盤 FAIL: {e}")
 
@@ -542,6 +562,7 @@ def fetch_market_breadth_margin():
 
     tpex_up = tpex_down = None
     tpex_close = {}
+    tpex_close_date = None   # TPEx 收盤 openapi 不支援回溯查詢，只能拿它「自己回應的日期」核對是否對得上 margin_date
     try:
         rows = _get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes")
         u = dn = 0
@@ -560,6 +581,10 @@ def fetch_market_breadth_margin():
                 u += 1
             elif chg < 0:
                 dn += 1
+            if tpex_close_date is None:
+                rd = (r.get("Date") or "").strip()   # ROC格式 "1150811"（民國年3碼+月2碼+日2碼）
+                if len(rd) == 7:
+                    tpex_close_date = date(int(rd[:3]) + 1911, int(rd[3:5]), int(rd[5:7]))
         if rows:
             tpex_up, tpex_down = u, dn
     except Exception as e:
@@ -620,6 +645,17 @@ def fetch_market_breadth_margin():
     twse_margin_total, twse_margin_lots = twse_margin_result if twse_margin_result else (None, {})
     tpex_margin_total, tpex_margin_lots = tpex_margin_result if tpex_margin_result else (None, {})
 
+    # 🔴 P2-36 補修：融資維持率＝Σ(融資張×收盤)/融資金額，收盤必須跟融資「同一天」，
+    # 不能死用「今天」的收盤配 margin_date 的融資（08-12 cron 曾出現 twse_close 今天未出→誤判null的回歸）。
+    if margin_date and margin_date != twse_close_date:
+        # TWSE MI_INDEX 真支援回溯查詢，直接對 margin_date 重查收盤
+        twse_close_date, twse_close = _fetch_twse_close(margin_date)
+    if margin_date and margin_date != tpex_close_date:
+        # TPEx 收盤 openapi 不支援回溯查詢（實測 d= 參數被忽略），沒有歷史收盤可查——
+        # 寧可對不上就不算（None），不拿錯一天的收盤硬湊出看似正常的數字
+        print(f"market_breadth TPEx收盤日({tpex_close_date})≠margin_date({margin_date})，TPEx維持率本次不計算")
+        tpex_close = {}
+
     breadth = None
     if twse_up is not None or tpex_up is not None:
         breadth = {"date": date_str, "twse_up": twse_up, "twse_down": twse_down,
@@ -649,11 +685,17 @@ def merge_market_breadth_margin(existing: list, today_record: dict | None, keep:
     累積制（規格§3：20天=累積不回填）：今天已有記錄則覆蓋同日那筆（重跑同一天不重複），
     否則附加新一筆；只留最新 keep 天。today_record=None（抓取失敗）時原樣返回，不假造。
     上線初期天數不足 keep 天時，原樣回傳目前累積的天數，不補假資料。
+    🔴 P2-36補修：同日重算時逐欄 OR-fallback（新值 None 就沿用舊值），不整列覆蓋——
+    融資 margin_date 可能連續數天backward-search落到同一天，但 TPEx 收盤 openapi 無歷史查詢、
+    每天只能看到「當下」，晚一天重算同一舊日期時 TPEx 收盤對不上只能回 None，若整列覆蓋
+    會把當初同日算對的舊值洗掉（即P2-36退回補修抓到的回歸根源之一）。
     """
     if today_record is None:
         return existing[-keep:]
-    by_date = {r["date"]: r for r in existing if r.get("date")}
-    by_date[today_record["date"]] = today_record
+    by_date = {r["date"]: dict(r) for r in existing if r.get("date")}
+    old = by_date.get(today_record["date"], {})
+    merged = {k: (v if v is not None else old.get(k)) for k, v in today_record.items()}
+    by_date[today_record["date"]] = merged
     return [by_date[d] for d in sorted(by_date)][-keep:]
 
 
