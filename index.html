@@ -609,7 +609,18 @@
       </div>
       <!-- 空頭 -->
       <div class="snap-center shrink-0 w-full md:w-auto">
-        <h2 class="text-green-400 font-bold text-lg mb-3 hidden md:block">▼ 空頭推薦</h2>
+        <h2 class="text-green-400 font-bold text-lg mb-1 hidden md:block">▼ 空頭推薦</h2>
+        <!-- P2-35：誠實標示（只加前端文字，不動選股邏輯/stocks.json）。常駐行不展開也可見，桌機/手機皆顯示。 -->
+        <div class="mb-2">
+          <button onclick="document.getElementById('short-warning-detail').classList.toggle('hidden')"
+            class="w-full text-left rounded bg-yellow-900/60 border border-yellow-600 px-3 py-2 text-xs text-yellow-200">
+            ⚠ 多頭環境下預期虧損（點看說明）
+          </button>
+          <div id="short-warning-detail" class="hidden mt-1 rounded bg-yellow-900/30 border border-yellow-700/50 px-3 py-2 text-xs text-yellow-100 leading-relaxed">
+            回測 2021-01~2026-08 顯示：本清單相對「放空大盤」幾乎沒有超額報酬（+60d 約 +0.9pp、+20d 約 −0.3pp）。<br>
+            絕對報酬為負，主要來自大盤上漲（beta），不是選股失準。在多頭環境下，本清單預期虧損。
+          </div>
+        </div>
         <div class="flex gap-1 mb-2 text-xs">
           <button onclick="toggleListSort('short','chgDay')" data-sortbtn="short-chgDay" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">日漲幅</button>
           <button onclick="toggleListSort('short','chgWeek')" data-sortbtn="short-chgWeek" class="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">週漲幅</button>
@@ -721,7 +732,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260812b"></script>
+  <script src="app.js?v=20260816a"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>
