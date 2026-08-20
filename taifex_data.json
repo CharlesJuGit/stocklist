@@ -25,7 +25,7 @@
     "dealer": -171.2,
     "total": -753.6
   },
-  "settlement_date": "2026-08-19",
+  "settlement_date": "2026-09-16",
   "recent_settlement_dates": [
     "2026-05-20",
     "2026-06-17",
@@ -1126,8 +1126,8 @@
       "fut_net": -81787,
       "opt_net": 267,
       "pressure": 81787,
-      "tdays": 0,
-      "ratio": 0,
+      "tdays": 20,
+      "ratio": 4089,
       "retail_total": 14774,
       "opt_strategy": "偏空",
       "foreign": -416.4,
@@ -1271,11 +1271,11 @@
     "nq": {
       "yesterday": {
         "date": "2026-08-20",
-        "high": 29639,
-        "low": 29556,
-        "range": 83
+        "high": 29656,
+        "low": 29608,
+        "range": 48
       },
-      "avg20": 593,
+      "avg20": 582,
       "category": "低",
       "history": [
         {
@@ -1388,15 +1388,15 @@
         },
         {
           "date": "2026-08-19",
-          "high": 29757,
-          "low": 29376,
-          "range": 381
+          "high": 29610,
+          "low": 29442,
+          "range": 168
         },
         {
           "date": "2026-08-20",
-          "high": 29639,
-          "low": 29556,
-          "range": 83
+          "high": 29656,
+          "low": 29608,
+          "range": 48
         }
       ]
     }
@@ -1639,6 +1639,13 @@
       "twse_down": 598,
       "tpex_up": 333,
       "tpex_down": 430
+    },
+    {
+      "date": "2026-08-20",
+      "twse_up": null,
+      "twse_down": null,
+      "tpex_up": 333,
+      "tpex_down": 430
     }
   ],
   "margin_ratio": [
@@ -1741,6 +1748,14 @@
       "sp_z": 1.9458,
       "hormuz_z": 1.6,
       "composite": 0.1072
+    },
+    {
+      "date": "2026-08-20",
+      "oil_z": 0.6564,
+      "yield_z": 1.8431,
+      "sp_z": 1.9233,
+      "hormuz_z": 1.6,
+      "composite": 0.5441
     }
   ],
   "basis": {
@@ -1901,14 +1916,6 @@
   },
   "update_log": [
     {
-      "at": "2026-08-18 17:50",
-      "trigger": "schedule",
-      "inst": "2026-08-18",
-      "fut": "2026-08-18",
-      "tx": "2026-08-18",
-      "nq": "2026-08-18"
-    },
-    {
       "at": "2026-08-18 18:47",
       "trigger": "schedule",
       "inst": "2026-08-18",
@@ -1995,10 +2002,18 @@
       "fut": "2026-08-19",
       "tx": "2026-08-19",
       "nq": "2026-08-19"
+    },
+    {
+      "at": "2026-08-20 12:49",
+      "trigger": "schedule",
+      "inst": "2026-08-19",
+      "fut": "2026-08-19",
+      "tx": "2026-08-19",
+      "nq": "2026-08-20"
     }
   ],
   "earnings": {
-    "fetched": "2026-08-19",
+    "fetched": "2026-08-20",
     "list": [
       {
         "sym": "NVDA",
@@ -2024,17 +2039,17 @@
   },
   "index_ytd": {
     "year": 2026,
-    "updated": "2026-08-19",
+    "updated": "2026-08-20",
     "otc": {
       "high": 459.56,
       "year": 2026
     },
     "mxf": {
       "high": 49239,
-      "last": 44550,
-      "date": "2026-08-19",
+      "last": 44797,
+      "date": "2026-08-20",
       "year": 2026
     }
   },
-  "updated_at": "2026-08-19T22:49:55Z"
+  "updated_at": "2026-08-20T04:49:54Z"
 }
