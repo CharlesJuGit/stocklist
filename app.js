@@ -1962,6 +1962,12 @@ async function triggerFetch() {
       }
     );
     if (res.status === 204) {
+      // P2-16（2026-08-28）：清掉 in-memory 快取。loadTaifexJson() 進站抓過一次就固定
+      // （`if (_taifexCache) return _taifexCache`），而「更新紀錄」彈窗正是走它——
+      // 不清的話，即使 Actions 已跑完並部署，彈窗仍顯示進站當下那份舊 log，
+      // 使用者會誤以為手動觸發沒生效（Ball 2026-08-28 實測踩到，須按「↻ 重新整理」才看得到）。
+      _taifexCache = null;
+      _taifexPromise = null;
       btn.textContent = '✓ 已觸發';
       setTimeout(() => { btn.textContent = '⬇ 抓新資料'; btn.disabled = false; }, 3000);
     } else if (res.status === 401) {

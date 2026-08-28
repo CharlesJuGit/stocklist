@@ -1702,7 +1702,10 @@ def main():
         print(f"inst backfill FAIL: {e}")
 
     # 更新紀錄：每次執行 append 一筆（含觸發方式與各資料抓到的日期），供前端「更新紀錄」顯示
-    # 用於觀察定期/手動觸發後是否正確更新到當日，保留最近 12 筆
+    # 用於觀察定期/手動觸發後是否正確更新到當日，保留最近 40 筆
+    # 🔴 2026-08-28（P2-34/P2-16）12 → 40：一天約 6 班，12 筆僅約 2 天，
+    # 而 P2-16 的殘驗收要看「週五 16:47 班的落點」——保留期跨不過一週，
+    # 導致驗收條件在機制上永遠驗不到。40 筆約一週，足以涵蓋跨週驗收。
     tw_now = datetime.now(timezone.utc) + timedelta(hours=8)
     # institute.date / date 為 YYYYMMDD、tx/nq 為 YYYY-MM-DD，統一成 YYYY-MM-DD 供前端比較/顯示
     def _ymd(d):
@@ -1716,7 +1719,7 @@ def main():
         "tx":      (tx_vol.get("yesterday") or {}).get("date", ""),
         "nq":      (nq_vol.get("yesterday") or {}).get("date", ""),
     })
-    update_log = update_log[-12:]
+    update_log = update_log[-40:]
 
     # 台指期正價差（近月/次月/季月 vs 加權指數現貨）；抓失敗沿用既有，避免空資料覆蓋
     basis = {}
