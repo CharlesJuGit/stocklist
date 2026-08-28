@@ -20,10 +20,10 @@
   },
   "institute": {
     "date": "20260828",
-    "foreign": 415.9,
-    "trust": 9.6,
+    "foreign": 417.5,
+    "trust": -2.0,
     "dealer": 42.7,
-    "total": 468.2
+    "total": 458.2
   },
   "settlement_date": "2026-09-16",
   "recent_settlement_dates": [
@@ -1167,8 +1167,8 @@
       "ratio": 6372,
       "retail_total": 3166,
       "opt_strategy": "偏空",
-      "foreign": 415.9,
-      "trust": 9.6,
+      "foreign": 417.5,
+      "trust": -2.0,
       "dealer": 42.7
     }
   ],
@@ -1308,12 +1308,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-08-28",
-        "high": 29706,
-        "low": 29578,
-        "range": 128
+        "high": 29812,
+        "low": 29464,
+        "range": 348
       },
       "avg20": 462,
-      "category": "低",
+      "category": "中",
       "history": [
         {
           "date": "2026-08-03",
@@ -1431,9 +1431,9 @@
         },
         {
           "date": "2026-08-28",
-          "high": 29706,
-          "low": 29578,
-          "range": 128
+          "high": 29812,
+          "low": 29464,
+          "range": 348
         }
       ]
     }
@@ -1807,6 +1807,11 @@
       "date": "2026-08-27",
       "twse": 193.24,
       "tpex": 185.05
+    },
+    {
+      "date": "2026-08-28",
+      "twse": 194.25,
+      "tpex": 185.75
     }
   ],
   "geo_stress_history": [
@@ -1908,11 +1913,11 @@
     },
     {
       "date": "2026-08-28",
-      "oil_z": 0.5418,
-      "yield_z": 1.8074,
-      "sp_z": 1.8865,
+      "oil_z": 0.5412,
+      "yield_z": 2.0086,
+      "sp_z": 1.828,
       "hormuz_z": 1.64,
-      "composite": 0.5257
+      "composite": 0.5904
     }
   ],
   "basis": {
@@ -2167,10 +2172,18 @@
       "fut": "2026-08-28",
       "tx": "2026-08-28",
       "nq": "2026-08-28"
+    },
+    {
+      "at": "2026-08-29 00:35",
+      "trigger": "schedule",
+      "inst": "2026-08-28",
+      "fut": "2026-08-28",
+      "tx": "2026-08-28",
+      "nq": "2026-08-28"
     }
   ],
   "earnings": {
-    "fetched": "2026-08-28",
+    "fetched": "2026-08-29",
     "list": [
       {
         "sym": "TSM",
@@ -2204,5 +2217,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-08-28T10:31:57Z"
+  "updated_at": "2026-08-28T16:35:25Z"
 }
