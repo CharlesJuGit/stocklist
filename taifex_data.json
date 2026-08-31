@@ -21,9 +21,9 @@
   "institute": {
     "date": "20260831",
     "foreign": -143.9,
-    "trust": -49.1,
+    "trust": -40.0,
     "dealer": -74.5,
-    "total": -267.5
+    "total": -258.4
   },
   "settlement_date": "2026-09-16",
   "recent_settlement_dates": [
@@ -1172,7 +1172,7 @@
       "retail_total": 8854,
       "opt_strategy": "偏空",
       "foreign": -143.9,
-      "trust": -49.1,
+      "trust": -40.0,
       "dealer": -74.5
     }
   ],
@@ -1823,6 +1823,11 @@
       "date": "2026-08-28",
       "twse": 194.25,
       "tpex": 185.75
+    },
+    {
+      "date": "2026-08-31",
+      "twse": 192.25,
+      "tpex": 189.59
     }
   ],
   "geo_stress_history": [
@@ -1932,11 +1937,11 @@
     },
     {
       "date": "2026-08-31",
-      "oil_z": 0.7366,
-      "yield_z": 2.0086,
-      "sp_z": 1.8174,
-      "hormuz_z": 1.64,
-      "composite": 0.6419
+      "oil_z": 0.6749,
+      "yield_z": 2.1695,
+      "sp_z": 1.6945,
+      "hormuz_z": 1.68,
+      "composite": 0.7075
     }
   ],
   "basis": {
@@ -2271,10 +2276,18 @@
       "fut": "2026-08-31",
       "tx": "2026-08-31",
       "nq": "2026-08-31"
+    },
+    {
+      "at": "2026-09-01 00:17",
+      "trigger": "schedule",
+      "inst": "2026-08-31",
+      "fut": "2026-08-31",
+      "tx": "2026-08-31",
+      "nq": "2026-08-31"
     }
   ],
   "earnings": {
-    "fetched": "2026-08-31",
+    "fetched": "2026-09-01",
     "list": [
       {
         "sym": "TSM",
@@ -2308,5 +2321,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-08-31T11:33:31Z"
+  "updated_at": "2026-08-31T16:17:56Z"
 }
