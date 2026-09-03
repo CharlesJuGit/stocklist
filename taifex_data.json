@@ -1,29 +1,29 @@
 {
-  "date": "20260902",
+  "date": "20260903",
   "futures": {
-    "txF": -85329,
-    "txT": 75062,
-    "txD": 1109,
-    "mtxF": -192,
-    "mtxT": -52,
-    "mtxD": -3638,
-    "tmxF": 13050,
+    "txF": -81575,
+    "txT": 74389,
+    "txD": 1134,
+    "mtxF": 2822,
+    "mtxT": -55,
+    "mtxD": -3154,
+    "tmxF": 21753,
     "tmxT": 0,
-    "tmxD": -47888
+    "tmxD": -47438
   },
   "options": {
-    "bc": 4482,
-    "sc": 8174,
-    "bp": 5245,
-    "sp": 5219,
-    "sp_amt": 75297
+    "bc": 6196,
+    "sc": 9450,
+    "bp": 6629,
+    "sp": 6578,
+    "sp_amt": 111334
   },
   "institute": {
-    "date": "20260902",
-    "foreign": -913.5,
-    "trust": -35.3,
-    "dealer": -203.6,
-    "total": -1152.4
+    "date": "20260903",
+    "foreign": -481.5,
+    "trust": 11.4,
+    "dealer": -167.1,
+    "total": -637.2
   },
   "settlement_date": "2026-09-16",
   "recent_settlement_dates": [
@@ -33,22 +33,6 @@
     "2026-09-16"
   ],
   "settlement_history": [
-    {
-      "date": "2026-06-09",
-      "txF": -61871,
-      "mtxF": 3754,
-      "bp": 30776,
-      "sp": 21783,
-      "bc": 15105,
-      "sc": 10728,
-      "fut_net": -60932,
-      "opt_net": 8993,
-      "pressure": 85553,
-      "tdays": 6,
-      "ratio": 14259,
-      "retail_total": 15665,
-      "opt_strategy": "雙買"
-    },
     {
       "date": "2026-06-10",
       "txF": -61949,
@@ -1182,25 +1166,39 @@
       "foreign": -913.5,
       "trust": -35.3,
       "dealer": -203.6
+    },
+    {
+      "date": "2026-09-03",
+      "txF": -81575,
+      "mtxF": 2822,
+      "bp": 6629,
+      "sp": 6578,
+      "sp_amt": 111334,
+      "bc": 6196,
+      "sc": 9450,
+      "fut_net": -80870,
+      "opt_net": 51,
+      "pressure": 80870,
+      "tdays": 9,
+      "ratio": 8986,
+      "retail_total": 5524,
+      "opt_strategy": "偏空",
+      "foreign": -481.5,
+      "trust": 11.4,
+      "dealer": -167.1
     }
   ],
   "volatility": {
     "tx": {
       "yesterday": {
-        "date": "2026-09-02",
-        "high": 47343,
-        "low": 46131,
-        "range": 1212
+        "date": "2026-09-03",
+        "high": 46472,
+        "low": 45686,
+        "range": 786
       },
-      "avg20": 946,
-      "category": "大",
+      "avg20": 922,
+      "category": "中",
       "history": [
-        {
-          "date": "2026-08-06",
-          "high": 44644,
-          "low": 43843,
-          "range": 801
-        },
         {
           "date": "2026-08-07",
           "high": 44873,
@@ -1314,18 +1312,24 @@
           "high": 47343,
           "low": 46131,
           "range": 1212
+        },
+        {
+          "date": "2026-09-03",
+          "high": 46472,
+          "low": 45686,
+          "range": 786
         }
       ]
     },
     "nq": {
       "yesterday": {
         "date": "2026-09-03",
-        "high": 29213,
-        "low": 29148,
-        "range": 65
+        "high": 29293,
+        "low": 29075,
+        "range": 218
       },
       "avg20": 389,
-      "category": "低",
+      "category": "小",
       "history": [
         {
           "date": "2026-08-07",
@@ -1443,20 +1447,14 @@
         },
         {
           "date": "2026-09-03",
-          "high": 29213,
-          "low": 29148,
-          "range": 65
+          "high": 29293,
+          "low": 29075,
+          "range": 218
         }
       ]
     }
   },
   "market_volume": [
-    {
-      "date": "2026-07-23",
-      "twse": 9306,
-      "tpex": 1849,
-      "total": 11155
-    },
     {
       "date": "2026-07-24",
       "twse": 8271,
@@ -1630,6 +1628,12 @@
       "twse": 9764,
       "tpex": 2217,
       "total": 11981
+    },
+    {
+      "date": "2026-09-03",
+      "twse": 9892,
+      "tpex": 2412,
+      "total": 12304
     }
   ],
   "market_breadth": [
@@ -1758,6 +1762,13 @@
       "twse_down": 563,
       "tpex_up": 291,
       "tpex_down": 473
+    },
+    {
+      "date": "2026-09-03",
+      "twse_up": 209,
+      "twse_down": 776,
+      "tpex_up": 155,
+      "tpex_down": 628
     }
   ],
   "margin_ratio": [
@@ -1990,29 +2001,30 @@
       "sp_z": 1.6656,
       "hormuz_z": 1.68,
       "composite": 0.8286
+    },
+    {
+      "date": "2026-09-03",
+      "oil_z": 0.9978,
+      "yield_z": 2.27,
+      "sp_z": 1.6572,
+      "hormuz_z": 1.68,
+      "composite": 0.8226
     }
   ],
   "basis": {
-    "date": "2026/09/02",
-    "spot": 46165,
+    "date": "2026/09/03",
+    "spot": 45858,
     "curve": [
       {
         "label": "09月",
-        "basis": 24
+        "basis": -21
       },
       {
         "label": "10月",
-        "basis": 200
+        "basis": 139
       }
     ],
     "history": [
-      {
-        "date": "2026/08/06",
-        "spot": 44397,
-        "near": -117,
-        "next": -97,
-        "quarter": null
-      },
       {
         "date": "2026/08/07",
         "spot": 44226,
@@ -2145,18 +2157,17 @@
         "near": 24,
         "next": 200,
         "quarter": null
+      },
+      {
+        "date": "2026/09/03",
+        "spot": 45858,
+        "near": -21,
+        "next": 139,
+        "quarter": null
       }
     ]
   },
   "update_log": [
-    {
-      "at": "2026-08-28 00:24",
-      "trigger": "schedule",
-      "inst": "2026-08-27",
-      "fut": "2026-08-27",
-      "tx": "2026-08-27",
-      "nq": "2026-08-27"
-    },
     {
       "at": "2026-08-28 03:12",
       "trigger": "schedule",
@@ -2468,6 +2479,14 @@
       "fut": "2026-09-02",
       "tx": "2026-09-02",
       "nq": "2026-09-02"
+    },
+    {
+      "at": "2026-09-03 16:53",
+      "trigger": "schedule",
+      "inst": "2026-09-03",
+      "fut": "2026-09-03",
+      "tx": "2026-09-03",
+      "nq": "2026-09-03"
     }
   ],
   "earnings": {
@@ -2493,17 +2512,17 @@
   },
   "index_ytd": {
     "year": 2026,
-    "updated": "2026-09-02",
+    "updated": "2026-09-03",
     "otc": {
       "high": 459.56,
       "year": 2026
     },
     "mxf": {
       "high": 49239,
-      "last": 46683,
-      "date": "2026-09-02",
+      "last": 46324,
+      "date": "2026-09-03",
       "year": 2026
     }
   },
-  "updated_at": "2026-09-03T00:28:22Z"
+  "updated_at": "2026-09-03T08:53:51Z"
 }
