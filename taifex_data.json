@@ -21,9 +21,9 @@
   "institute": {
     "date": "20260917",
     "foreign": 121.9,
-    "trust": 77.1,
+    "trust": 117.0,
     "dealer": 15.8,
-    "total": 214.8
+    "total": 254.7
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -1212,7 +1212,7 @@
       "retail_total": 9724,
       "opt_strategy": "看空",
       "foreign": 121.9,
-      "trust": 77.1,
+      "trust": 117.0,
       "dealer": 15.8
     }
   ],
@@ -1352,12 +1352,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-09-17",
-        "high": 29593,
+        "high": 29753,
         "low": 29248,
-        "range": 345
+        "range": 505
       },
       "avg20": 386,
-      "category": "中",
+      "category": "大",
       "history": [
         {
           "date": "2026-08-20",
@@ -1475,9 +1475,9 @@
         },
         {
           "date": "2026-09-17",
-          "high": 29593,
+          "high": 29753,
           "low": 29248,
-          "range": 345
+          "range": 505
         }
       ]
     }
@@ -1808,11 +1808,6 @@
   ],
   "margin_ratio": [
     {
-      "date": "2026-08-20",
-      "twse": 188.85,
-      "tpex": 179.84
-    },
-    {
       "date": "2026-08-21",
       "twse": 187.44,
       "tpex": 180.6
@@ -1906,6 +1901,11 @@
       "date": "2026-09-16",
       "twse": 183.92,
       "tpex": 185.76
+    },
+    {
+      "date": "2026-09-17",
+      "twse": 183.94,
+      "tpex": 183.61
     }
   ],
   "geo_stress_history": [
@@ -2063,11 +2063,11 @@
     },
     {
       "date": "2026-09-17",
-      "oil_z": 1.5222,
-      "yield_z": 2.7987,
-      "sp_z": 1.2357,
+      "oil_z": 1.4907,
+      "yield_z": 2.5161,
+      "sp_z": 1.4073,
       "hormuz_z": 1.56,
-      "composite": 1.1613
+      "composite": 1.0399
     }
   ],
   "basis": {
@@ -2546,8 +2546,26 @@
       "fut": "2026-09-17",
       "tx": "2026-09-17",
       "nq": "2026-09-17"
+    },
+    {
+      "at": "2026-09-17 21:41",
+      "trigger": "schedule",
+      "inst": "2026-09-17",
+      "fut": "2026-09-17",
+      "tx": "2026-09-17",
+      "nq": "2026-09-17"
     }
   ],
+  "daily_summary": [
+    {
+      "date": "2026-09-17",
+      "first_same_day_inst_at": "21:41",
+      "n_runs": 1,
+      "latency_min": 372,
+      "stale": false
+    }
+  ],
+  "stale": false,
   "earnings": {
     "fetched": "2026-09-17",
     "list": [
@@ -2595,5 +2613,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-09-17T09:57:10Z"
+  "updated_at": "2026-09-17T13:42:07Z"
 }
