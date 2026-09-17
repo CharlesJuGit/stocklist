@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-09-17（**Feat (Sonnet)**：P2-16 每日更新延遲摘要 ＋ `stale` 旗標 ⚠ 橫幅，Ball 核准 Fable 三項）
+
+Fable 2026-09-17 覆審 P2-16（`handoff/open/P2-16.md`）裁定：主判準改**每日更新延遲分布**
+（非二元「有無落地」）、保留期解耦成**每日摘要**（無限保留）、加 **stale 旗標 ＋ 前端 ⚠ 橫幅**
+把「Ball 的眼睛」機制化，手動鈕保留為救援手段。Ball 核准三項，交辦動工。
+
+### ① 每日更新延遲摘要（`fetch_taifex.py`，新 `daily_summary`）
+- 新純函式 `compute_stale(now_tw, inst_date_iso)`／`update_daily_summary(...)`（`is_trading_day`
+  下方，供 `main()` 呼叫、也供獨立測試 import，不碰網路）。
+- `daily_summary`：**一天一列** `{date, first_same_day_inst_at, n_runs, latency_min, stale}`，
+  首次見到 `inst==當日` 才記時刻、**之後不覆寫**；`latency_min = first_same_day_inst_at − 15:30`
+  （TWSE 三大法人 BFI82U 發布基準）；**保留不設上限**。
+- `update_log` 保留 `[-40:]` → **`[-400:]`**（僅除錯用，判準改吃 `daily_summary`）。
+
+### ② `stale` 旗標 ＋ 前端 ⚠ 橫幅
+- `compute_stale`：**交易日 且 已過 18:00 TWN 且 inst 日期 < 當日** → `true`。
+  🔴 交易日判定**重用既有 `is_trading_day()`**（TWSE holidaySchedule，同結算日計算的權威來源，
+  未另寫第二份假日判斷）——週末／國定假日一律 `false`，不管時間或 inst 狀態。
+- `taifex_data.json` 新增頂層 `stale`（bool，每班重算）。
+- 前端 `app.js` 新 `loadStaleBanner()`（掛進 `loadMarketInfo()` 的 `Promise.all`）＋
+  `index.html` 新 `#stale-banner`（市場資訊面板內，資料日期下方、更新紀錄按鈕上方）：
+  `stale=true` 時顯示「⚠ 三大法人資料落後（最後 YYYY-MM-DD），可按上方『抓新資料』」，
+  平時 `hidden`。手動鈕（`triggerFetch`）維持為救援手段，未變動。
+
+### ③ 判準（累積 4 週後由 reviewer 驗，本次只鋪機制）
+主：每交易日 `latency_min` P90 ≤180分、單日 ≤480分。附：連續 4 週五 16~18 點窗口至少 1 班同日。
+判準吃 `daily_summary`，不吃 `update_log`。
+
+### B1~B8 驗收
+| # | 結果 |
+|---|---|
+| B1 同日不重複/不覆寫 | ✅ `test_p216_stale.py` 實測：第二次執行 `first_same_day_inst_at` 不變、`n_runs` 累加、列數仍 1 |
+| B2 延遲計算 | ✅ 2026-09-11 16:53 回代 → **83 分**，與案卡參照值相符 |
+| 🔴 B3 `stale` 觸發 | ✅ **模擬 inst 落後**（交易日 18:31、inst 仍卡前一日）→ `stale=true` **實測觸發**；
+正常/未過 18:00 兩種對照組皆 `false`（無誤報） |
+| B4 假日不誤報 | ✅ 模擬週六、模擬國定假日 → 皆 `stale=false` |
+| B5 `update_log[-400:]` | ✅ 已改（見①） |
+| B6 cache-buster | ✅ `app.js?v=20260828b → 20260917`（`app.js`／`index.html` 皆有改動）|
+| B7 push 核對 sha | 見下方 push 記錄（GitHub API 獨立核對，不信 shell 回顯）|
+| B8 隱私掃描 | ✅ `git diff` 掃描專案一策略衍生欄位關鍵字 **0 命中**（本次改動純三大法人更新時效機制，
+不帶任何策略衍生欄位）|
+
+⚠ **誠實記錄**：B2 案卡另給了「08-28 應得 ≈900分（18:31−15:30）」的參照值，
+但 `18:31−15:30` 依本函式定義字面計算是 **181 分**，兩者不吻合——這是案卡本身（Fable 覆審記錄）
+的一個算式與結論不一致之處，本次沿用**明確定義的公式**（已用 09-11 案例驗證吻合），
+08-28 那個數字未強行湊合，留給 reviewer 核對案卡原意。
+
+### 交付物
+`fetch_taifex.py`（+`compute_stale`／`update_daily_summary`／`main()` 接線）、`app.js`
+（+`loadStaleBanner`）、`index.html`（+`#stale-banner`、cache-buster bump）、
+`test_p216_stale.py`（新，B1~B4 驗證腳本，純函式測試、不碰網路）。
+
+判準③（P90/單日/連續4週五）**累積 4 週後才驗**，本案暫不結案。
+
+---
+
 ## 2026-08-28（stockweb 盤點 (Opus)：P2-34 壞按鈕止血、P2-16 驗收條件解鎖、兩案結案）
 
 **🔴 Fix（線上缺陷止血，P2-34）：** 移除 `index.html:719-725` 的 Buy Me a Coffee 按鈕——

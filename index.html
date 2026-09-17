@@ -44,6 +44,11 @@
     <!-- 資料日期 -->
     <div class="text-center text-xs text-gray-400" id="market-date">載入中...</div>
     <div class="text-center text-xs text-gray-500" id="taifex-updated"></div>
+
+    <!-- P2-16：資料落後 ⚠ 橫幅（stale 旗標，交易日18點後三大法人仍未同步當日才顯示）-->
+    <div id="stale-banner" class="hidden text-center text-xs text-yellow-200 bg-yellow-900/40
+      border border-yellow-700 rounded-lg px-3 py-1.5"></div>
+
     <div class="text-center mt-1">
       <button onclick="openUpdateLogModal()"
         class="text-xs text-blue-400 hover:text-blue-300 underline">更新紀錄 ▸</button>
@@ -728,7 +733,7 @@
       class="w-11 h-11 rounded-full bg-gray-700/90 hover:bg-gray-600 text-white text-lg shadow-lg backdrop-blur">↓</button>
   </div>
 
-  <script src="app.js?v=20260828b"></script>
+  <script src="app.js?v=20260917"></script>
   <script data-goatcounter="https://charlesju.goatcounter.com/count"
           async src="https://gc.zgo.at/count.js"></script>
   <script>

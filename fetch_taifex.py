@@ -1125,6 +1125,51 @@ def is_trading_day(d):
     return d.weekday() < 5 and d.strftime("%Y-%m-%d") not in fetch_tw_holidays()
 
 
+# ── P2-16：每日更新延遲摘要 ＋ stale 旗標（純函式，供 main() 呼叫與獨立測試）──
+
+INST_BASELINE_HOUR, INST_BASELINE_MIN = 15, 30   # TWSE 三大法人（BFI82U）發布基準時刻
+STALE_HOUR = 18                                  # 過此時刻仍未同步 → 視為落後
+
+
+def compute_stale(now_tw, inst_date_iso: str) -> bool:
+    """P2-16②：資料是否落後（本地端旗標，供前端 ⚠ 橫幅）。
+    now_tw＝台灣時間 now（datetime，含 tzinfo 與否皆可，只用其 date/hour）；
+    inst_date_iso＝三大法人資料日期（YYYY-MM-DD，可空字串）。
+    🔴 避免週末／假日誤報：重用既有 `is_trading_day()`（TWSE holidaySchedule，同結算日計算的
+    權威來源，不另寫第二份假日判斷）——非交易日一律 False，不管時間或 inst 狀態。"""
+    today = now_tw.date()
+    if not is_trading_day(today):
+        return False
+    if now_tw.hour < STALE_HOUR:
+        return False
+    today_iso = today.strftime("%Y-%m-%d")
+    return (not inst_date_iso) or (inst_date_iso < today_iso)
+
+
+def update_daily_summary(daily_summary: list, now_tw, inst_date_iso: str, stale: bool) -> list:
+    """P2-16①：一天一列的更新延遲摘要，解耦於 `update_log`（保留期不再卡驗收條件）。
+    欄位：{date, first_same_day_inst_at, n_runs, latency_min, stale}。
+    - `first_same_day_inst_at` 首次見到 inst==當日 才記錄，**之後不覆寫**（append-only 精神，
+      比照 `LEDGER_PATH` 慣例）。
+    - `latency_min` = `first_same_day_inst_at − 15:30`（TWSE 三大法人發布基準），分鐘。
+    - `n_runs`／`stale` 每次呼叫皆更新（反映「本日截至最近一次執行」的狀態）。
+    - 保留**不設上限**（一列僅百餘 bytes）；就地修改並回傳同一個 list。"""
+    today_iso = now_tw.strftime("%Y-%m-%d")
+    row = next((r for r in daily_summary if r.get("date") == today_iso), None)
+    if row is None:
+        row = {"date": today_iso, "first_same_day_inst_at": None, "n_runs": 0,
+               "latency_min": None, "stale": False}
+        daily_summary.append(row)
+    row["n_runs"] = row.get("n_runs", 0) + 1
+    if row.get("first_same_day_inst_at") is None and inst_date_iso == today_iso:
+        row["first_same_day_inst_at"] = now_tw.strftime("%H:%M")
+        base = now_tw.replace(hour=INST_BASELINE_HOUR, minute=INST_BASELINE_MIN, second=0, microsecond=0)
+        row["latency_min"] = round((now_tw - base).total_seconds() / 60)
+    row["stale"] = stale
+    daily_summary.sort(key=lambda r: r["date"])
+    return daily_summary
+
+
 def get_settlement_date(ref_date=None):
     """
     取得台指期當月結算日（第三個週三；遇休市日順延至次一營業日）。
@@ -1710,16 +1755,26 @@ def main():
     # institute.date / date 為 YYYYMMDD、tx/nq 為 YYYY-MM-DD，統一成 YYYY-MM-DD 供前端比較/顯示
     def _ymd(d):
         return f"{d[:4]}-{d[4:6]}-{d[6:]}" if d and len(d) == 8 else (d or "")
+    inst_date_iso = _ymd(institute.get("date", "") if institute else "")
     update_log = existing_json.get("update_log", [])
     update_log.append({
         "at":      tw_now.strftime("%Y-%m-%d %H:%M"),
         "trigger": _os.getenv("TRIGGER_TYPE", "manual"),
-        "inst":    _ymd(institute.get("date", "") if institute else ""),
+        "inst":    inst_date_iso,
         "fut":     _ymd(date or ""),
         "tx":      (tx_vol.get("yesterday") or {}).get("date", ""),
         "nq":      (nq_vol.get("yesterday") or {}).get("date", ""),
     })
-    update_log = update_log[-40:]
+    # 🔴 2026-09-17（P2-16 Fable 修正版）40 → 400：40 筆（~1週）驗過一次就撞到同一種保留期
+    # 卡驗收條件的問題（4 週驗收窗需要 ≥168 筆才有餘裕）。真正解法是①的 daily_summary
+    # 解耦——判準改吃 daily_summary（無限保留），update_log 只留除錯用，此處 400 筆是保險。
+    update_log = update_log[-400:]
+
+    # P2-16①②（2026-09-17，Fable 修正版裁示）：每日更新延遲摘要 ＋ stale 旗標。
+    # daily_summary 解耦於 update_log 的保留期限制（無限保留，判準吃它、不吃 update_log）。
+    stale = compute_stale(tw_now, inst_date_iso)
+    daily_summary = update_daily_summary(
+        existing_json.get("daily_summary", []), tw_now, inst_date_iso, stale)
 
     # 台指期正價差（近月/次月/季月 vs 加權指數現貨）；抓失敗沿用既有，避免空資料覆蓋
     basis = {}
@@ -1773,6 +1828,8 @@ def main():
         "geo_stress_history": geo_stress_history,
         "basis":              basis,
         "update_log":         update_log,
+        "daily_summary":      daily_summary,   # P2-16①：一天一列更新延遲摘要（無限保留）
+        "stale":              stale,           # P2-16②：資料是否落後（前端 ⚠ 橫幅用）
         "earnings":           earnings,
         "index_ytd":          update_index_ytd(existing_json),
         "updated_at":         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

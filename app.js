@@ -957,8 +957,23 @@ async function loadMarketInfo() {
     loadMarketBreadth(),
     loadMarginRatio(),
     loadEarnings(),
+    loadStaleBanner(),
   ]);
   await loadSignalSummary();
+}
+
+// ── P2-16：資料落後 ⚠ 橫幅（stale 旗標，後端每班計算好，前端只讀不重算）──────
+async function loadStaleBanner() {
+  try {
+    const data = await loadTaifexJson();
+    const box = document.getElementById('stale-banner');
+    if (!box) return;
+    if (!data?.stale) { box.classList.add('hidden'); return; }
+    const instDate = data?.institute?.date || '';
+    const last = instDate ? instDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : '--';
+    box.textContent = `⚠ 三大法人資料落後（最後 ${last}），可按上方「抓新資料」`;
+    box.classList.remove('hidden');
+  } catch (e) { console.error('loadStaleBanner:', e); }
 }
 
 // ── 上市櫃成交量 ──────────────────────────────────────────────
