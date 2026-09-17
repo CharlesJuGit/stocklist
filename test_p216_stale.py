@@ -62,6 +62,21 @@ print(f"  交易日 17:59（未過 18:00）、inst=09-17（落後）→ stale={s
 assert stale5 is False
 print("  ✅ 18:00 門檻生效")
 
+print("\n=== 颱風臨時停市不誤報（Opus R 2026-09-17 覆審追加）===")
+# holidaySchedule 是事先公告的行事曆，不含臨時停市 → is_trading_day 仍判 True；
+# 但那天整個市場沒開，期貨(fut)也會同步落後 → 不該誤報「三大法人特別慢」
+now_typhoon = datetime(2026, 9, 18, 20, 0)
+stale_typhoon_no_fut_check = ft.compute_stale(now_typhoon, "2026-09-17")  # 舊呼叫（省略 fut）：向後相容，仍會誤報
+stale_typhoon = ft.compute_stale(now_typhoon, "2026-09-17", "2026-09-17")  # 新呼叫：fut 也落後
+print(f"  交易日 20:00、inst 落後、（省略 fut）→ stale={stale_typhoon_no_fut_check}（向後相容，維持舊行為）")
+print(f"  交易日 20:00、inst 落後、fut 也落後（疑似臨時停市）→ stale={stale_typhoon}（應為 False）")
+assert stale_typhoon_no_fut_check is True, "向後相容性破壞：省略 fut 時行為不應改變"
+assert stale_typhoon is False, "🔴 颱風停市誤報修法失敗：fut 也落後時仍誤報 stale"
+stale_normal_fut_ok = ft.compute_stale(now_typhoon, "2026-09-17", "2026-09-18")  # fut 是最新的，inst 才是真的慢
+print(f"  交易日 20:00、inst 落後、但 fut 是當日（三大法人真的比期貨慢）→ stale={stale_normal_fut_ok}（應為 True）")
+assert stale_normal_fut_ok is True, "🔴 修法過頭：fut 正常時不該被放過"
+print("  ✅ fut 同步落後才視為疑似臨時停市不誤報；fut 正常但 inst 落後時照樣抓")
+
 print("\n=== B4：假日不誤報（週六 ＋ 模擬國定假日，皆為交易日 inst 落後同款情境）===")
 # 週六
 now_sat = datetime(2026, 9, 19, 20, 0)   # 2026-09-19 是週六

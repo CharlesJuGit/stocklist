@@ -1131,19 +1131,33 @@ INST_BASELINE_HOUR, INST_BASELINE_MIN = 15, 30   # TWSE 三大法人（BFI82U）
 STALE_HOUR = 18                                  # 過此時刻仍未同步 → 視為落後
 
 
-def compute_stale(now_tw, inst_date_iso: str) -> bool:
+def compute_stale(now_tw, inst_date_iso: str, fut_date_iso: str = None) -> bool:
     """P2-16②：資料是否落後（本地端旗標，供前端 ⚠ 橫幅）。
     now_tw＝台灣時間 now（datetime，含 tzinfo 與否皆可，只用其 date/hour）；
-    inst_date_iso＝三大法人資料日期（YYYY-MM-DD，可空字串）。
+    inst_date_iso＝三大法人資料日期（YYYY-MM-DD，可空字串）；
+    fut_date_iso＝期貨資料日期（YYYY-MM-DD，可空字串或省略）。
     🔴 避免週末／假日誤報：重用既有 `is_trading_day()`（TWSE holidaySchedule，同結算日計算的
-    權威來源，不另寫第二份假日判斷）——非交易日一律 False，不管時間或 inst 狀態。"""
+    權威來源，不另寫第二份假日判斷）——非交易日一律 False，不管時間或 inst 狀態。
+
+    🔴 P2-16 Opus R 覆審（2026-09-17）補：`holidaySchedule` 是**事先公告**的行事曆，
+    **不含颱風等臨時停市**——那種日子 `is_trading_day` 誤判為交易日、inst 又確實落後（因為
+    當天根本沒開盤），會誤報「三大法人資料落後」（實際是整個市場沒開，按手動鈕也抓不到東西）。
+    修法：若**期貨（fut）也同步落後**，代表當天市場很可能根本沒開盤，不是「三大法人特別慢」，
+    此時不算 stale（`fut_date_iso` 省略/None 時維持舊行為，向後相容既有呼叫端）。"""
     today = now_tw.date()
     if not is_trading_day(today):
         return False
     if now_tw.hour < STALE_HOUR:
         return False
     today_iso = today.strftime("%Y-%m-%d")
-    return (not inst_date_iso) or (inst_date_iso < today_iso)
+    inst_behind = (not inst_date_iso) or (inst_date_iso < today_iso)
+    if not inst_behind:
+        return False
+    if fut_date_iso is not None:
+        fut_behind = (not fut_date_iso) or (fut_date_iso < today_iso)
+        if fut_behind:
+            return False   # 期貨也落後 ⟹ 疑似臨時停市，不誤報「三大法人落後」
+    return True
 
 
 def update_daily_summary(daily_summary: list, now_tw, inst_date_iso: str, stale: bool) -> list:
@@ -1756,12 +1770,13 @@ def main():
     def _ymd(d):
         return f"{d[:4]}-{d[4:6]}-{d[6:]}" if d and len(d) == 8 else (d or "")
     inst_date_iso = _ymd(institute.get("date", "") if institute else "")
+    fut_date_iso = _ymd(date or "")
     update_log = existing_json.get("update_log", [])
     update_log.append({
         "at":      tw_now.strftime("%Y-%m-%d %H:%M"),
         "trigger": _os.getenv("TRIGGER_TYPE", "manual"),
         "inst":    inst_date_iso,
-        "fut":     _ymd(date or ""),
+        "fut":     fut_date_iso,
         "tx":      (tx_vol.get("yesterday") or {}).get("date", ""),
         "nq":      (nq_vol.get("yesterday") or {}).get("date", ""),
     })
@@ -1770,9 +1785,10 @@ def main():
     # 解耦——判準改吃 daily_summary（無限保留），update_log 只留除錯用，此處 400 筆是保險。
     update_log = update_log[-400:]
 
-    # P2-16①②（2026-09-17，Fable 修正版裁示）：每日更新延遲摘要 ＋ stale 旗標。
+    # P2-16①②（2026-09-17，Fable 修正版裁示；fut_date_iso 條件為 Opus R 覆審補：颱風臨時停市
+    # 不誤報，見 compute_stale docstring）：每日更新延遲摘要 ＋ stale 旗標。
     # daily_summary 解耦於 update_log 的保留期限制（無限保留，判準吃它、不吃 update_log）。
-    stale = compute_stale(tw_now, inst_date_iso)
+    stale = compute_stale(tw_now, inst_date_iso, fut_date_iso)
     daily_summary = update_daily_summary(
         existing_json.get("daily_summary", []), tw_now, inst_date_iso, stale)
 

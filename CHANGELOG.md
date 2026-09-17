@@ -8,6 +8,20 @@
 
 ---
 
+## 2026-09-17（**Fix (Sonnet)**：P2-16 追加——`stale` 颱風臨時停市誤報，Opus R 覆審發現）
+
+Opus R 驗收 P2-16 機制時發現：`holidaySchedule` 是**事先公告**的行事曆，不含颱風等臨時停市，
+那種日子 `is_trading_day()` 仍判為交易日、inst 也確實落後（因為當天根本沒開盤）→ 誤報
+「三大法人資料落後」，代價是「訓練使用者忽略橫幅」。
+
+**修法**：`compute_stale(now_tw, inst_date_iso, fut_date_iso=None)` 新增第三參數——
+**期貨（fut）也同步落後時，視為疑似臨時停市，不誤報**（`fut_date_iso` 省略時維持舊行為，
+向後相容）。呼叫端 `main()` 傳入既有的 `fut_date_iso`（`update_log` 的 `fut` 欄同一份值），
+不新增資料源。`test_p216_stale.py` 加 3 個場景：省略 fut（相容）／fut 也落後（不誤報）／
+fut 正常但 inst 落後（照常抓），全過。隱私掃描 0 命中。
+
+---
+
 ## 2026-09-17（**Feat (Sonnet)**：P2-16 每日更新延遲摘要 ＋ `stale` 旗標 ⚠ 橫幅，Ball 核准 Fable 三項）
 
 Fable 2026-09-17 覆審 P2-16（`handoff/open/P2-16.md`）裁定：主判準改**每日更新延遲分布**
