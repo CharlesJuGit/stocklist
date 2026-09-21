@@ -1354,9 +1354,9 @@
     "nq": {
       "yesterday": {
         "date": "2026-09-21",
-        "high": 30262,
+        "high": 30264,
         "low": 29945,
-        "range": 317
+        "range": 319
       },
       "avg20": 388,
       "category": "中",
@@ -1477,9 +1477,9 @@
         },
         {
           "date": "2026-09-21",
-          "high": 30262,
+          "high": 30264,
           "low": 29945,
-          "range": 317
+          "range": 319
         }
       ]
     }
@@ -1662,8 +1662,8 @@
     {
       "date": "2026-09-21",
       "twse": 8668,
-      "tpex": 0,
-      "total": 8668
+      "tpex": 2124,
+      "total": 10792
     }
   ],
   "market_breadth": [
@@ -1804,8 +1804,8 @@
       "date": "2026-09-21",
       "twse_up": 484,
       "twse_down": 498,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 437,
+      "tpex_down": 342
     }
   ],
   "margin_ratio": [
@@ -2065,11 +2065,11 @@
     },
     {
       "date": "2026-09-21",
-      "oil_z": 1.064,
+      "oil_z": 1.0047,
       "yield_z": 2.676,
       "sp_z": 1.4702,
       "hormuz_z": 1.52,
-      "composite": 0.9475
+      "composite": 0.9326
     }
   ],
   "basis": {
@@ -2668,6 +2668,14 @@
       "fut": "2026-09-21",
       "tx": "2026-09-21",
       "nq": "2026-09-21"
+    },
+    {
+      "at": "2026-09-21 18:37",
+      "trigger": "schedule",
+      "inst": "2026-09-21",
+      "fut": "2026-09-21",
+      "tx": "2026-09-21",
+      "nq": "2026-09-21"
     }
   ],
   "daily_summary": [
@@ -2695,7 +2703,7 @@
     {
       "date": "2026-09-21",
       "first_same_day_inst_at": "17:53",
-      "n_runs": 1,
+      "n_runs": 2,
       "latency_min": 143,
       "stale": false
     }
@@ -2748,5 +2756,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-09-21T09:53:40Z"
+  "updated_at": "2026-09-21T10:37:59Z"
 }
