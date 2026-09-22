@@ -2066,11 +2066,11 @@
     },
     {
       "date": "2026-09-22",
-      "oil_z": 0.8855,
-      "yield_z": 2.4082,
-      "sp_z": 1.7397,
-      "hormuz_z": 1.52,
-      "composite": 0.7685
+      "oil_z": 0.9061,
+      "yield_z": 2.5039,
+      "sp_z": 1.7393,
+      "hormuz_z": 1.56,
+      "composite": 0.8077
     }
   ],
   "basis": {
@@ -2773,6 +2773,14 @@
       "fut": "2026-09-22",
       "tx": "2026-09-22",
       "nq": "2026-09-22"
+    },
+    {
+      "at": "2026-09-23 00:58",
+      "trigger": "schedule",
+      "inst": "2026-09-22",
+      "fut": "2026-09-22",
+      "tx": "2026-09-22",
+      "nq": "2026-09-22"
     }
   ],
   "daily_summary": [
@@ -2810,11 +2818,18 @@
       "n_runs": 9,
       "latency_min": 107,
       "stale": false
+    },
+    {
+      "date": "2026-09-23",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-09-22",
+    "fetched": "2026-09-23",
     "list": [
       {
         "sym": "TSM",
@@ -2860,5 +2875,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-09-22T14:54:53Z"
+  "updated_at": "2026-09-22T16:58:33Z"
 }
