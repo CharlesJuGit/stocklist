@@ -1357,12 +1357,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-09-25",
-        "high": 30765,
+        "high": 30963,
         "low": 30679,
-        "range": 86
+        "range": 284
       },
       "avg20": 423,
-      "category": "低",
+      "category": "小",
       "history": [
         {
           "date": "2026-08-28",
@@ -1480,9 +1480,9 @@
         },
         {
           "date": "2026-09-25",
-          "high": 30765,
+          "high": 30963,
           "low": 30679,
-          "range": 86
+          "range": 284
         }
       ]
     }
@@ -1671,13 +1671,6 @@
   ],
   "market_breadth": [
     {
-      "date": "2026-08-28",
-      "twse_up": 361,
-      "twse_down": 611,
-      "tpex_up": 350,
-      "tpex_down": 425
-    },
-    {
       "date": "2026-08-31",
       "twse_up": 334,
       "twse_down": 660,
@@ -1809,6 +1802,13 @@
       "twse_down": 546,
       "tpex_up": 389,
       "tpex_down": 380
+    },
+    {
+      "date": "2026-09-25",
+      "twse_up": null,
+      "twse_down": null,
+      "tpex_up": 389,
+      "tpex_down": 380
     }
   ],
   "margin_ratio": [
@@ -1914,14 +1914,6 @@
     }
   ],
   "geo_stress_history": [
-    {
-      "date": "2026-08-28",
-      "oil_z": 0.5557,
-      "yield_z": 2.0086,
-      "sp_z": 1.8174,
-      "hormuz_z": 1.64,
-      "composite": 0.5967
-    },
     {
       "date": "2026-08-31",
       "oil_z": 0.6957,
@@ -2073,6 +2065,14 @@
       "sp_z": 1.5412,
       "hormuz_z": 1.56,
       "composite": 1.0629
+    },
+    {
+      "date": "2026-09-25",
+      "oil_z": 0.9594,
+      "yield_z": 3.1347,
+      "sp_z": 1.5607,
+      "hormuz_z": 1.56,
+      "composite": 1.0234
     }
   ],
   "basis": {
@@ -2919,6 +2919,14 @@
       "fut": "2026-09-24",
       "tx": "2026-09-24",
       "nq": "2026-09-24"
+    },
+    {
+      "at": "2026-09-25 17:34",
+      "trigger": "schedule",
+      "inst": "2026-09-24",
+      "fut": "2026-09-24",
+      "tx": "2026-09-24",
+      "nq": "2026-09-25"
     }
   ],
   "daily_summary": [
@@ -2974,7 +2982,7 @@
     {
       "date": "2026-09-25",
       "first_same_day_inst_at": null,
-      "n_runs": 2,
+      "n_runs": 3,
       "latency_min": null,
       "stale": false
     }
@@ -3015,7 +3023,7 @@
   },
   "index_ytd": {
     "year": 2026,
-    "updated": "2026-09-24",
+    "updated": "2026-09-25",
     "otc": {
       "high": 459.56,
       "year": 2026
@@ -3027,5 +3035,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-09-25T00:39:15Z"
+  "updated_at": "2026-09-25T09:34:36Z"
 }
