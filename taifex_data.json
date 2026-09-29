@@ -20,10 +20,10 @@
   },
   "institute": {
     "date": "20260929",
-    "foreign": -632.0,
-    "trust": 14.2,
+    "foreign": -625.8,
+    "trust": 5.8,
     "dealer": -164.0,
-    "total": -781.8
+    "total": -784.0
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -1217,8 +1217,8 @@
       "ratio": 5249,
       "retail_total": 9187,
       "opt_strategy": "中性",
-      "foreign": -632.0,
-      "trust": 14.2,
+      "foreign": -625.8,
+      "trust": 5.8,
       "dealer": -164.0
     }
   ],
@@ -1358,12 +1358,12 @@
     "nq": {
       "yesterday": {
         "date": "2026-09-29",
-        "high": 30669,
+        "high": 30726,
         "low": 30372,
-        "range": 297
+        "range": 354
       },
       "avg20": 432,
-      "category": "小",
+      "category": "中",
       "history": [
         {
           "date": "2026-09-01",
@@ -1481,9 +1481,9 @@
         },
         {
           "date": "2026-09-29",
-          "high": 30669,
+          "high": 30726,
           "low": 30372,
-          "range": 297
+          "range": 354
         }
       ]
     }
@@ -1814,11 +1814,6 @@
   ],
   "margin_ratio": [
     {
-      "date": "2026-08-28",
-      "twse": 194.25,
-      "tpex": 185.75
-    },
-    {
       "date": "2026-08-31",
       "twse": 192.25,
       "tpex": 189.59
@@ -1912,6 +1907,11 @@
       "date": "2026-09-24",
       "twse": 193.87,
       "tpex": 189.15
+    },
+    {
+      "date": "2026-09-29",
+      "twse": 191.81,
+      "tpex": 188.33
     }
   ],
   "geo_stress_history": [
@@ -2069,11 +2069,11 @@
     },
     {
       "date": "2026-09-29",
-      "oil_z": 0.8763,
-      "yield_z": 3.2272,
-      "sp_z": 1.4675,
-      "hormuz_z": 1.64,
-      "composite": 1.069
+      "oil_z": 0.8509,
+      "yield_z": 3.1803,
+      "sp_z": 1.4554,
+      "hormuz_z": 1.52,
+      "composite": 1.024
     }
   ],
   "basis": {
@@ -3064,6 +3064,14 @@
       "fut": "2026-09-29",
       "tx": "2026-09-29",
       "nq": "2026-09-29"
+    },
+    {
+      "at": "2026-09-29 22:58",
+      "trigger": "schedule",
+      "inst": "2026-09-29",
+      "fut": "2026-09-29",
+      "tx": "2026-09-29",
+      "nq": "2026-09-29"
     }
   ],
   "daily_summary": [
@@ -3140,7 +3148,7 @@
     {
       "date": "2026-09-29",
       "first_same_day_inst_at": "18:37",
-      "n_runs": 8,
+      "n_runs": 9,
       "latency_min": 188,
       "stale": false
     }
@@ -3197,5 +3205,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-09-29T11:19:06Z"
+  "updated_at": "2026-09-29T14:58:47Z"
 }
