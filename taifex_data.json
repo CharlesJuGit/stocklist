@@ -21,9 +21,9 @@
   "institute": {
     "date": "20261005",
     "foreign": 719.0,
-    "trust": -63.9,
+    "trust": -52.9,
     "dealer": 109.5,
-    "total": 764.6
+    "total": 775.6
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -1222,7 +1222,7 @@
       "retail_total": -5859,
       "opt_strategy": "中性",
       "foreign": 719.0,
-      "trust": -63.9,
+      "trust": -52.9,
       "dealer": 109.5
     }
   ],
@@ -1812,8 +1812,8 @@
       "date": "2026-10-05",
       "twse_up": 364,
       "twse_down": 631,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 296,
+      "tpex_down": 498
     }
   ],
   "margin_ratio": [
@@ -2073,11 +2073,11 @@
     },
     {
       "date": "2026-10-05",
-      "oil_z": 0.7678,
+      "oil_z": 0.7478,
       "yield_z": 3.0652,
       "sp_z": 1.518,
       "hormuz_z": 1.52,
-      "composite": 0.9587
+      "composite": 0.9538
     }
   ],
   "basis": {
@@ -3316,6 +3316,14 @@
       "fut": "2026-10-05",
       "tx": "2026-10-05",
       "nq": "2026-10-05"
+    },
+    {
+      "at": "2026-10-05 20:12",
+      "trigger": "schedule",
+      "inst": "2026-10-05",
+      "fut": "2026-10-05",
+      "tx": "2026-10-05",
+      "nq": "2026-10-05"
     }
   ],
   "daily_summary": [
@@ -3427,7 +3435,7 @@
     {
       "date": "2026-10-05",
       "first_same_day_inst_at": "19:24",
-      "n_runs": 1,
+      "n_runs": 2,
       "latency_min": 234,
       "stale": false
     }
@@ -3484,5 +3492,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-05T11:24:24Z"
+  "updated_at": "2026-10-05T12:13:11Z"
 }
