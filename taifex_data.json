@@ -1814,8 +1814,8 @@
       "date": "2026-10-07",
       "twse_up": 588,
       "twse_down": 387,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 419,
+      "tpex_down": 355
     }
   ],
   "margin_ratio": [
@@ -1917,7 +1917,7 @@
     {
       "date": "2026-10-07",
       "twse": 198.91,
-      "tpex": null
+      "tpex": 193.97
     }
   ],
   "geo_stress_history": [
@@ -2075,11 +2075,11 @@
     },
     {
       "date": "2026-10-07",
-      "oil_z": 0.687,
-      "yield_z": 2.9794,
-      "sp_z": 1.6436,
+      "oil_z": 0.6578,
+      "yield_z": 2.9856,
+      "sp_z": 1.6582,
       "hormuz_z": 1.52,
-      "composite": 0.8857
+      "composite": 0.8763
     }
   ],
   "basis": {
@@ -3462,6 +3462,14 @@
       "fut": "2026-10-07",
       "tx": "2026-10-07",
       "nq": "2026-10-07"
+    },
+    {
+      "at": "2026-10-08 00:32",
+      "trigger": "schedule",
+      "inst": "2026-10-07",
+      "fut": "2026-10-07",
+      "tx": "2026-10-07",
+      "nq": "2026-10-07"
     }
   ],
   "daily_summary": [
@@ -3590,11 +3598,18 @@
       "n_runs": 7,
       "latency_min": 211,
       "stale": false
+    },
+    {
+      "date": "2026-10-08",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-10-07",
+    "fetched": "2026-10-08",
     "list": [
       {
         "sym": "TSM",
@@ -3644,5 +3659,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-07T15:46:36Z"
+  "updated_at": "2026-10-07T16:32:45Z"
 }
