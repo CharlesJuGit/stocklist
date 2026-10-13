@@ -7,9 +7,9 @@
     "mtxF": -1058,
     "mtxT": -15,
     "mtxD": -9846,
-    "tmxF": -8816,
+    "tmxF": 0,
     "tmxT": 0,
-    "tmxD": -39136
+    "tmxD": 0
   },
   "options": {
     "bc": 17720,
@@ -1224,7 +1224,7 @@
       "pressure": 87504,
       "tdays": 6,
       "ratio": 14584,
-      "retail_total": 20509,
+      "retail_total": 10919,
       "opt_strategy": "偏空",
       "foreign": -1652.9,
       "trust": 246.3,
@@ -2078,11 +2078,11 @@
     },
     {
       "date": "2026-10-13",
-      "oil_z": 0.9685,
-      "yield_z": 2.5334,
-      "sp_z": 1.616,
+      "oil_z": 0.9606,
+      "yield_z": 2.5155,
+      "sp_z": 1.6076,
       "hormuz_z": 1.52,
-      "composite": 0.8515
+      "composite": 0.8471
     }
   ],
   "basis": {
@@ -3733,6 +3733,14 @@
       "fut": "2026-10-13",
       "tx": "2026-10-13",
       "nq": "2026-10-13"
+    },
+    {
+      "at": "2026-10-14 01:36",
+      "trigger": "schedule",
+      "inst": "2026-10-13",
+      "fut": "2026-10-13",
+      "tx": "2026-10-13",
+      "nq": "2026-10-13"
     }
   ],
   "daily_summary": [
@@ -3900,7 +3908,7 @@
     {
       "date": "2026-10-14",
       "first_same_day_inst_at": null,
-      "n_runs": 3,
+      "n_runs": 4,
       "latency_min": null,
       "stale": false
     }
@@ -3957,5 +3965,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-13T16:58:25Z"
+  "updated_at": "2026-10-13T17:36:53Z"
 }
