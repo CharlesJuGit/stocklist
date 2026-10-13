@@ -1,29 +1,29 @@
 {
-  "date": "20261012",
+  "date": "20261013",
   "futures": {
-    "txF": -82806,
-    "txT": 76848,
-    "txD": 147,
-    "mtxF": 1679,
-    "mtxT": -11,
-    "mtxD": -9353,
-    "tmxF": -2002,
+    "txF": -87239,
+    "txT": 77838,
+    "txD": 1491,
+    "mtxF": -1058,
+    "mtxT": -15,
+    "mtxD": -9846,
+    "tmxF": -8816,
     "tmxT": 0,
-    "tmxD": -18676
+    "tmxD": -39136
   },
   "options": {
-    "bc": 14521,
-    "sc": 13997,
-    "bp": 10534,
-    "sp": 8484,
-    "sp_amt": 421562
+    "bc": 17720,
+    "sc": 16870,
+    "bp": 13167,
+    "sp": 10204,
+    "sp_amt": 599865
   },
   "institute": {
-    "date": "20261012",
-    "foreign": -522.0,
-    "trust": 71.4,
-    "dealer": -142.9,
-    "total": -593.5
+    "date": "20261013",
+    "foreign": -1653.4,
+    "trust": 238.7,
+    "dealer": -569.8,
+    "total": -1984.5
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -33,25 +33,6 @@
     "2026-10-21"
   ],
   "settlement_history": [
-    {
-      "date": "2026-07-16",
-      "txF": -84453,
-      "mtxF": -1501,
-      "bp": 13849,
-      "sp": 8763,
-      "bc": 3941,
-      "sc": 5861,
-      "fut_net": -84828,
-      "opt_net": 5086,
-      "pressure": 95907,
-      "tdays": 24,
-      "ratio": 3996,
-      "retail_total": 19900,
-      "opt_strategy": "看空",
-      "foreign": -483.3,
-      "trust": 86.5,
-      "dealer": -33.6
-    },
     {
       "date": "2026-07-17",
       "txF": -86189,
@@ -1228,25 +1209,39 @@
       "foreign": -522.0,
       "trust": 71.4,
       "dealer": -142.9
+    },
+    {
+      "date": "2026-10-13",
+      "txF": -87239,
+      "mtxF": -1058,
+      "bp": 13167,
+      "sp": 10204,
+      "sp_amt": 599865,
+      "bc": 17720,
+      "sc": 16870,
+      "fut_net": -87504,
+      "opt_net": 2963,
+      "pressure": 87504,
+      "tdays": 6,
+      "ratio": 14584,
+      "retail_total": 20509,
+      "opt_strategy": "偏空",
+      "foreign": -1653.4,
+      "trust": 238.7,
+      "dealer": -569.8
     }
   ],
   "volatility": {
     "tx": {
       "yesterday": {
-        "date": "2026-10-12",
-        "high": 49594,
-        "low": 48413,
-        "range": 1181
+        "date": "2026-10-13",
+        "high": 49422,
+        "low": 48240,
+        "range": 1182
       },
-      "avg20": 819,
+      "avg20": 826,
       "category": "高",
       "history": [
-        {
-          "date": "2026-09-10",
-          "high": 47295,
-          "low": 46506,
-          "range": 789
-        },
         {
           "date": "2026-09-11",
           "high": 46896,
@@ -1360,6 +1355,12 @@
           "high": 49594,
           "low": 48413,
           "range": 1181
+        },
+        {
+          "date": "2026-10-13",
+          "high": 49422,
+          "low": 48240,
+          "range": 1182
         }
       ]
     },
@@ -1497,12 +1498,6 @@
     }
   },
   "market_volume": [
-    {
-      "date": "2026-08-27",
-      "twse": 9674,
-      "tpex": 2803,
-      "total": 12477
-    },
     {
       "date": "2026-08-28",
       "twse": 10689,
@@ -1676,16 +1671,15 @@
       "twse": 8945,
       "tpex": 2198,
       "total": 11143
+    },
+    {
+      "date": "2026-10-13",
+      "twse": 12018,
+      "tpex": 2479,
+      "total": 14497
     }
   ],
   "market_breadth": [
-    {
-      "date": "2026-09-15",
-      "twse_up": 207,
-      "twse_down": 790,
-      "tpex_up": 229,
-      "tpex_down": 553
-    },
     {
       "date": "2026-09-16",
       "twse_up": 733,
@@ -1818,6 +1812,13 @@
       "twse_down": 451,
       "tpex_up": 330,
       "tpex_down": 466
+    },
+    {
+      "date": "2026-10-13",
+      "twse_up": 269,
+      "twse_down": 730,
+      "tpex_up": 175,
+      "tpex_down": 609
     }
   ],
   "margin_ratio": [
@@ -1923,14 +1924,6 @@
     }
   ],
   "geo_stress_history": [
-    {
-      "date": "2026-09-15",
-      "oil_z": 1.8822,
-      "yield_z": 2.8739,
-      "sp_z": 1.3316,
-      "hormuz_z": 1.6,
-      "composite": 1.2561
-    },
     {
       "date": "2026-09-16",
       "oil_z": 1.6093,
@@ -2082,29 +2075,34 @@
       "sp_z": 1.6391,
       "hormuz_z": 1.52,
       "composite": 0.847
+    },
+    {
+      "date": "2026-10-13",
+      "oil_z": 0.8372,
+      "yield_z": 2.6058,
+      "sp_z": 1.6391,
+      "hormuz_z": 1.52,
+      "composite": 0.831
     }
   ],
   "basis": {
-    "date": "2026/10/12",
-    "spot": 49302,
+    "date": "2026/10/13",
+    "spot": 48341,
     "curve": [
       {
         "label": "10月",
-        "basis": 7
+        "basis": 59
       },
       {
         "label": "11月",
-        "basis": 198
+        "basis": 274
+      },
+      {
+        "label": "12月",
+        "basis": 461
       }
     ],
     "history": [
-      {
-        "date": "2026/09/10",
-        "spot": 46940,
-        "near": -70,
-        "next": 110,
-        "quarter": null
-      },
       {
         "date": "2026/09/11",
         "spot": 46185,
@@ -2237,6 +2235,13 @@
         "near": 7,
         "next": 198,
         "quarter": null
+      },
+      {
+        "date": "2026/10/13",
+        "spot": 48341,
+        "near": 59,
+        "next": 274,
+        "quarter": 461
       }
     ]
   },
@@ -3688,6 +3693,14 @@
       "fut": "2026-10-12",
       "tx": "2026-10-12",
       "nq": "2026-10-12"
+    },
+    {
+      "at": "2026-10-13 19:42",
+      "trigger": "schedule",
+      "inst": "2026-10-13",
+      "fut": "2026-10-13",
+      "tx": "2026-10-13",
+      "nq": "2026-10-13"
     }
   ],
   "daily_summary": [
@@ -3847,9 +3860,9 @@
     },
     {
       "date": "2026-10-13",
-      "first_same_day_inst_at": null,
-      "n_runs": 6,
-      "latency_min": null,
+      "first_same_day_inst_at": "19:42",
+      "n_runs": 7,
+      "latency_min": 252,
       "stale": false
     }
   ],
@@ -3893,17 +3906,17 @@
   },
   "index_ytd": {
     "year": 2026,
-    "updated": "2026-10-12",
+    "updated": "2026-10-13",
     "otc": {
       "high": 459.56,
       "year": 2026
     },
     "mxf": {
       "high": 50265,
-      "last": 48709,
-      "date": "2026-10-12",
+      "last": 48936,
+      "date": "2026-10-13",
       "year": 2026
     }
   },
-  "updated_at": "2026-10-13T03:06:10Z"
+  "updated_at": "2026-10-13T11:42:32Z"
 }
