@@ -7,9 +7,9 @@
     "mtxF": -751,
     "mtxT": -20,
     "mtxD": -10352,
-    "tmxF": 0,
+    "tmxF": -4300,
     "tmxT": 0,
-    "tmxD": 0
+    "tmxD": -68359
   },
   "options": {
     "bc": 15849,
@@ -21,9 +21,9 @@
   "institute": {
     "date": "20261016",
     "foreign": -461.5,
-    "trust": 117.5,
+    "trust": 110.5,
     "dealer": -334.1,
-    "total": -678.1
+    "total": -685.1
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -1227,10 +1227,10 @@
       "pressure": 105961,
       "tdays": 3,
       "ratio": 35320,
-      "retail_total": 11123,
+      "retail_total": 25655,
       "opt_strategy": "偏空",
       "foreign": -461.5,
-      "trust": 117.5,
+      "trust": 110.5,
       "dealer": -334.1
     }
   ],
@@ -1826,11 +1826,6 @@
   ],
   "margin_ratio": [
     {
-      "date": "2026-09-15",
-      "twse": 180.19,
-      "tpex": 179.05
-    },
-    {
       "date": "2026-09-16",
       "twse": 183.92,
       "tpex": 185.76
@@ -1924,6 +1919,11 @@
       "date": "2026-10-15",
       "twse": 181.8,
       "tpex": 175.44
+    },
+    {
+      "date": "2026-10-16",
+      "twse": 183.39,
+      "tpex": 176.83
     }
   ],
   "geo_stress_history": [
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-16",
-      "oil_z": 1.0071,
-      "yield_z": 2.0462,
+      "oil_z": 1.0369,
+      "yield_z": 2.1048,
       "sp_z": 1.4414,
       "hormuz_z": 1.48,
-      "composite": 0.773
+      "composite": 0.7951
     }
   ],
   "basis": {
@@ -3900,6 +3900,14 @@
       "fut": "2026-10-16",
       "tx": "2026-10-16",
       "nq": "2026-10-16"
+    },
+    {
+      "at": "2026-10-16 21:26",
+      "trigger": "schedule",
+      "inst": "2026-10-16",
+      "fut": "2026-10-16",
+      "tx": "2026-10-16",
+      "nq": "2026-10-16"
     }
   ],
   "daily_summary": [
@@ -4081,7 +4089,7 @@
     {
       "date": "2026-10-16",
       "first_same_day_inst_at": "16:59",
-      "n_runs": 4,
+      "n_runs": 5,
       "latency_min": 90,
       "stale": false
     }
@@ -4138,5 +4146,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-16T09:42:10Z"
+  "updated_at": "2026-10-16T13:27:06Z"
 }
