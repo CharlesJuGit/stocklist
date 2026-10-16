@@ -7,9 +7,9 @@
     "mtxF": -751,
     "mtxT": -20,
     "mtxD": -10352,
-    "tmxF": -4300,
+    "tmxF": 0,
     "tmxT": 0,
-    "tmxD": -68359
+    "tmxD": 0
   },
   "options": {
     "bc": 15849,
@@ -1227,7 +1227,7 @@
       "pressure": 105961,
       "tdays": 3,
       "ratio": 35320,
-      "retail_total": 25655,
+      "retail_total": 11123,
       "opt_strategy": "偏空",
       "foreign": -461.5,
       "trust": 117.5,
@@ -1677,9 +1677,9 @@
     },
     {
       "date": "2026-10-16",
-      "twse": 9864,
+      "twse": 9938,
       "tpex": 2216,
-      "total": 12080
+      "total": 12154
     }
   ],
   "market_breadth": [
@@ -1820,8 +1820,8 @@
       "date": "2026-10-16",
       "twse_up": 684,
       "twse_down": 286,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 542,
+      "tpex_down": 247
     }
   ],
   "margin_ratio": [
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-16",
-      "oil_z": 1.015,
+      "oil_z": 1.0071,
       "yield_z": 2.0462,
       "sp_z": 1.4414,
       "hormuz_z": 1.48,
-      "composite": 0.775
+      "composite": 0.773
     }
   ],
   "basis": {
@@ -3892,6 +3892,14 @@
       "fut": "2026-10-16",
       "tx": "2026-10-16",
       "nq": "2026-10-16"
+    },
+    {
+      "at": "2026-10-16 17:41",
+      "trigger": "schedule",
+      "inst": "2026-10-16",
+      "fut": "2026-10-16",
+      "tx": "2026-10-16",
+      "nq": "2026-10-16"
     }
   ],
   "daily_summary": [
@@ -4073,7 +4081,7 @@
     {
       "date": "2026-10-16",
       "first_same_day_inst_at": "16:59",
-      "n_runs": 3,
+      "n_runs": 4,
       "latency_min": 90,
       "stale": false
     }
@@ -4130,5 +4138,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-16T09:01:22Z"
+  "updated_at": "2026-10-16T09:42:10Z"
 }
