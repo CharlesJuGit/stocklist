@@ -1371,11 +1371,11 @@
       "yesterday": {
         "date": "2026-10-16",
         "high": 30225,
-        "low": 29787,
-        "range": 438
+        "low": 29609,
+        "range": 616
       },
       "avg20": 478,
-      "category": "中",
+      "category": "大",
       "history": [
         {
           "date": "2026-09-21",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-10-16",
           "high": 30225,
-          "low": 29787,
-          "range": 438
+          "low": 29609,
+          "range": 616
         }
       ]
     }
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-16",
-      "oil_z": 1.0351,
-      "yield_z": 2.031,
-      "sp_z": 1.4363,
+      "oil_z": 1.1585,
+      "yield_z": 2.1284,
+      "sp_z": 1.3008,
       "hormuz_z": 1.48,
-      "composite": 0.7775
+      "composite": 0.8665
     }
   ],
   "basis": {
@@ -3932,6 +3932,14 @@
       "fut": "2026-10-16",
       "tx": "2026-10-16",
       "nq": "2026-10-16"
+    },
+    {
+      "at": "2026-10-17 00:40",
+      "trigger": "schedule",
+      "inst": "2026-10-16",
+      "fut": "2026-10-16",
+      "tx": "2026-10-16",
+      "nq": "2026-10-16"
     }
   ],
   "daily_summary": [
@@ -4116,16 +4124,19 @@
       "n_runs": 8,
       "latency_min": 90,
       "stale": false
+    },
+    {
+      "date": "2026-10-17",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-10-16",
+    "fetched": "2026-10-17",
     "list": [
-      {
-        "sym": "TSM",
-        "next": "2026-10-15"
-      },
       {
         "sym": "TSLA",
         "next": "2026-10-21"
@@ -4170,5 +4181,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-16T14:52:50Z"
+  "updated_at": "2026-10-16T16:40:25Z"
 }
