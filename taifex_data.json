@@ -1820,8 +1820,8 @@
       "date": "2026-10-19",
       "twse_up": 163,
       "twse_down": 849,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 161,
+      "tpex_down": 647
     }
   ],
   "margin_ratio": [
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-19",
-      "oil_z": 1.1732,
+      "oil_z": 1.1792,
       "yield_z": 2.0487,
       "sp_z": 1.2191,
       "hormuz_z": 1.48,
-      "composite": 0.8707
+      "composite": 0.8722
     }
   ],
   "basis": {
@@ -3960,6 +3960,14 @@
       "fut": "2026-10-19",
       "tx": "2026-10-19",
       "nq": "2026-10-19"
+    },
+    {
+      "at": "2026-10-19 18:41",
+      "trigger": "schedule",
+      "inst": "2026-10-19",
+      "fut": "2026-10-19",
+      "tx": "2026-10-19",
+      "nq": "2026-10-19"
     }
   ],
   "daily_summary": [
@@ -4155,7 +4163,7 @@
     {
       "date": "2026-10-19",
       "first_same_day_inst_at": "17:49",
-      "n_runs": 1,
+      "n_runs": 2,
       "latency_min": 140,
       "stale": false
     }
@@ -4208,5 +4216,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-19T09:49:52Z"
+  "updated_at": "2026-10-19T10:41:57Z"
 }
