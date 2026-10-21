@@ -20,10 +20,10 @@
   },
   "institute": {
     "date": "20261021",
-    "foreign": 9.6,
-    "trust": 129.2,
-    "dealer": -133.1,
-    "total": 5.7
+    "foreign": 22.4,
+    "trust": 128.0,
+    "dealer": -135.7,
+    "total": 14.7
   },
   "settlement_date": "2026-10-21",
   "recent_settlement_dates": [
@@ -1229,9 +1229,9 @@
       "ratio": 0,
       "retail_total": 17949,
       "opt_strategy": "偏空",
-      "foreign": 9.6,
-      "trust": 129.2,
-      "dealer": -133.1
+      "foreign": 22.4,
+      "trust": 128.0,
+      "dealer": -135.7
     }
   ],
   "volatility": {
@@ -1371,8 +1371,8 @@
       "yesterday": {
         "date": "2026-10-21",
         "high": 30010,
-        "low": 29732,
-        "range": 278
+        "low": 29728,
+        "range": 282
       },
       "avg20": 492,
       "category": "小",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-10-21",
           "high": 30010,
-          "low": 29732,
-          "range": 278
+          "low": 29728,
+          "range": 282
         }
       ]
     }
@@ -1826,11 +1826,6 @@
   ],
   "margin_ratio": [
     {
-      "date": "2026-09-18",
-      "twse": 189.8,
-      "tpex": 190.99
-    },
-    {
       "date": "2026-09-21",
       "twse": 191.44,
       "tpex": 186.81
@@ -1924,6 +1919,11 @@
       "date": "2026-10-20",
       "twse": 178.93,
       "tpex": 172.42
+    },
+    {
+      "date": "2026-10-21",
+      "twse": 182.85,
+      "tpex": 176.37
     }
   ],
   "geo_stress_history": [
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-21",
-      "oil_z": 1.2182,
-      "yield_z": 2.0561,
-      "sp_z": 1.3313,
+      "oil_z": 1.0745,
+      "yield_z": 1.9339,
+      "sp_z": 1.363,
       "hormuz_z": 1.52,
-      "composite": 0.8658
+      "composite": 0.7913
     }
   ],
   "basis": {
@@ -4096,6 +4096,14 @@
       "fut": "2026-10-21",
       "tx": "2026-10-21",
       "nq": "2026-10-21"
+    },
+    {
+      "at": "2026-10-21 22:02",
+      "trigger": "schedule",
+      "inst": "2026-10-21",
+      "fut": "2026-10-21",
+      "tx": "2026-10-21",
+      "nq": "2026-10-21"
     }
   ],
   "daily_summary": [
@@ -4305,7 +4313,7 @@
     {
       "date": "2026-10-21",
       "first_same_day_inst_at": "17:19",
-      "n_runs": 4,
+      "n_runs": 5,
       "latency_min": 110,
       "stale": false
     }
@@ -4358,5 +4366,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-21T10:05:20Z"
+  "updated_at": "2026-10-21T14:02:36Z"
 }
