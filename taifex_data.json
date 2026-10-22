@@ -7,9 +7,9 @@
     "mtxF": -3140,
     "mtxT": -25,
     "mtxD": -9922,
-    "tmxF": 0,
+    "tmxF": -11872,
     "tmxT": 0,
-    "tmxD": 0
+    "tmxD": -43459
   },
   "options": {
     "bc": 14300,
@@ -1227,7 +1227,7 @@
       "pressure": 88082,
       "tdays": 18,
       "ratio": 4893,
-      "retail_total": 13087,
+      "retail_total": 24153,
       "opt_strategy": "中性",
       "foreign": -815.8,
       "trust": 94.9,
@@ -1371,8 +1371,8 @@
       "yesterday": {
         "date": "2026-10-22",
         "high": 29993,
-        "low": 29250,
-        "range": 743
+        "low": 29136,
+        "range": 857
       },
       "avg20": 489,
       "category": "高",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-10-22",
           "high": 29993,
-          "low": 29250,
-          "range": 743
+          "low": 29136,
+          "range": 857
         }
       ]
     }
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-22",
-      "oil_z": 1.1738,
-      "yield_z": 1.7068,
-      "sp_z": 1.1751,
+      "oil_z": 1.2029,
+      "yield_z": 1.5988,
+      "sp_z": 1.1558,
       "hormuz_z": 1.52,
-      "composite": 0.8064
+      "composite": 0.7915
     }
   ],
   "basis": {
@@ -4188,6 +4188,14 @@
       "fut": "2026-10-22",
       "tx": "2026-10-22",
       "nq": "2026-10-22"
+    },
+    {
+      "at": "2026-10-23 01:11",
+      "trigger": "schedule",
+      "inst": "2026-10-22",
+      "fut": "2026-10-22",
+      "tx": "2026-10-22",
+      "nq": "2026-10-22"
     }
   ],
   "daily_summary": [
@@ -4407,20 +4415,19 @@
       "n_runs": 8,
       "latency_min": 112,
       "stale": false
+    },
+    {
+      "date": "2026-10-23",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-10-22",
+    "fetched": "2026-10-23",
     "list": [
-      {
-        "sym": "META",
-        "next": "2026-10-21"
-      },
-      {
-        "sym": "TSLA",
-        "next": "2026-10-21"
-      },
       {
         "sym": "GOOGL",
         "next": "2026-10-28"
@@ -4452,10 +4459,10 @@
     },
     "mxf": {
       "high": 50265,
-      "last": 48290,
-      "date": "2026-10-01",
+      "last": 47481,
+      "date": "2026-10-22",
       "year": 2026
     }
   },
-  "updated_at": "2026-10-22T15:19:10Z"
+  "updated_at": "2026-10-22T17:12:06Z"
 }
