@@ -4,12 +4,12 @@
     "txF": -84917,
     "txT": 87179,
     "txD": 483,
-    "mtxF": 0,
-    "mtxT": 0,
-    "mtxD": 0,
-    "tmxF": 1511,
+    "mtxF": 1224,
+    "mtxT": -21,
+    "mtxD": -9778,
+    "tmxF": 0,
     "tmxT": 0,
-    "tmxD": -28624
+    "tmxD": 0
   },
   "options": {
     "bc": 13549,
@@ -1216,18 +1216,18 @@
     {
       "date": "2026-10-28",
       "txF": -84917,
-      "mtxF": 0,
+      "mtxF": 1224,
       "bp": 9197,
       "sp": 8301,
       "sp_amt": 677556,
       "bc": 13549,
       "sc": 12874,
-      "fut_net": -84917,
+      "fut_net": -84611,
       "opt_net": 896,
-      "pressure": 84917,
+      "pressure": 84611,
       "tdays": 15,
-      "ratio": 5661,
-      "retail_total": 5423,
+      "ratio": 5641,
+      "retail_total": 8575,
       "opt_strategy": "中性",
       "foreign": 159.6,
       "trust": 143.2,
@@ -1370,9 +1370,9 @@
     "nq": {
       "yesterday": {
         "date": "2026-10-28",
-        "high": 29989,
+        "high": 30009,
         "low": 29767,
-        "range": 222
+        "range": 242
       },
       "avg20": 527,
       "category": "小",
@@ -1493,9 +1493,9 @@
         },
         {
           "date": "2026-10-28",
-          "high": 29989,
+          "high": 30009,
           "low": 29767,
-          "range": 222
+          "range": 242
         }
       ]
     }
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-28",
-      "oil_z": 1.384,
-      "yield_z": 1.7123,
-      "sp_z": 1.3085,
+      "oil_z": 1.3593,
+      "yield_z": 1.6456,
+      "sp_z": 1.3307,
       "hormuz_z": 1.52,
-      "composite": 0.827
+      "composite": 0.7986
     }
   ],
   "basis": {
@@ -4452,6 +4452,14 @@
       "fut": "2026-10-28",
       "tx": "2026-10-28",
       "nq": "2026-10-28"
+    },
+    {
+      "at": "2026-10-29 02:54",
+      "trigger": "schedule",
+      "inst": "2026-10-28",
+      "fut": "2026-10-28",
+      "tx": "2026-10-28",
+      "nq": "2026-10-28"
     }
   ],
   "daily_summary": [
@@ -4710,7 +4718,7 @@
     {
       "date": "2026-10-29",
       "first_same_day_inst_at": null,
-      "n_runs": 3,
+      "n_runs": 4,
       "latency_min": null,
       "stale": false
     }
@@ -4755,5 +4763,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-28T18:22:19Z"
+  "updated_at": "2026-10-28T18:55:23Z"
 }
