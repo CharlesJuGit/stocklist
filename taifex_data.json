@@ -4,12 +4,12 @@
     "txF": -89522,
     "txT": 87218,
     "txD": 1511,
-    "mtxF": -2886,
-    "mtxT": -24,
-    "mtxD": -10003,
-    "tmxF": 0,
+    "mtxF": 0,
+    "mtxT": 0,
+    "mtxD": 0,
+    "tmxF": -12484,
     "tmxT": 0,
-    "tmxD": 0
+    "tmxD": -40489
   },
   "options": {
     "bc": 16389,
@@ -1216,18 +1216,18 @@
     {
       "date": "2026-10-29",
       "txF": -89522,
-      "mtxF": -2886,
+      "mtxF": 0,
       "bp": 12363,
       "sp": 11154,
       "sp_amt": 838710,
       "bc": 16389,
       "sc": 16204,
-      "fut_net": -90244,
+      "fut_net": -89522,
       "opt_net": 1209,
-      "pressure": 90244,
+      "pressure": 89522,
       "tdays": 14,
-      "ratio": 6446,
-      "retail_total": 12913,
+      "ratio": 6394,
+      "retail_total": 10595,
       "opt_strategy": "中性",
       "foreign": -688.2,
       "trust": 70.4,
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-29",
-      "oil_z": 1.2121,
-      "yield_z": 1.5281,
-      "sp_z": 1.2865,
+      "oil_z": 1.2061,
+      "yield_z": 1.5398,
+      "sp_z": 1.3036,
       "hormuz_z": 1.52,
-      "composite": 0.7434
+      "composite": 0.7406
     }
   ],
   "basis": {
@@ -4484,6 +4484,14 @@
       "fut": "2026-10-29",
       "tx": "2026-10-29",
       "nq": "2026-10-29"
+    },
+    {
+      "at": "2026-10-29 23:33",
+      "trigger": "schedule",
+      "inst": "2026-10-29",
+      "fut": "2026-10-29",
+      "tx": "2026-10-29",
+      "nq": "2026-10-29"
     }
   ],
   "daily_summary": [
@@ -4742,7 +4750,7 @@
     {
       "date": "2026-10-29",
       "first_same_day_inst_at": "18:51",
-      "n_runs": 7,
+      "n_runs": 8,
       "latency_min": 202,
       "stale": false
     }
@@ -4787,5 +4795,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-29T15:27:26Z"
+  "updated_at": "2026-10-29T15:34:07Z"
 }
