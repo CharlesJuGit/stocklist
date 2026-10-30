@@ -1371,8 +1371,8 @@
       "yesterday": {
         "date": "2026-10-30",
         "high": 29180,
-        "low": 28611,
-        "range": 569
+        "low": 28568,
+        "range": 612
       },
       "avg20": 536,
       "category": "大",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-10-30",
           "high": 29180,
-          "low": 28611,
-          "range": 569
+          "low": 28568,
+          "range": 612
         }
       ]
     }
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-10-30",
-      "oil_z": 1.4296,
-      "yield_z": 1.4358,
-      "sp_z": 0.9756,
+      "oil_z": 1.4351,
+      "yield_z": 1.4184,
+      "sp_z": 0.9644,
       "hormuz_z": 1.52,
-      "composite": 0.8525
+      "composite": 0.8523
     }
   ],
   "basis": {
@@ -4564,6 +4564,14 @@
       "fut": "2026-10-30",
       "tx": "2026-10-30",
       "nq": "2026-10-30"
+    },
+    {
+      "at": "2026-10-31 00:42",
+      "trigger": "schedule",
+      "inst": "2026-10-30",
+      "fut": "2026-10-30",
+      "tx": "2026-10-30",
+      "nq": "2026-10-30"
     }
   ],
   "daily_summary": [
@@ -4832,16 +4840,19 @@
       "n_runs": 9,
       "latency_min": 200,
       "stale": false
+    },
+    {
+      "date": "2026-10-31",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-10-30",
+    "fetched": "2026-10-31",
     "list": [
-      {
-        "sym": "AMZN",
-        "next": "2026-10-29"
-      },
       {
         "sym": "AAPL",
         "next": "2026-11-02"
@@ -4866,5 +4877,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-10-30T15:57:54Z"
+  "updated_at": "2026-10-30T16:43:18Z"
 }
