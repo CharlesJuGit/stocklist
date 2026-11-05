@@ -1371,11 +1371,11 @@
       "yesterday": {
         "date": "2026-11-05",
         "high": 28668,
-        "low": 28168,
-        "range": 500
+        "low": 26732,
+        "range": 1936
       },
       "avg20": 649,
-      "category": "中",
+      "category": "高",
       "history": [
         {
           "date": "2026-10-09",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-11-05",
           "high": 28668,
-          "low": 28168,
-          "range": 500
+          "low": 26732,
+          "range": 1936
         }
       ]
     }
@@ -1820,8 +1820,8 @@
       "date": "2026-11-05",
       "twse_up": 167,
       "twse_down": 857,
-      "tpex_up": null,
-      "tpex_down": null
+      "tpex_up": 119,
+      "tpex_down": 714
     }
   ],
   "margin_ratio": [
@@ -1923,7 +1923,7 @@
     {
       "date": "2026-11-05",
       "twse": 155.73,
-      "tpex": null
+      "tpex": 147.6
     }
   ],
   "geo_stress_history": [
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-11-05",
-      "oil_z": 0.5084,
-      "yield_z": 1.2421,
-      "sp_z": 1.1676,
+      "oil_z": 0.5744,
+      "yield_z": 1.0842,
+      "sp_z": 0.6095,
       "hormuz_z": 1.52,
-      "composite": 0.5257
+      "composite": 0.6423
     }
   ],
   "basis": {
@@ -4796,6 +4796,14 @@
       "fut": "2026-11-05",
       "tx": "2026-11-05",
       "nq": "2026-11-05"
+    },
+    {
+      "at": "2026-11-06 00:40",
+      "trigger": "schedule",
+      "inst": "2026-11-05",
+      "fut": "2026-11-05",
+      "tx": "2026-11-05",
+      "nq": "2026-11-05"
     }
   ],
   "daily_summary": [
@@ -5099,11 +5107,18 @@
       "n_runs": 8,
       "latency_min": 284,
       "stale": false
+    },
+    {
+      "date": "2026-11-06",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-11-05",
+    "fetched": "2026-11-06",
     "list": [
       {
         "sym": "NVDA",
@@ -5125,5 +5140,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-11-05T13:05:14Z"
+  "updated_at": "2026-11-05T16:40:33Z"
 }
