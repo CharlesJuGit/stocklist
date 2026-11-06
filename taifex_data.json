@@ -1,29 +1,29 @@
 {
-  "date": "20261105",
+  "date": "20261106",
   "futures": {
-    "txF": -95651,
-    "txT": 90283,
-    "txD": 2330,
-    "mtxF": -1220,
-    "mtxT": -45,
-    "mtxD": -10998,
-    "tmxF": -11470,
+    "txF": -99930,
+    "txT": 90437,
+    "txD": 1680,
+    "mtxF": 913,
+    "mtxT": -60,
+    "mtxD": -6769,
+    "tmxF": -590,
     "tmxT": 0,
-    "tmxD": -55773
+    "tmxD": -44994
   },
   "options": {
-    "bc": 22536,
-    "sc": 23356,
-    "bp": 17546,
-    "sp": 15122,
-    "sp_amt": 2310640
+    "bc": 18367,
+    "sc": 18799,
+    "bp": 13490,
+    "sp": 10354,
+    "sp_amt": 2872605
   },
   "institute": {
-    "date": "20261105",
-    "foreign": -1024.6,
-    "trust": 225.9,
-    "dealer": -435.3,
-    "total": -1234.0
+    "date": "20261106",
+    "foreign": -911.9,
+    "trust": 266.9,
+    "dealer": -494.8,
+    "total": -1139.8
   },
   "settlement_date": "2026-11-18",
   "recent_settlement_dates": [
@@ -33,26 +33,6 @@
     "2026-11-18"
   ],
   "settlement_history": [
-    {
-      "date": "2026-08-07",
-      "txF": -87911,
-      "mtxF": -2804,
-      "bp": 15094,
-      "sp": 12587,
-      "sp_amt": null,
-      "bc": 8342,
-      "sc": 5916,
-      "fut_net": -88612,
-      "opt_net": 2507,
-      "pressure": 88612,
-      "tdays": 8,
-      "ratio": 11076,
-      "retail_total": 13782,
-      "opt_strategy": "偏多",
-      "foreign": -407.2,
-      "trust": -12.0,
-      "dealer": -9.7
-    },
     {
       "date": "2026-08-10",
       "txF": -89201,
@@ -1232,25 +1212,39 @@
       "foreign": -1024.6,
       "trust": 225.9,
       "dealer": -435.3
+    },
+    {
+      "date": "2026-11-06",
+      "txF": -99930,
+      "mtxF": 913,
+      "bp": 13490,
+      "sp": 10354,
+      "sp_amt": 2872605,
+      "bc": 18367,
+      "sc": 18799,
+      "fut_net": -99702,
+      "opt_net": 3136,
+      "pressure": 99702,
+      "tdays": 8,
+      "ratio": 12463,
+      "retail_total": 15033,
+      "opt_strategy": "偏空",
+      "foreign": -911.9,
+      "trust": 266.9,
+      "dealer": -494.8
     }
   ],
   "volatility": {
     "tx": {
       "yesterday": {
-        "date": "2026-11-05",
-        "high": 44274,
-        "low": 41666,
-        "range": 2608
+        "date": "2026-11-06",
+        "high": 42298,
+        "low": 37694,
+        "range": 4604
       },
-      "avg20": 1268,
+      "avg20": 1328,
       "category": "高",
       "history": [
-        {
-          "date": "2026-10-06",
-          "high": 50247,
-          "low": 49720,
-          "range": 527
-        },
         {
           "date": "2026-10-07",
           "high": 50265,
@@ -1364,15 +1358,21 @@
           "high": 44274,
           "low": 41666,
           "range": 2608
+        },
+        {
+          "date": "2026-11-06",
+          "high": 42298,
+          "low": 37694,
+          "range": 4604
         }
       ]
     },
     "nq": {
       "yesterday": {
         "date": "2026-11-06",
-        "high": 27137,
+        "high": 27252,
         "low": 26366,
-        "range": 771
+        "range": 886
       },
       "avg20": 720,
       "category": "大",
@@ -1493,20 +1493,14 @@
         },
         {
           "date": "2026-11-06",
-          "high": 27137,
+          "high": 27252,
           "low": 26366,
-          "range": 771
+          "range": 886
         }
       ]
     }
   },
   "market_volume": [
-    {
-      "date": "2026-09-18",
-      "twse": 11423,
-      "tpex": 2674,
-      "total": 14097
-    },
     {
       "date": "2026-09-21",
       "twse": 8668,
@@ -1680,16 +1674,15 @@
       "twse": 9870,
       "tpex": 1785,
       "total": 11655
+    },
+    {
+      "date": "2026-11-06",
+      "twse": 13210,
+      "tpex": 1638,
+      "total": 14848
     }
   ],
   "market_breadth": [
-    {
-      "date": "2026-10-09",
-      "twse_up": null,
-      "twse_down": null,
-      "tpex_up": 356,
-      "tpex_down": 416
-    },
     {
       "date": "2026-10-12",
       "twse_up": 538,
@@ -1822,6 +1815,13 @@
       "twse_down": 857,
       "tpex_up": 119,
       "tpex_down": 714
+    },
+    {
+      "date": "2026-11-06",
+      "twse_up": 105,
+      "twse_down": 952,
+      "tpex_up": null,
+      "tpex_down": null
     }
   ],
   "margin_ratio": [
@@ -1927,14 +1927,6 @@
     }
   ],
   "geo_stress_history": [
-    {
-      "date": "2026-10-09",
-      "oil_z": 0.8169,
-      "yield_z": 2.6865,
-      "sp_z": 1.6896,
-      "hormuz_z": 1.52,
-      "composite": 0.8335
-    },
     {
       "date": "2026-10-12",
       "oil_z": 0.9015,
@@ -2086,29 +2078,34 @@
       "sp_z": 0.3691,
       "hormuz_z": 1.52,
       "composite": 0.6988
+    },
+    {
+      "date": "2026-11-06",
+      "oil_z": 0.5985,
+      "yield_z": 1.0668,
+      "sp_z": 0.3274,
+      "hormuz_z": 1.52,
+      "composite": 0.7145
     }
   ],
   "basis": {
-    "date": "2026/11/05",
-    "spot": 41575,
+    "date": "2026/11/06",
+    "spot": 39702,
     "curve": [
       {
         "label": "11月",
-        "basis": 340
+        "basis": 84
       },
       {
         "label": "12月",
-        "basis": 408
+        "basis": 119
+      },
+      {
+        "label": "27/01",
+        "basis": 203
       }
     ],
     "history": [
-      {
-        "date": "2026/10/06",
-        "spot": 49823,
-        "near": 237,
-        "next": 421,
-        "quarter": null
-      },
       {
         "date": "2026/10/07",
         "spot": 49806,
@@ -2240,6 +2237,13 @@
         "spot": 41575,
         "near": 340,
         "next": 408,
+        "quarter": null
+      },
+      {
+        "date": "2026/11/06",
+        "spot": 39702,
+        "near": 84,
+        "next": 119,
         "quarter": null
       }
     ]
@@ -4844,6 +4848,14 @@
       "fut": "2026-11-05",
       "tx": "2026-11-05",
       "nq": "2026-11-05"
+    },
+    {
+      "at": "2026-11-06 20:01",
+      "trigger": "schedule",
+      "inst": "2026-11-06",
+      "fut": "2026-11-06",
+      "tx": "2026-11-06",
+      "nq": "2026-11-06"
     }
   ],
   "daily_summary": [
@@ -5150,9 +5162,9 @@
     },
     {
       "date": "2026-11-06",
-      "first_same_day_inst_at": null,
-      "n_runs": 6,
-      "latency_min": null,
+      "first_same_day_inst_at": "20:01",
+      "n_runs": 7,
+      "latency_min": 271,
       "stale": false
     }
   ],
@@ -5168,17 +5180,17 @@
   },
   "index_ytd": {
     "year": 2026,
-    "updated": "2026-11-05",
+    "updated": "2026-11-06",
     "otc": {
       "high": 459.56,
       "year": 2026
     },
     "mxf": {
       "high": 50265,
-      "last": 43397,
-      "date": "2026-11-05",
+      "last": 38970,
+      "date": "2026-11-06",
       "year": 2026
     }
   },
-  "updated_at": "2026-11-06T02:41:17Z"
+  "updated_at": "2026-11-06T12:01:35Z"
 }
