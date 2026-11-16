@@ -1371,11 +1371,11 @@
       "yesterday": {
         "date": "2026-11-16",
         "high": 28279,
-        "low": 27554,
-        "range": 725
+        "low": 27236,
+        "range": 1043
       },
       "avg20": 821,
-      "category": "中",
+      "category": "大",
       "history": [
         {
           "date": "2026-10-20",
@@ -1494,8 +1494,8 @@
         {
           "date": "2026-11-16",
           "high": 28279,
-          "low": 27554,
-          "range": 725
+          "low": 27236,
+          "range": 1043
         }
       ]
     }
@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-11-16",
-      "oil_z": 0.364,
-      "yield_z": 1.9007,
-      "sp_z": 0.8085,
+      "oil_z": 0.2316,
+      "yield_z": 1.7844,
+      "sp_z": 0.4432,
       "hormuz_z": 1.52,
-      "composite": 0.744
+      "composite": 0.7732
     }
   ],
   "basis": {
@@ -5248,6 +5248,14 @@
       "fut": "2026-11-16",
       "tx": "2026-11-16",
       "nq": "2026-11-16"
+    },
+    {
+      "at": "2026-11-17 02:47",
+      "trigger": "schedule",
+      "inst": "2026-11-16",
+      "fut": "2026-11-16",
+      "tx": "2026-11-16",
+      "nq": "2026-11-16"
     }
   ],
   "daily_summary": [
@@ -5614,11 +5622,18 @@
       "n_runs": 2,
       "latency_min": 310,
       "stale": false
+    },
+    {
+      "date": "2026-11-17",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
   "earnings": {
-    "fetched": "2026-11-16",
+    "fetched": "2026-11-17",
     "list": [
       {
         "sym": "NVDA",
@@ -5640,5 +5655,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-11-16T13:34:20Z"
+  "updated_at": "2026-11-16T18:47:54Z"
 }
