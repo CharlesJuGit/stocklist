@@ -2081,11 +2081,11 @@
     },
     {
       "date": "2026-11-26",
-      "oil_z": 0.1216,
+      "oil_z": 0.1378,
       "yield_z": 0.9327,
       "sp_z": -0.1979,
       "hormuz_z": 1.52,
-      "composite": 0.693
+      "composite": 0.6971
     }
   ],
   "basis": {
@@ -2245,14 +2245,6 @@
     ]
   },
   "update_log": [
-    {
-      "at": "2026-09-17 17:56",
-      "trigger": "schedule",
-      "inst": "2026-09-17",
-      "fut": "2026-09-17",
-      "tx": "2026-09-17",
-      "nq": "2026-09-17"
-    },
     {
       "at": "2026-09-17 21:41",
       "trigger": "schedule",
@@ -5444,6 +5436,14 @@
       "fut": "2026-11-26",
       "tx": "2026-11-26",
       "nq": "2026-11-26"
+    },
+    {
+      "at": "2026-11-27 02:33",
+      "trigger": "schedule",
+      "inst": "2026-11-26",
+      "fut": "2026-11-26",
+      "tx": "2026-11-26",
+      "nq": "2026-11-26"
     }
   ],
   "daily_summary": [
@@ -5873,6 +5873,13 @@
       "n_runs": 8,
       "latency_min": 380,
       "stale": false
+    },
+    {
+      "date": "2026-11-27",
+      "first_same_day_inst_at": null,
+      "n_runs": 1,
+      "latency_min": null,
+      "stale": false
     }
   ],
   "stale": false,
@@ -5899,5 +5906,5 @@
       "year": 2026
     }
   },
-  "updated_at": "2026-11-26T15:03:11Z"
+  "updated_at": "2026-11-26T18:35:02Z"
 }
